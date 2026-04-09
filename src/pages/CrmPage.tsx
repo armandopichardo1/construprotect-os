@@ -20,7 +20,6 @@ export default function CrmPage() {
   const [tab, setTab] = useState<Tab>('pipeline');
   const queryClient = useQueryClient();
 
-  // Dialog state
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [showDealDialog, setShowDealDialog] = useState(false);
@@ -29,7 +28,6 @@ export default function CrmPage() {
   const [editActivity, setEditActivity] = useState<Activity | null>(null);
   const [deleteItem, setDeleteItem] = useState<{ type: 'contact' | 'deal' | 'activity' | 'quote'; item: any } | null>(null);
 
-  // Queries
   const { data: contacts = [] } = useQuery({
     queryKey: ['crm-contacts'],
     queryFn: async () => {
@@ -66,40 +64,36 @@ export default function CrmPage() {
     },
   });
 
-  // Actions
   const handleNewForTab = () => {
     if (tab === 'contacts') { setEditContact(null); setShowContactDialog(true); }
     else if (tab === 'pipeline') { setEditDeal(null); setShowDealDialog(true); }
     else if (tab === 'agenda') { setEditActivity(null); setShowActivityDialog(true); }
-    else { /* quotes: todo */ }
   };
 
   const NEW_LABELS: Record<Tab, string> = { pipeline: 'Deal', contacts: 'Contacto', agenda: 'Actividad', quotes: 'Cotización' };
 
   return (
     <AppLayout>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-foreground">CRM</h1>
-          <Button size="sm" className="h-8 text-xs rounded-xl" onClick={handleNewForTab}>
-            <Plus className="w-3.5 h-3.5 mr-1" />{NEW_LABELS[tab]}
+      <div className="space-y-5">
+        <div className="flex items-center gap-4">
+          <div className="flex gap-1 rounded-xl bg-muted p-1">
+            {([
+              { key: 'pipeline' as Tab, label: 'Pipeline' },
+              { key: 'contacts' as Tab, label: 'Contactos' },
+              { key: 'agenda' as Tab, label: 'Agenda' },
+              { key: 'quotes' as Tab, label: 'Cotizaciones' },
+            ]).map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} className={cn(
+                'rounded-lg px-4 py-1.5 text-xs font-medium transition-colors',
+                tab === t.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              )}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" onClick={handleNewForTab}>
+            <Plus className="w-3.5 h-3.5 mr-1" /> {NEW_LABELS[tab]}
           </Button>
-        </div>
-
-        <div className="flex gap-1 rounded-xl bg-muted p-1">
-          {([
-            { key: 'pipeline' as Tab, label: 'Pipeline' },
-            { key: 'contacts' as Tab, label: 'Contactos' },
-            { key: 'agenda' as Tab, label: 'Agenda' },
-            { key: 'quotes' as Tab, label: 'Cotizaciones' },
-          ]).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={cn(
-              'flex-1 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors',
-              tab === t.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-            )}>
-              {t.label}
-            </button>
-          ))}
         </div>
 
         {tab === 'pipeline' && (
@@ -131,7 +125,6 @@ export default function CrmPage() {
         )}
       </div>
 
-      {/* Dialogs */}
       <ContactDialog open={showContactDialog} onOpenChange={(v) => { setShowContactDialog(v); if (!v) setEditContact(null); }} queryClient={queryClient} editContact={editContact} />
       <DealDialog open={showDealDialog} onOpenChange={(v) => { setShowDealDialog(v); if (!v) setEditDeal(null); }} contacts={contacts} queryClient={queryClient} editDeal={editDeal} />
       <ActivityDialog open={showActivityDialog} onOpenChange={(v) => { setShowActivityDialog(v); if (!v) setEditActivity(null); }} contacts={contacts} deals={deals} queryClient={queryClient} editActivity={editActivity} />

@@ -44,20 +44,22 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-[380px] space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-foreground">🏗️ ConstruProtect OS</h1>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-3">
+          <span className="text-5xl block">🏗️</span>
+          <h1 className="text-3xl font-bold text-foreground">ConstruProtect OS</h1>
           <p className="text-sm text-muted-foreground">
-            {isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
+            {isSignUp ? 'Crear cuenta' : 'Iniciar sesión en el sistema'}
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-card border border-border p-6">
           {isSignUp && (
             <Input
               placeholder="Nombre completo"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+              className="h-11"
             />
           )}
           <Input
@@ -66,6 +68,7 @@ export default function LoginPage() {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoCapitalize="none"
+            className="h-11"
           />
           <Input
             type="password"
@@ -74,8 +77,9 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
+            className="h-11"
           />
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full h-11 text-sm" disabled={loading}>
             {loading ? 'Cargando...' : isSignUp ? 'Registrarse' : 'Entrar'}
           </Button>
         </form>

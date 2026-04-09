@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 
-const tabs = ['Stock', 'Productos', 'Analytics', 'Envíos', 'ABC'];
+const tabs = ['Stock', 'Analytics', 'Envíos', 'ABC'];
 const productCategories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
+const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const shipments = [
   { id: 'ENV-2847', supplier: 'Porcelanosa España', items: 12, eta: '2026-04-18', step: 2, steps: ['Ordenado', 'Tránsito', 'Aduanas', 'Almacén', 'Recibido'] },
@@ -40,10 +42,10 @@ function MiniSparkline({ data }: { data: number[] }) {
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min || 1;
-  const points = data.map((v, i) => `${(i / Math.max(data.length - 1, 1)) * 50},${20 - ((v - min) / range) * 18}`).join(' ');
+  const points = data.map((v, i) => `${(i / Math.max(data.length - 1, 1)) * 60},${20 - ((v - min) / range) * 18}`).join(' ');
   const trending = data[data.length - 1] >= data[0];
   return (
-    <svg width="50" height="22" className="shrink-0">
+    <svg width="60" height="22" className="shrink-0">
       <polyline points={points} fill="none" stroke={trending ? 'hsl(160, 84%, 39%)' : 'hsl(0, 84%, 60%)'} strokeWidth="1.5" />
     </svg>
   );
@@ -57,34 +59,7 @@ type StockItem = {
 export default function InventarioPage() {
   const [tab, setTab] = useState('Stock');
   const [filter, setFilter] = useState('all');
-  const [prodSearch, setProdSearch] = useState('');
-  const [prodCatFilter, setProdCatFilter] = useState('');
-  const [prodDialogOpen, setProdDialogOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
-
-  const { data: allProducts = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('name');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const addProductMutation = useMutation({
-    mutationFn: async (product: any) => {
-      const { error } = await supabase.from('products').insert(product);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-      setProdDialogOpen(false);
-      toast.success('Producto creado');
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
 
   const { data: stockData } = useQuery({
     queryKey: ['inventory-stock'],
@@ -97,8 +72,6 @@ export default function InventarioPage() {
       if (!inv || !products) return [];
 
       const productMap = Object.fromEntries(products.map(p => [p.id, p]));
-
-      // Build monthly movement sums per product (last 6 months)
       const movementsByProduct: Record<string, number[]> = {};
       const now = new Date();
       (movements || []).forEach(m => {
@@ -144,7 +117,6 @@ export default function InventarioPage() {
     return (order[a.status as keyof typeof order] ?? 4) - (order[b.status as keyof typeof order] ?? 4);
   });
 
-  // Analytics data
   const categoryValues = useMemo(() => {
     const cats: Record<string, number> = {};
     items.forEach(i => { cats[i.category] = (cats[i.category] || 0) + i.value; });
@@ -161,10 +133,9 @@ export default function InventarioPage() {
         return { name: i.name, days: Math.min(days, 120), color: days < 15 ? 'hsl(0, 84%, 60%)' : days < 30 ? 'hsl(38, 92%, 50%)' : 'hsl(160, 84%, 39%)' };
       })
       .sort((a, b) => a.days - b.days)
-      .slice(0, 8);
+      .slice(0, 10);
   }, [items]);
 
-  // ABC
   const abcGroups = useMemo(() => {
     const byValue = [...items].sort((a, b) => b.value - a.value);
     const total = byValue.reduce((s, i) => s + i.value, 0);
@@ -181,80 +152,74 @@ export default function InventarioPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-4">
-        <h1 className="text-lg font-bold text-foreground">Inventario</h1>
-
-        <div className="flex gap-1 rounded-xl bg-muted p-1">
+      <div className="space-y-5">
+        <div className="flex gap-2 rounded-xl bg-muted p-1 w-fit">
           {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} className={cn('flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors', tab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+            <button key={t} onClick={() => setTab(t)} className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors', tab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
               {t}
             </button>
           ))}
         </div>
 
         {tab === 'Stock' && (
-          <div className="space-y-3">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
               {([['all', 'Todos'], ['ok', '🟢 OK'], ['low', '🟡 Bajo'], ['out', '🔴 Agotado'], ['excess', '🟠 Exceso']] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setFilter(key)}
-                  className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors',
+                  className={cn('rounded-full px-3 py-1 text-xs font-medium border transition-colors',
                     filter === key ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border')}>
                   {label} ({counts[key]})
                 </button>
               ))}
             </div>
-            {sorted.map(item => (
-              <div key={item.id} className="rounded-xl bg-card border border-border p-3 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{item.sku} · {item.category}</p>
-                  </div>
-                  <StatusBadge status={item.status} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-lg font-bold text-foreground">{item.qty}</p>
-                      <p className="text-[10px] text-muted-foreground">en stock</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Reorden: {item.reorder}</p>
-                  </div>
-                  <MiniSparkline data={item.movements} />
-                </div>
-              </div>
-            ))}
-            {sorted.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Sin productos en inventario</p>}
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">SKU</TableHead>
+                    <TableHead className="text-xs">Producto</TableHead>
+                    <TableHead className="text-xs">Categoría</TableHead>
+                    <TableHead className="text-xs text-right">Stock</TableHead>
+                    <TableHead className="text-xs text-right">Reorden</TableHead>
+                    <TableHead className="text-xs text-right">Valor</TableHead>
+                    <TableHead className="text-xs">Estado</TableHead>
+                    <TableHead className="text-xs">Tendencia</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sorted.map(item => (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{item.sku}</TableCell>
+                      <TableCell className="text-xs font-medium">{item.name}</TableCell>
+                      <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{item.category}</span></TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{item.qty}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.reorder}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
+                      <TableCell><StatusBadge status={item.status} /></TableCell>
+                      <TableCell><MiniSparkline data={item.movements} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {sorted.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Sin productos en inventario</p>}
+            </div>
           </div>
         )}
 
-        {tab === 'Productos' && <ProductosTab
-          products={allProducts}
-          search={prodSearch}
-          setSearch={setProdSearch}
-          catFilter={prodCatFilter}
-          setCatFilter={setProdCatFilter}
-          dialogOpen={prodDialogOpen}
-          setDialogOpen={setProdDialogOpen}
-          importOpen={importOpen}
-          setImportOpen={setImportOpen}
-          addMutation={addProductMutation}
-        />}
-
         {tab === 'Analytics' && (
-          <div className="space-y-4">
-            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Valor de Inventario por Categoría</h2>
-              <div className="flex items-center gap-4">
-                <ResponsiveContainer width={120} height={120}>
-                  <PieChart><Pie data={categoryValues} innerRadius={35} outerRadius={55} dataKey="value" stroke="none">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+              <h2 className="text-sm font-semibold text-foreground">Valor por Categoría</h2>
+              <div className="flex items-center gap-6">
+                <ResponsiveContainer width={160} height={160}>
+                  <PieChart><Pie data={categoryValues} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                     {categoryValues.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie></PieChart>
+                  </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
                 </ResponsiveContainer>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {categoryValues.map(c => (
                     <div key={c.name} className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
+                      <div className="h-3 w-3 rounded-full shrink-0" style={{ background: c.color }} />
                       <span className="text-xs text-foreground">{c.name}</span>
                       <span className="text-xs text-muted-foreground ml-auto">{formatUSD(c.value)}</span>
                     </div>
@@ -262,9 +227,9 @@ export default function InventarioPage() {
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+            <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
               <h2 className="text-sm font-semibold text-foreground">Días de Suministro</h2>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {daysOfSupply.map(d => (
                   <div key={d.name} className="space-y-1">
                     <div className="flex justify-between text-xs">
@@ -282,9 +247,9 @@ export default function InventarioPage() {
         )}
 
         {tab === 'Envíos' && (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {shipments.map(s => (
-              <div key={s.id} className="rounded-2xl bg-card border border-border p-4 space-y-3">
+              <div key={s.id} className="rounded-2xl bg-card border border-border p-5 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{s.id}</p>
@@ -292,7 +257,7 @@ export default function InventarioPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{s.items} ítems</p>
-                    <p className="text-xs text-primary">ETA: {s.eta}</p>
+                    <p className="text-xs text-primary font-medium">ETA: {s.eta}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -309,22 +274,22 @@ export default function InventarioPage() {
         )}
 
         {tab === 'ABC' && (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {([['A', abcGroups.A, '70% del valor', 'bg-primary/15 text-primary'] as const,
               ['B', abcGroups.B, '20% del valor', 'bg-warning/15 text-warning'] as const,
               ['C', abcGroups.C, '10% del valor', 'bg-muted text-muted-foreground'] as const,
             ]).map(([tier, group, desc, style]) => (
-              <div key={tier} className="rounded-2xl bg-card border border-border p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className={cn('h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold', style)}>{tier}</span>
+              <div key={tier} className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className={cn('h-10 w-10 rounded-lg flex items-center justify-center text-lg font-bold', style)}>{tier}</span>
                   <div>
                     <p className="text-sm font-semibold text-foreground">Clase {tier} — {desc}</p>
-                    <p className="text-[10px] text-muted-foreground">{group.length} productos</p>
+                    <p className="text-xs text-muted-foreground">{group.length} productos</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {group.map(i => (
-                    <span key={i.sku} className="rounded-full bg-muted px-2.5 py-1 text-[10px] text-foreground">{i.name}</span>
+                    <span key={i.sku} className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground">{i.name}</span>
                   ))}
                 </div>
               </div>
@@ -333,93 +298,5 @@ export default function InventarioPage() {
         )}
       </div>
     </AppLayout>
-  );
-}
-
-function ProductosTab({ products, search, setSearch, catFilter, setCatFilter, dialogOpen, setDialogOpen, importOpen, setImportOpen, addMutation }: any) {
-  const filtered = products.filter((p: any) => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !catFilter || p.category === catFilter;
-    return matchSearch && matchCat;
-  });
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    addMutation.mutate({
-      sku: fd.get('sku'), name: fd.get('name'), brand: fd.get('brand'), category: fd.get('category'),
-      unit_cost_usd: Number(fd.get('unit_cost_usd')) || 0, price_list_usd: Number(fd.get('price_list_usd')) || 0,
-      price_architect_usd: Number(fd.get('price_architect_usd')) || 0, price_project_usd: Number(fd.get('price_project_usd')) || 0,
-      price_wholesale_usd: Number(fd.get('price_wholesale_usd')) || 0, reorder_point: Number(fd.get('reorder_point')) || 10,
-      coverage_m2: Number(fd.get('coverage_m2')) || null,
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="text-xs">📥 Excel</Button>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild><Button size="sm" className="text-xs">+ Nuevo</Button></DialogTrigger>
-          <DialogContent className="max-h-[85vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nuevo Producto</DialogTitle></DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <Input name="sku" placeholder="SKU *" required />
-              <Input name="name" placeholder="Nombre *" required />
-              <Input name="brand" placeholder="Marca" />
-              <select name="category" className="w-full rounded-lg bg-input border border-border px-3 py-2 text-sm text-foreground">
-                <option value="">Categoría</option>
-                {productCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div className="grid grid-cols-2 gap-2">
-                <Input name="unit_cost_usd" type="number" step="0.01" placeholder="Costo USD" />
-                <Input name="price_list_usd" type="number" step="0.01" placeholder="Precio Lista" />
-                <Input name="price_architect_usd" type="number" step="0.01" placeholder="Precio Arquitecto" />
-                <Input name="price_project_usd" type="number" step="0.01" placeholder="Precio Proyecto" />
-                <Input name="price_wholesale_usd" type="number" step="0.01" placeholder="Precio Mayoreo" />
-                <Input name="coverage_m2" type="number" step="0.01" placeholder="Cobertura m²" />
-                <Input name="reorder_point" type="number" placeholder="Punto reorden" />
-              </div>
-              <Button type="submit" className="w-full" disabled={addMutation.isPending}>
-                {addMutation.isPending ? 'Guardando...' : 'Guardar'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Input placeholder="Buscar por nombre o SKU..." value={search} onChange={(e) => setSearch(e.target.value)} />
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button onClick={() => setCatFilter('')} className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors', !catFilter ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border')}>Todos</button>
-        {productCategories.map(c => (
-          <button key={c} onClick={() => setCatFilter(c)} className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors', catFilter === c ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border')}>{c}</button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground py-8">No hay productos</p>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((p: any) => (
-            <div key={p.id} className="rounded-xl bg-card border border-border p-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{p.sku} · {p.brand || '—'} · {p.category || '—'}</p>
-                </div>
-                <p className="text-sm font-bold text-primary">{formatUSD(Number(p.price_list_usd))}</p>
-              </div>
-              <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-                <span>Costo: {formatUSD(Number(p.unit_cost_usd))}</span>
-                <span>Arq: {formatUSD(Number(p.price_architect_usd))}</span>
-                <span>Proy: {formatUSD(Number(p.price_project_usd))}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <ExcelImportDialog open={importOpen} onOpenChange={setImportOpen} />
-    </div>
   );
 }
