@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatUSD } from '@/lib/format';
+import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 
 const categories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
 
@@ -14,6 +15,7 @@ export default function ProductosPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery({
@@ -65,8 +67,9 @@ export default function ProductosPage() {
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-foreground">Productos</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-foreground flex-1">Productos</h1>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="text-xs">📥 Excel</Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm">+ Nuevo</Button>
@@ -148,6 +151,7 @@ export default function ProductosPage() {
             ))}
           </div>
         )}
+        <ExcelImportDialog open={importOpen} onOpenChange={setImportOpen} />
       </div>
     </AppLayout>
   );
