@@ -295,7 +295,7 @@ function NewOppDialog({ open, onOpenChange, clients, queryClient }: { open: bool
     const { error } = await supabase.from('crm_opportunities').insert({
       client_id: form.client_id,
       title: form.title.trim(),
-      stage: form.stage as any,
+      stage: form.stage as "prospecto" | "contactado" | "cotizado" | "negociacion" | "cerrado_ganado" | "cerrado_perdido",
       value_usd: Number(form.value_usd) || 0,
       probability_pct: Number(form.probability_pct) || 50,
       notes: form.notes.trim() || null,
