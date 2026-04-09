@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatUSD } from '@/lib/format';
+import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 
 const categories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
 
@@ -14,6 +15,7 @@ export default function ProductosPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery({
