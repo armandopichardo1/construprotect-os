@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
@@ -11,10 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { toast } from 'sonner';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import ReactMarkdown from 'react-markdown';
-import { Bot, Send, X, Check } from 'lucide-react';
+import { Bot, Send, X, Check, Pencil, Trash2 } from 'lucide-react';
 
 const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
@@ -130,7 +131,6 @@ export default function FinanzasPage() {
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
-            {/* KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: 'Ingresos MTD', value: formatUSD(revenueMTD), color: 'text-primary' },
@@ -145,7 +145,6 @@ export default function FinanzasPage() {
               ))}
             </div>
 
-            {/* Charts grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 rounded-2xl bg-card border border-border p-5 space-y-4">
                 <h2 className="text-sm font-semibold text-foreground">Ingresos vs Costos vs Gastos</h2>
@@ -182,7 +181,6 @@ export default function FinanzasPage() {
               )}
             </div>
 
-            {/* Profit trend full width */}
             <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
               <h2 className="text-sm font-semibold text-foreground">Tendencia de Utilidad</h2>
               <ResponsiveContainer width="100%" height={200}>
@@ -208,11 +206,27 @@ export default function FinanzasPage() {
   );
 }
 
+// ============ VENTAS TAB ============
 function VentasTab({ sales, queryClient, rate }: any) {
   const [showForm, setShowForm] = useState(false);
+  const [editSale, setEditSale] = useState<any>(null);
+  const [deleteSale, setDeleteSale] = useState<any>(null);
+
+  const handleDeleteSale = async () => {
+    if (!deleteSale) return;
+    // Delete sale items first, then sale
+    await supabase.from('sale_items').delete().eq('sale_id', deleteSale.id);
+    const { error } = await supabase.from('sales').delete().eq('id', deleteSale.id);
+    if (error) { toast.error('Error al eliminar venta'); throw error; }
+    toast.success('Venta eliminada');
+    queryClient.invalidateQueries({ queryKey: ['sales'] });
+    queryClient.invalidateQueries({ queryKey: ['sale-items'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+  };
+
   return (
     <div className="space-y-4">
-      <Button size="sm" onClick={() => setShowForm(true)}>+ Nueva Venta</Button>
+      <Button size="sm" onClick={() => { setEditSale(null); setShowForm(true); }}>+ Nueva Venta</Button>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -220,9 +234,12 @@ function VentasTab({ sales, queryClient, rate }: any) {
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
               <TableHead className="text-xs">Ref.</TableHead>
+              <TableHead className="text-xs text-right">Subtotal</TableHead>
+              <TableHead className="text-xs text-right">ITBIS</TableHead>
               <TableHead className="text-xs text-right">Total USD</TableHead>
               <TableHead className="text-xs">Estado</TableHead>
               <TableHead className="text-xs">Productos</TableHead>
+              <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -231,15 +248,26 @@ function VentasTab({ sales, queryClient, rate }: any) {
                 <TableCell className="text-xs">{s.date}</TableCell>
                 <TableCell className="text-xs font-medium">{s.crm_clients?.name || '—'}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.invoice_ref || '—'}</TableCell>
+                <TableCell className="text-xs text-right font-mono">{formatUSD(Number(s.subtotal_usd))}</TableCell>
+                <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(Number(s.itbis_usd))}</TableCell>
                 <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(Number(s.total_usd))}</TableCell>
                 <TableCell>
-                  <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium',
-                    s.payment_status === 'paid' ? 'bg-success/15 text-success' :
-                    s.payment_status === 'overdue' ? 'bg-destructive/15 text-destructive' : 'bg-warning/15 text-warning'
-                  )}>{s.payment_status === 'paid' ? 'Pagado' : s.payment_status === 'overdue' ? 'Vencido' : 'Pendiente'}</span>
+                  <SaleStatusSelect sale={s} queryClient={queryClient} />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                   {s.sale_items?.map((si: any) => `${si.products?.name || '?'} ×${si.quantity}`).join(', ') || '—'}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setEditSale(s); setShowForm(true); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteSale(s)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -247,19 +275,75 @@ function VentasTab({ sales, queryClient, rate }: any) {
         </Table>
         {sales.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay ventas registradas</p>}
       </div>
-      <SaleFormDialog open={showForm} onOpenChange={setShowForm} queryClient={queryClient} rate={rate} />
+      <SaleFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) setEditSale(null); }} queryClient={queryClient} rate={rate} editSale={editSale} />
+      <DeleteConfirmDialog
+        open={!!deleteSale}
+        onOpenChange={(v) => { if (!v) setDeleteSale(null); }}
+        title="Eliminar venta"
+        description={`¿Eliminar la venta <strong>${deleteSale?.invoice_ref || deleteSale?.date || ''}</strong> por <strong>${formatUSD(Number(deleteSale?.total_usd || 0))}</strong>? Se eliminarán todos los ítems asociados. Esta acción no se puede deshacer.`}
+        onConfirm={handleDeleteSale}
+      />
     </div>
   );
 }
 
-function SaleFormDialog({ open, onOpenChange, queryClient, rate }: any) {
+function SaleStatusSelect({ sale, queryClient }: { sale: any; queryClient: any }) {
+  const statusMap: Record<string, { label: string; style: string }> = {
+    paid: { label: 'Pagado', style: 'bg-success/15 text-success' },
+    pending: { label: 'Pendiente', style: 'bg-warning/15 text-warning' },
+    overdue: { label: 'Vencido', style: 'bg-destructive/15 text-destructive' },
+    partial: { label: 'Parcial', style: 'bg-primary/15 text-primary' },
+    cancelled: { label: 'Cancelado', style: 'bg-muted text-muted-foreground' },
+  };
+
+  const handleChange = async (status: string) => {
+    const update: any = { payment_status: status };
+    if (status === 'paid') update.payment_date = new Date().toISOString().split('T')[0];
+    const { error } = await supabase.from('sales').update(update).eq('id', sale.id);
+    if (error) { toast.error('Error al actualizar estado'); return; }
+    toast.success('Estado actualizado');
+    queryClient.invalidateQueries({ queryKey: ['sales'] });
+  };
+
+  const current = statusMap[sale.payment_status] || statusMap.pending;
+  return (
+    <Select value={sale.payment_status} onValueChange={handleChange}>
+      <SelectTrigger className={cn('h-6 text-[10px] px-2 rounded-full border-0 w-auto min-w-[80px]', current.style)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(statusMap).map(([k, v]) => (
+          <SelectItem key={k} value={k} className="text-xs">{v.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any) {
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
   const [items, setItems] = useState([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
   const [saving, setSaving] = useState(false);
+  const isEdit = !!editSale;
 
   const { data: clients = [] } = useQuery({ queryKey: ['crm-clients'], queryFn: async () => { const { data } = await supabase.from('crm_clients').select('*'); return data || []; } });
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true); return data || []; } });
+
+  useEffect(() => {
+    if (editSale) {
+      setContactId(editSale.contact_id || '');
+      setInvoiceRef(editSale.invoice_ref || '');
+      if (editSale.sale_items?.length) {
+        setItems(editSale.sale_items.map((si: any) => ({
+          product_id: si.product_id || '', quantity: si.quantity, unit_price_usd: Number(si.unit_price_usd),
+        })));
+      }
+    } else {
+      setContactId(''); setInvoiceRef('');
+      setItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+    }
+  }, [editSale, open]);
 
   const subtotal = items.reduce((s, i) => s + i.unit_price_usd * i.quantity, 0);
   const itbis = subtotal * 0.18;
@@ -270,18 +354,32 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate }: any) {
     if (!contactId) { toast.error('Selecciona un cliente'); return; }
     if (items.some(i => !i.product_id)) { toast.error('Selecciona productos'); return; }
     setSaving(true);
-    const { data: sale, error } = await supabase.from('sales').insert({
+
+    const salePayload = {
       contact_id: contactId, invoice_ref: invoiceRef || null,
       subtotal_usd: subtotal, itbis_usd: itbis, total_usd: total,
       total_dop: total * xr, exchange_rate: xr, payment_status: 'pending' as any,
-    }).select().single();
-    if (error || !sale) { toast.error('Error'); setSaving(false); return; }
+    };
+
+    let saleId: string;
+
+    if (isEdit) {
+      const { error } = await supabase.from('sales').update(salePayload).eq('id', editSale.id);
+      if (error) { toast.error('Error al actualizar'); setSaving(false); return; }
+      saleId = editSale.id;
+      // Delete old items and re-insert
+      await supabase.from('sale_items').delete().eq('sale_id', saleId);
+    } else {
+      const { data: sale, error } = await supabase.from('sales').insert(salePayload).select().single();
+      if (error || !sale) { toast.error('Error'); setSaving(false); return; }
+      saleId = sale.id;
+    }
 
     const saleItemsData = items.map(i => {
       const prod = products.find((p: any) => p.id === i.product_id);
       const costUsd = Number(prod?.unit_cost_usd || 0);
       return {
-        sale_id: sale.id, product_id: i.product_id, quantity: i.quantity,
+        sale_id: saleId, product_id: i.product_id, quantity: i.quantity,
         unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
         line_total_usd: i.unit_price_usd * i.quantity,
         margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
@@ -289,29 +387,30 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate }: any) {
     });
     await supabase.from('sale_items').insert(saleItemsData);
 
-    for (const item of items) {
-      const { data: inv } = await supabase.from('inventory').select('*').eq('product_id', item.product_id).limit(1).single();
-      if (inv) await supabase.from('inventory').update({ quantity_on_hand: Math.max(0, inv.quantity_on_hand - item.quantity) }).eq('id', inv.id);
-      await supabase.from('inventory_movements').insert({
-        product_id: item.product_id, movement_type: 'sale' as any, quantity: -item.quantity,
-        unit_cost_usd: Number(products.find((p: any) => p.id === item.product_id)?.unit_cost_usd || 0),
-        reference_id: sale.id, reference_type: 'sale',
-      });
+    if (!isEdit) {
+      for (const item of items) {
+        const { data: inv } = await supabase.from('inventory').select('*').eq('product_id', item.product_id).limit(1).single();
+        if (inv) await supabase.from('inventory').update({ quantity_on_hand: Math.max(0, inv.quantity_on_hand - item.quantity) }).eq('id', inv.id);
+        await supabase.from('inventory_movements').insert({
+          product_id: item.product_id, movement_type: 'sale' as any, quantity: -item.quantity,
+          unit_cost_usd: Number(products.find((p: any) => p.id === item.product_id)?.unit_cost_usd || 0),
+          reference_id: saleId, reference_type: 'sale',
+        });
+      }
     }
 
     setSaving(false);
-    toast.success('Venta registrada');
+    toast.success(isEdit ? 'Venta actualizada' : 'Venta registrada');
     queryClient.invalidateQueries({ queryKey: ['sales'] });
     queryClient.invalidateQueries({ queryKey: ['sale-items'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
     onOpenChange(false);
-    setItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Nueva Venta</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? 'Editar Venta' : 'Nueva Venta'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -336,6 +435,11 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate }: any) {
                 </Select>
                 <Input type="number" value={item.quantity} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" placeholder="Cant." />
                 <Input type="number" value={item.unit_price_usd} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price_usd: Number(e.target.value) } : it))} className="w-24" step="0.01" placeholder="Precio" />
+                {items.length > 1 && (
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
             <Button variant="ghost" size="sm" onClick={() => setItems(prev => [...prev, { product_id: '', quantity: 1, unit_price_usd: 0 }])}>+ Línea</Button>
@@ -346,18 +450,30 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate }: any) {
             <div className="flex justify-between font-bold"><span>Total USD</span><span>{formatUSD(total)}</span></div>
             <div className="flex justify-between text-muted-foreground"><span>Total DOP</span><span>RD${(total * xr).toLocaleString('es-DO', { minimumFractionDigits: 0 })}</span></div>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : 'Registrar Venta'}</Button>
+          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Venta'}</Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
+// ============ GASTOS TAB ============
 function GastosTab({ expenses, queryClient, rate }: any) {
   const [showForm, setShowForm] = useState(false);
+  const [editExpense, setEditExpense] = useState<any>(null);
+  const [deleteExpense, setDeleteExpense] = useState<any>(null);
+
+  const handleDeleteExpense = async () => {
+    if (!deleteExpense) return;
+    const { error } = await supabase.from('expenses').delete().eq('id', deleteExpense.id);
+    if (error) { toast.error('Error al eliminar gasto'); throw error; }
+    toast.success('Gasto eliminado');
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+  };
+
   return (
     <div className="space-y-4">
-      <Button size="sm" onClick={() => setShowForm(true)}>+ Nuevo Gasto</Button>
+      <Button size="sm" onClick={() => { setEditExpense(null); setShowForm(true); }}>+ Nuevo Gasto</Button>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -366,7 +482,9 @@ function GastosTab({ expenses, queryClient, rate }: any) {
               <TableHead className="text-xs">Categoría</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Proveedor</TableHead>
-              <TableHead className="text-xs text-right">Monto USD</TableHead>
+              <TableHead className="text-xs text-right">USD</TableHead>
+              <TableHead className="text-xs text-right">DOP</TableHead>
+              <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -375,10 +493,23 @@ function GastosTab({ expenses, queryClient, rate }: any) {
               return (
                 <TableRow key={e.id}>
                   <TableCell className="text-xs">{e.date}</TableCell>
-                  <TableCell className="text-xs">{cat.icon} {cat.label}</TableCell>
+                  <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
                   <TableCell className="text-xs font-medium">{e.description}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(Number(e.amount_usd))}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">RD${Number(e.amount_dop).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <button onClick={() => { setEditExpense(e); setShowForm(true); }}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteExpense(e)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -386,40 +517,66 @@ function GastosTab({ expenses, queryClient, rate }: any) {
         </Table>
         {expenses.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay gastos registrados</p>}
       </div>
-      <ExpenseFormDialog open={showForm} onOpenChange={setShowForm} queryClient={queryClient} rate={rate} />
+      <ExpenseFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) setEditExpense(null); }} queryClient={queryClient} rate={rate} editExpense={editExpense} />
+      <DeleteConfirmDialog
+        open={!!deleteExpense}
+        onOpenChange={(v) => { if (!v) setDeleteExpense(null); }}
+        title="Eliminar gasto"
+        description={`¿Eliminar el gasto <strong>${deleteExpense?.description || ''}</strong> por <strong>${formatUSD(Number(deleteExpense?.amount_usd || 0))}</strong>? Esta acción no se puede deshacer.`}
+        onConfirm={handleDeleteExpense}
+      />
     </div>
   );
 }
 
-function ExpenseFormDialog({ open, onOpenChange, queryClient, rate }: any) {
+function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense }: any) {
   const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
+  const isEdit = !!editExpense;
+
+  useEffect(() => {
+    if (editExpense) {
+      setForm({
+        description: editExpense.description || '',
+        category: editExpense.category || 'other',
+        vendor: editExpense.vendor || '',
+        amount_usd: String(editExpense.amount_usd || ''),
+        amount_dop: String(editExpense.amount_dop || ''),
+      });
+    } else {
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
+    }
+  }, [editExpense, open]);
 
   const handleSave = async () => {
     if (!form.description.trim()) { toast.error('Descripción requerida'); return; }
     setSaving(true);
     const amtUsd = Number(form.amount_usd) || (Number(form.amount_dop) / xr);
     const amtDop = Number(form.amount_dop) || (Number(form.amount_usd) * xr);
-    const { error } = await supabase.from('expenses').insert({
+    const payload = {
       description: form.description.trim(), category: form.category as any,
       vendor: form.vendor.trim() || null,
       amount_usd: Math.round(amtUsd * 100) / 100,
       amount_dop: Math.round(amtDop * 100) / 100,
       exchange_rate: xr,
-    });
+    };
+
+    const { error } = isEdit
+      ? await supabase.from('expenses').update(payload).eq('id', editExpense.id)
+      : await supabase.from('expenses').insert(payload);
+
     setSaving(false);
     if (error) { toast.error('Error al guardar'); return; }
-    toast.success('Gasto registrado');
+    toast.success(isEdit ? 'Gasto actualizado' : 'Gasto registrado');
     queryClient.invalidateQueries({ queryKey: ['expenses'] });
     onOpenChange(false);
-    setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Nuevo Gasto</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div><Label className="text-xs">Descripción *</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="mt-1" /></div>
@@ -440,13 +597,14 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate }: any) {
             <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
             <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : 'Registrar Gasto'}</Button>
+          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Gasto'}</Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
+// ============ P&L TAB ============
 function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses }: any) {
   const grossProfit = revenueMTD - cogsMTD;
   const grossMarginPct = revenueMTD > 0 ? (grossProfit / revenueMTD * 100) : 0;
@@ -511,6 +669,7 @@ function PLRow({ label, value, bold, negative, color, pct }: { label: string; va
   );
 }
 
+// ============ AI ASESOR TAB ============
 function AIAsesorTab({ sales, expenses, revenueMTD, grossMargin }: any) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
@@ -519,8 +678,7 @@ function AIAsesorTab({ sales, expenses, revenueMTD, grossMargin }: any) {
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = { role: 'user' as const, content: input };
-    const allMsgs = [...messages, userMsg];
-    setMessages(allMsgs);
+    setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
@@ -587,6 +745,7 @@ function AIAsesorTab({ sales, expenses, revenueMTD, grossMargin }: any) {
   );
 }
 
+// ============ AI ASSISTANT DIALOG ============
 function AIAssistantDialog({ open, onOpenChange, queryClient, rate }: any) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
@@ -694,7 +853,6 @@ function AIAssistantDialog({ open, onOpenChange, queryClient, rate }: any) {
                   <div className="flex justify-between"><span className="text-muted-foreground">Categoría</span><span>{EXPENSE_CATEGORIES[preview.data.category]?.icon} {EXPENSE_CATEGORIES[preview.data.category]?.label}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Descripción</span><span className="text-right max-w-[60%]">{preview.data.description}</span></div>
                   <div className="flex justify-between font-bold"><span>USD</span><span>{formatUSD(preview.data.amount_usd)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">DOP</span><span>RD${Number(preview.data.amount_dop).toLocaleString()}</span></div>
                 </div>
               )}
               {preview.type === 'sale' && (
