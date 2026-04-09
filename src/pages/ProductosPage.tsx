@@ -2,20 +2,26 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { formatUSD } from '@/lib/format';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
+import { ProductDialog } from '@/components/ProductDialog';
+import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
+import { Pencil, Trash2 } from 'lucide-react';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Product = Tables<'products'>;
 
 const categories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery({
@@ -27,42 +33,13 @@ export default function ProductosPage() {
     },
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (product: any) => {
-      const { error } = await supabase.from('products').insert(product);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      setDialogOpen(false);
-      toast.success('Producto creado');
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
-
   const filtered = products.filter(p => {
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCat = !catFilter || p.category === catFilter;
     return matchSearch && matchCat;
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    addMutation.mutate({
-      sku: fd.get('sku'),
-      name: fd.get('name'),
-      brand: fd.get('brand'),
-      category: fd.get('category'),
-      unit_cost_usd: Number(fd.get('unit_cost_usd')) || 0,
-      price_list_usd: Number(fd.get('price_list_usd')) || 0,
-      price_architect_usd: Number(fd.get('price_architect_usd')) || 0,
-      price_project_usd: Number(fd.get('price_project_usd')) || 0,
-      price_wholesale_usd: Number(fd.get('price_wholesale_usd')) || 0,
-      reorder_point: Number(fd.get('reorder_point')) || 10,
-      coverage_m2: Number(fd.get('coverage_m2')) || null,
-    });
-  };
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['products'] });
 
   return (
     <AppLayout>
@@ -70,37 +47,7 @@ export default function ProductosPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-foreground flex-1">Productos</h1>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="text-xs">📥 Excel</Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">+ Nuevo</Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Nuevo Producto</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <Input name="sku" placeholder="SKU *" required />
-                <Input name="name" placeholder="Nombre *" required />
-                <Input name="brand" placeholder="Marca" />
-                <select name="category" className="w-full rounded-lg bg-input border border-border px-3 py-2 text-sm text-foreground">
-                  <option value="">Categoría</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input name="unit_cost_usd" type="number" step="0.01" placeholder="Costo USD" />
-                  <Input name="price_list_usd" type="number" step="0.01" placeholder="Precio Lista" />
-                  <Input name="price_architect_usd" type="number" step="0.01" placeholder="Precio Arquitecto" />
-                  <Input name="price_project_usd" type="number" step="0.01" placeholder="Precio Proyecto" />
-                  <Input name="price_wholesale_usd" type="number" step="0.01" placeholder="Precio Mayoreo" />
-                  <Input name="coverage_m2" type="number" step="0.01" placeholder="Cobertura m²" />
-                  <Input name="reorder_point" type="number" placeholder="Punto reorden" />
-                </div>
-                <Button type="submit" className="w-full" disabled={addMutation.isPending}>
-                  {addMutation.isPending ? 'Guardando...' : 'Guardar'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" onClick={() => { setEditProduct(null); setDialogOpen(true); }}>+ Nuevo</Button>
         </div>
 
         <Input
@@ -136,22 +83,50 @@ export default function ProductosPage() {
             {filtered.map(p => (
               <div key={p.id} className="rounded-xl bg-card border border-border p-3">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-foreground">{p.name}</p>
                     <p className="text-[10px] text-muted-foreground">{p.sku} · {p.brand || '—'} · {p.category || '—'}</p>
                   </div>
-                  <p className="text-sm font-bold text-primary">{formatUSD(Number(p.price_list_usd))}</p>
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <p className="text-sm font-bold text-primary mr-1">{formatUSD(Number(p.price_list_usd))}</p>
+                    <button
+                      onClick={() => { setEditProduct(p); setDialogOpen(true); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteProduct(p)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
                   <span>Costo: {formatUSD(Number(p.unit_cost_usd))}</span>
                   <span>Arq: {formatUSD(Number(p.price_architect_usd))}</span>
                   <span>Proy: {formatUSD(Number(p.price_project_usd))}</span>
+                  {p.dimensions && <span>📐 {p.dimensions}</span>}
                 </div>
               </div>
             ))}
           </div>
         )}
+
         <ExcelImportDialog open={importOpen} onOpenChange={setImportOpen} />
+        <ProductDialog
+          open={dialogOpen}
+          onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditProduct(null); }}
+          product={editProduct}
+          onSuccess={refresh}
+        />
+        <ProductDeleteDialog
+          open={!!deleteProduct}
+          onOpenChange={(v) => { if (!v) setDeleteProduct(null); }}
+          product={deleteProduct}
+          onSuccess={refresh}
+        />
       </div>
     </AppLayout>
   );
