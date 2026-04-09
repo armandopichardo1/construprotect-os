@@ -130,6 +130,57 @@ export type Database = {
         }
         Relationships: []
       }
+      expenses: {
+        Row: {
+          amount_dop: number
+          amount_usd: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string
+          exchange_rate: number | null
+          id: string
+          is_recurring: boolean | null
+          receipt_url: string | null
+          recurring_frequency: string | null
+          subcategory: string | null
+          vendor: string | null
+        }
+        Insert: {
+          amount_dop?: number
+          amount_usd?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description: string
+          exchange_rate?: number | null
+          id?: string
+          is_recurring?: boolean | null
+          receipt_url?: string | null
+          recurring_frequency?: string | null
+          subcategory?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          amount_dop?: number
+          amount_usd?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string
+          exchange_rate?: number | null
+          id?: string
+          is_recurring?: boolean | null
+          receipt_url?: string | null
+          recurring_frequency?: string | null
+          subcategory?: string | null
+          vendor?: string | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           id: string
@@ -351,6 +402,126 @@ export type Database = {
         }
         Relationships: []
       }
+      sale_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total_usd: number
+          margin_pct: number | null
+          product_id: string | null
+          quantity: number
+          sale_id: string
+          unit_cost_usd: number
+          unit_price_usd: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total_usd?: number
+          margin_pct?: number | null
+          product_id?: string | null
+          quantity?: number
+          sale_id: string
+          unit_cost_usd?: number
+          unit_price_usd?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total_usd?: number
+          margin_pct?: number | null
+          product_id?: string | null
+          quantity?: number
+          sale_id?: string
+          unit_cost_usd?: number
+          unit_price_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          deal_id: string | null
+          exchange_rate: number | null
+          id: string
+          invoice_ref: string | null
+          itbis_usd: number
+          notes: string | null
+          payment_date: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          subtotal_usd: number
+          total_dop: number
+          total_usd: number
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          deal_id?: string | null
+          exchange_rate?: number | null
+          id?: string
+          invoice_ref?: string | null
+          itbis_usd?: number
+          notes?: string | null
+          payment_date?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          subtotal_usd?: number
+          total_dop?: number
+          total_usd?: number
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          deal_id?: string | null
+          exchange_rate?: number | null
+          id?: string
+          invoice_ref?: string | null
+          itbis_usd?: number
+          notes?: string | null
+          payment_date?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          subtotal_usd?: number
+          total_dop?: number
+          total_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           key: string
@@ -374,6 +545,18 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      expense_category:
+        | "warehouse"
+        | "software"
+        | "accounting"
+        | "marketing"
+        | "shipping"
+        | "customs"
+        | "travel"
+        | "samples"
+        | "office"
+        | "bank_fees"
+        | "other"
       movement_type:
         | "receipt"
         | "sale"
@@ -381,6 +564,7 @@ export type Database = {
         | "sample"
         | "return"
         | "damage"
+      payment_status: "pending" | "paid" | "partial" | "overdue" | "cancelled"
       pipeline_stage:
         | "prospecto"
         | "contactado"
@@ -515,6 +699,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      expense_category: [
+        "warehouse",
+        "software",
+        "accounting",
+        "marketing",
+        "shipping",
+        "customs",
+        "travel",
+        "samples",
+        "office",
+        "bank_fees",
+        "other",
+      ],
       movement_type: [
         "receipt",
         "sale",
@@ -523,6 +720,7 @@ export const Constants = {
         "return",
         "damage",
       ],
+      payment_status: ["pending", "paid", "partial", "overdue", "cancelled"],
       pipeline_stage: [
         "prospecto",
         "contactado",
