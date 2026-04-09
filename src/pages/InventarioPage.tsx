@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,21 @@ export default function InventarioPage() {
   const [showPO, setShowPO] = useState(false);
   const [poContent, setPOContent] = useState('');
   const [poLoading, setPOLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Realtime: auto-refresh inventory when any user makes changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_movements' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const { data: stockData } = useQuery({
     queryKey: ['inventory-stock'],
