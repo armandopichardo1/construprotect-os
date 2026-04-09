@@ -54,6 +54,21 @@ export default function InventarioPage() {
   const [showPO, setShowPO] = useState(false);
   const [poContent, setPOContent] = useState('');
   const [poLoading, setPOLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Realtime: auto-refresh inventory when any user makes changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_movements' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const { data: stockData } = useQuery({
     queryKey: ['inventory-stock'],
