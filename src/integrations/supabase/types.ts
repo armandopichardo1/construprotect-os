@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      crm_clients: {
+        Row: {
+          company: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_opportunities: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          expected_close_date: string | null
+          id: string
+          notes: string | null
+          probability_pct: number | null
+          stage: Database["public"]["Enums"]["pipeline_stage"]
+          title: string
+          updated_at: string
+          value_usd: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_close_date?: string | null
+          id?: string
+          notes?: string | null
+          probability_pct?: number | null
+          stage?: Database["public"]["Enums"]["pipeline_stage"]
+          title: string
+          updated_at?: string
+          value_usd?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_close_date?: string | null
+          id?: string
+          notes?: string | null
+          probability_pct?: number | null
+          stage?: Database["public"]["Enums"]["pipeline_stage"]
+          title?: string
+          updated_at?: string
+          value_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "crm_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rates: {
         Row: {
           created_at: string
@@ -292,6 +381,13 @@ export type Database = {
         | "sample"
         | "return"
         | "damage"
+      pipeline_stage:
+        | "prospecto"
+        | "contactado"
+        | "cotizado"
+        | "negociacion"
+        | "cerrado_ganado"
+        | "cerrado_perdido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -426,6 +522,14 @@ export const Constants = {
         "sample",
         "return",
         "damage",
+      ],
+      pipeline_stage: [
+        "prospecto",
+        "contactado",
+        "cotizado",
+        "negociacion",
+        "cerrado_ganado",
+        "cerrado_perdido",
       ],
     },
   },
