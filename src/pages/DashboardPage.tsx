@@ -7,12 +7,11 @@ import { formatUSD } from '@/lib/format';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
-const axisTick = { fill: 'hsl(220, 12%, 55%)', fontSize: 10 };
+const axisTick = { fill: 'hsl(220, 12%, 55%)', fontSize: 11 };
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  // Real inventory data
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
     queryFn: async () => {
@@ -54,7 +53,6 @@ export default function DashboardPage() {
     },
   });
 
-  // Revenue from movements (sales)
   const { data: revenueData } = useQuery({
     queryKey: ['dashboard-revenue'],
     queryFn: async () => {
@@ -74,7 +72,6 @@ export default function DashboardPage() {
       movements.forEach(m => {
         if (m.movement_type !== 'sale') return;
         const date = new Date(m.created_at);
-        const monthKey = date.toLocaleDateString('es', { month: 'short' });
         const monthIdx = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
         
         const revenue = Math.abs(m.quantity) * Number(m.unit_cost_usd || 0);
@@ -111,15 +108,6 @@ export default function DashboardPage() {
     },
   });
 
-  // Exchange rate
-  const { data: rate } = useQuery({
-    queryKey: ['latest-rate'],
-    queryFn: async () => {
-      const { data } = await supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1).maybeSingle();
-      return data;
-    },
-  });
-
   const margin = revenueData && revenueData.totalRevenue > 0
     ? ((revenueData.totalRevenue - revenueData.totalCogs) / revenueData.totalRevenue * 100)
     : 0;
@@ -128,108 +116,103 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-5">
+      <div className="space-y-6">
         <div>
-          <h1 className="text-lg font-bold text-foreground">Dashboard</h1>
-          <p className="text-xs text-muted-foreground">Hola, {user?.user_metadata?.full_name || 'usuario'}</p>
+          <p className="text-sm text-muted-foreground">Hola, {user?.user_metadata?.full_name || 'usuario'} 👋</p>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* KPIs — 4-column grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard title="Ingresos MTD" value={formatUSD(revenueData?.totalRevenue || 0)} icon="💰" variant="primary" />
-          <KpiCard title="Margen" value={`${margin.toFixed(1)}%`} icon="📈" variant="success" />
+          <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon="📈" variant="success" />
           <KpiCard title="Valor Inventario" value={formatUSD(inventoryStats?.totalValue || 0)} icon="📦" />
           <KpiCard
-            title="Inventario"
-            value={`${(inventoryStats?.totalUnits || 0).toLocaleString()} uds`}
+            title="Alertas Stock"
+            value={`${inventoryStats?.alerts || 0}`}
             icon="🔔"
             variant={inventoryStats?.alerts ? 'warning' : 'default'}
-            subtitle={`${inventoryStats?.alerts || 0} alertas`}
+            subtitle={`${(inventoryStats?.totalUnits || 0).toLocaleString()} unidades total`}
           />
         </div>
 
-        {/* Rate banner */}
-        {rate && (
-          <div className="flex items-center justify-between rounded-xl bg-card border border-border px-3 py-2">
-            <span className="text-xs text-muted-foreground">USD/DOP hoy</span>
-            <div className="flex gap-3 text-xs">
-              <span className="text-foreground">Compra: <strong>{Number(rate.usd_buy).toFixed(2)}</strong></span>
-              <span className="text-foreground">Venta: <strong>{Number(rate.usd_sell).toFixed(2)}</strong></span>
-            </div>
-          </div>
-        )}
-
-        {/* Alerts */}
-        {lowStockItems.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground">Alertas de Stock</h2>
-            {lowStockItems.slice(0, 4).map((item, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-xl bg-card border border-border px-3 py-2.5">
-                <span className="text-sm">{item.status === 'out' ? '🔴' : '🟡'}</span>
-                <span className="text-xs text-foreground flex-1">{item.name}</span>
-                <span className="text-xs text-muted-foreground">{item.qty} uds</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Revenue vs COGS */}
-        {revenueData && revenueData.monthly.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+        {/* 2-column layout: charts left, side panels right */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Revenue vs COGS - takes 2/3 */}
+          <div className="lg:col-span-2 rounded-2xl bg-card border border-border p-5 space-y-4">
             <h2 className="text-sm font-semibold text-foreground">Ingresos vs Costos</h2>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={revenueData.monthly} barGap={2}>
-                <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
-                <YAxis tick={axisTick} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
-                <Bar dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[4, 4, 0, 0]} name="Ingresos" />
-                <Bar dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[4, 4, 0, 0]} name="Costos" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Category donut */}
-        {inventoryStats && inventoryStats.categoryData.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Inventario por Categoría</h2>
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width={120} height={120}>
-                <PieChart>
-                  <Pie data={inventoryStats.categoryData} innerRadius={35} outerRadius={55} dataKey="value" stroke="none">
-                    {inventoryStats.categoryData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
+            {revenueData && revenueData.monthly.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={revenueData.monthly} barGap={2}>
+                  <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisTick} axisLine={false} tickLine={false} width={50} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                  <Bar dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos" />
+                  <Bar dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos" />
+                </BarChart>
               </ResponsiveContainer>
-              <div className="space-y-1.5">
-                {inventoryStats.categoryData.map((c) => (
-                  <div key={c.name} className="flex items-center gap-2">
-                    <div className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
-                    <span className="text-xs text-foreground">{c.name}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">{formatUSD(c.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin datos de ventas</div>
+            )}
           </div>
-        )}
 
-        {/* Top Products */}
+          {/* Right column: Category donut + Alerts */}
+          <div className="space-y-6">
+            {/* Category donut */}
+            {inventoryStats && inventoryStats.categoryData.length > 0 && (
+              <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+                <h2 className="text-sm font-semibold text-foreground">Inventario por Categoría</h2>
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={inventoryStats.categoryData} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                      {inventoryStats.categoryData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-1.5">
+                  {inventoryStats.categoryData.map((c) => (
+                    <div key={c.name} className="flex items-center gap-2">
+                      <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                      <span className="text-xs text-foreground">{c.name}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">{formatUSD(c.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Stock alerts */}
+            {lowStockItems.length > 0 && (
+              <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-foreground">Alertas de Stock</h2>
+                <div className="space-y-2">
+                  {lowStockItems.slice(0, 6).map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <span className="text-sm">{item.status === 'out' ? '🔴' : '🟡'}</span>
+                      <span className="text-xs text-foreground flex-1 truncate">{item.name}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{item.qty} uds</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Top products - full width bar chart */}
         {revenueData && revenueData.topProducts.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
             <h2 className="text-sm font-semibold text-foreground">Top 5 Productos (por venta)</h2>
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               {revenueData.topProducts.map((p) => (
-                <div key={p.name} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-foreground truncate mr-2">{p.name}</span>
-                    <span className="text-muted-foreground shrink-0">{formatUSD(p.revenue)}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div key={p.name} className="space-y-2">
+                  <p className="text-xs text-foreground truncate">{p.name}</p>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${p.pct}%` }} />
                   </div>
+                  <p className="text-xs text-muted-foreground">{formatUSD(p.revenue)}</p>
                 </div>
               ))}
             </div>
@@ -237,16 +220,15 @@ export default function DashboardPage() {
         )}
 
         {/* AI Summary */}
-        <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 space-y-2">
+        <div className="rounded-2xl bg-primary/5 border border-primary/20 p-5 space-y-2">
           <div className="flex items-center gap-2">
             <span>🤖</span>
             <h2 className="text-sm font-semibold text-foreground">Resumen IA</h2>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Inventario total: {(inventoryStats?.totalUnits || 0).toLocaleString()} unidades valoradas en {formatUSD(inventoryStats?.totalValue || 0)}.
             {lowStockItems.length > 0 && ` Hay ${lowStockItems.length} producto(s) requiriendo reabastecimiento urgente.`}
             {' '}Margen bruto actual: {margin.toFixed(1)}%.
-            {rate && ` Tasa USD/DOP: ${Number(rate.usd_sell).toFixed(2)}.`}
           </p>
         </div>
       </div>

@@ -19,17 +19,17 @@ const variantStyles = {
 
 export function KpiCard({ title, value, subtitle, icon, trend, variant = 'default' }: KpiCardProps) {
   return (
-    <div className={cn('rounded-2xl p-4 border border-border', variantStyles[variant])}>
+    <div className={cn('rounded-2xl p-5 border border-border', variantStyles[variant])}>
       <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">{title}</p>
-          <p className="text-xl font-bold text-foreground">{value}</p>
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <span className="text-2xl">{icon}</span>
+        <span className="text-3xl">{icon}</span>
       </div>
       {trend && (
-        <div className="mt-2 flex items-center gap-1">
+        <div className="mt-3 flex items-center gap-1">
           <span className={cn(
             'text-xs font-semibold',
             trend.value >= 0 ? 'text-success' : 'text-destructive'
