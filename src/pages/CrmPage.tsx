@@ -198,7 +198,7 @@ function OppCard({ opp, queryClient }: { opp: any; queryClient: any }) {
   const updateStage = async (newStage: string) => {
     const { error } = await supabase
       .from('crm_opportunities')
-      .update({ stage: newStage })
+      .update({ stage: newStage as any })
       .eq('id', opp.id);
     if (error) { toast.error('Error al actualizar'); return; }
     queryClient.invalidateQueries({ queryKey: ['crm-opportunities'] });
