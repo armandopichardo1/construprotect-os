@@ -67,8 +67,9 @@ export default function ProductosPage() {
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-foreground">Productos</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-foreground flex-1">Productos</h1>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="text-xs">📥 Excel</Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm">+ Nuevo</Button>
