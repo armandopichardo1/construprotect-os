@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { type Deal, DEAL_STAGES, type DealStage, daysInStage, stageColor, ACTIVITY_TYPES } from '@/lib/crm-utils';
+import { type Deal, type Contact, DEAL_STAGES, type DealStage, daysInStage, stageColor } from '@/lib/crm-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Trash2, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Pencil, Trash2, Bot, RefreshCw } from 'lucide-react';
+import { streamBusinessAI } from '@/lib/business-ai';
+import ReactMarkdown from 'react-markdown';
 
 interface PipelineTabProps {
   deals: Deal[];
@@ -28,16 +32,13 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
     toast.success('Deal actualizado');
   };
 
-  // Stats
   const activeDeals = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
   const totalPipeline = activeDeals.reduce((s, d) => s + Number(d.value_usd || 0), 0);
-  const weightedPipeline = activeDeals.reduce((s, d) => s + Number(d.value_usd || 0) * (d.probability / 100), 0);
   const wonDeals = deals.filter(d => d.stage === 'won');
   const wonValue = wonDeals.reduce((s, d) => s + Number(d.value_usd || 0), 0);
 
   return (
     <div className="space-y-3">
-      {/* KPIs */}
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-xl bg-card border border-border p-2.5 text-center">
           <p className="text-lg font-bold text-foreground">{activeDeals.length}</p>
@@ -53,7 +54,6 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
         </div>
       </div>
 
-      {/* Horizontal Kanban */}
       <div className="overflow-x-auto -mx-4 px-4 pb-2">
         <div className="flex gap-2.5" style={{ minWidth: `${activeStages.length * 220}px` }}>
           {activeStages.map(stage => {
@@ -72,9 +72,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                       <DealCard key={deal.id} deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} />
                     ))}
                     {stageDeals.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-muted-foreground">
-                        Sin deals
-                      </div>
+                      <div className="rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-muted-foreground">Sin deals</div>
                     )}
                   </div>
                 </div>
@@ -84,7 +82,6 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
         </div>
       </div>
 
-      {/* Won / Lost summary */}
       {(wonDeals.length > 0 || deals.filter(d => d.stage === 'lost').length > 0) && (
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-success/5 border border-success/20 p-2.5">
@@ -102,38 +99,94 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
 }
 
 function DealCard({ deal, onEdit, onDelete, onStageChange }: { deal: Deal; onEdit: (d: Deal) => void; onDelete: (d: Deal) => void; onStageChange: (id: string, stage: DealStage) => void }) {
+  const [showPlan, setShowPlan] = useState(false);
+  const [planContent, setPlanContent] = useState('');
+  const [planLoading, setPlanLoading] = useState(false);
   const days = daysInStage(deal.updated_at);
   const dayColor = stageColor(days);
 
+  // Fetch contact info for AI plan
+  const { data: contact } = useQuery({
+    queryKey: ['contact-for-deal', deal.contact_id],
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('*').eq('id', deal.contact_id).single();
+      return data;
+    },
+    enabled: showPlan,
+  });
+
+  const generatePlan = async () => {
+    setShowPlan(true);
+    setPlanContent('');
+    setPlanLoading(true);
+    try {
+      await streamBusinessAI({
+        action: 'deal-plan',
+        payload: { deal, contact },
+        onDelta: (chunk) => setPlanContent(prev => prev + chunk),
+        onDone: () => setPlanLoading(false),
+      });
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+      setPlanLoading(false);
+    }
+  };
+
   return (
-    <div className="rounded-lg bg-card border border-border p-2.5 space-y-1.5 shadow-sm">
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
-          <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.contact_name} · {deal.contacts?.company_name || ''}</p>
+    <>
+      <div className="rounded-lg bg-card border border-border p-2.5 space-y-1.5 shadow-sm">
+        <div className="flex items-start justify-between gap-1">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
+            <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.contact_name} · {deal.contacts?.company_name || ''}</p>
+          </div>
+          <div className="flex gap-0.5 shrink-0">
+            <button onClick={generatePlan} className="p-1 rounded text-primary hover:text-primary/80" title="AI Game Plan">
+              <Bot className="w-3 h-3" />
+            </button>
+            <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
+            <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+          </div>
         </div>
-        <div className="flex gap-0.5 shrink-0">
-          <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-          <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
+          <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Select value={deal.stage} onValueChange={(v) => onStageChange(deal.id, v as DealStage)}>
+            <SelectTrigger className="h-5 text-[9px] w-auto min-w-[80px] rounded border-0 bg-muted px-1.5">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PIPELINE_STAGES.map(s => (
+                <SelectItem key={s} value={s} className="text-[10px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-[9px] text-muted-foreground">{deal.probability}%</span>
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
-        <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Select value={deal.stage} onValueChange={(v) => onStageChange(deal.id, v as DealStage)}>
-          <SelectTrigger className="h-5 text-[9px] w-auto min-w-[80px] rounded border-0 bg-muted px-1.5">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PIPELINE_STAGES.map(s => (
-              <SelectItem key={s} value={s} className="text-[10px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-[9px] text-muted-foreground">{deal.probability}%</span>
-      </div>
-    </div>
+
+      {/* AI Deal Game Plan Dialog */}
+      <Dialog open={showPlan} onOpenChange={setShowPlan}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="w-4 h-4" /> Game Plan: {deal.title}
+              <Button size="sm" variant="ghost" onClick={generatePlan} disabled={planLoading} className="ml-auto">
+                <RefreshCw className={`w-3.5 h-3.5 ${planLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm prose-invert max-w-none">
+            {planContent ? <ReactMarkdown>{planContent}</ReactMarkdown> : (
+              <div className="text-center text-muted-foreground py-8">
+                {planLoading ? <p className="animate-pulse">Generando plan de acción...</p> : <p>Generando...</p>}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

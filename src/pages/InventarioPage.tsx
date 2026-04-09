@@ -2,18 +2,18 @@ import { useState, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ExcelImportDialog } from '@/components/ExcelImportDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Bot, RefreshCw } from 'lucide-react';
+import { streamBusinessAI } from '@/lib/business-ai';
+import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
 const tabs = ['Stock', 'Analytics', 'Envíos', 'ABC'];
-const productCategories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const shipments = [
@@ -23,18 +23,9 @@ const shipments = [
 ];
 
 function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    ok: 'bg-success/15 text-success',
-    low: 'bg-warning/15 text-warning',
-    out: 'bg-destructive/15 text-destructive',
-    excess: 'bg-primary/15 text-primary',
-  };
+  const styles: Record<string, string> = { ok: 'bg-success/15 text-success', low: 'bg-warning/15 text-warning', out: 'bg-destructive/15 text-destructive', excess: 'bg-primary/15 text-primary' };
   const labels: Record<string, string> = { ok: 'OK', low: 'Bajo', out: 'Agotado', excess: 'Exceso' };
-  return (
-    <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-semibold', styles[status])}>
-      {labels[status]}
-    </span>
-  );
+  return <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-semibold', styles[status])}>{labels[status]}</span>;
 }
 
 function MiniSparkline({ data }: { data: number[] }) {
@@ -54,12 +45,15 @@ function MiniSparkline({ data }: { data: number[] }) {
 type StockItem = {
   id: string; name: string; sku: string; qty: number; reorder: number;
   status: string; category: string; value: number; movements: number[];
+  velocity: number; costUsd: number;
 };
 
 export default function InventarioPage() {
   const [tab, setTab] = useState('Stock');
   const [filter, setFilter] = useState('all');
-  const queryClient = useQueryClient();
+  const [showPO, setShowPO] = useState(false);
+  const [poContent, setPOContent] = useState('');
+  const [poLoading, setPOLoading] = useState(false);
 
   const { data: stockData } = useQuery({
     queryKey: ['inventory-stock'],
@@ -67,12 +61,12 @@ export default function InventarioPage() {
       const [{ data: inv }, { data: products }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
         supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point'),
-        supabase.from('inventory_movements').select('product_id, quantity, created_at').order('created_at'),
+        supabase.from('inventory_movements').select('product_id, quantity, created_at, movement_type').order('created_at'),
       ]);
       if (!inv || !products) return [];
-
       const productMap = Object.fromEntries(products.map(p => [p.id, p]));
       const movementsByProduct: Record<string, number[]> = {};
+      const salesByProduct: Record<string, number> = {};
       const now = new Date();
       (movements || []).forEach(m => {
         const date = new Date(m.created_at);
@@ -81,8 +75,10 @@ export default function InventarioPage() {
         const idx = 5 - monthsAgo;
         if (!movementsByProduct[m.product_id]) movementsByProduct[m.product_id] = [0, 0, 0, 0, 0, 0];
         movementsByProduct[m.product_id][idx] += Math.abs(m.quantity);
+        if (m.movement_type === 'sale') {
+          salesByProduct[m.product_id] = (salesByProduct[m.product_id] || 0) + Math.abs(m.quantity);
+        }
       });
-
       return inv.map(i => {
         const p = productMap[i.product_id];
         if (!p) return null;
@@ -91,12 +87,13 @@ export default function InventarioPage() {
         if (qty === 0) status = 'out';
         else if (qty <= Number(p.reorder_point)) status = 'low';
         else if (qty > Number(p.reorder_point) * 5) status = 'excess';
-
+        const mvmts = movementsByProduct[i.product_id] || [0, 0, 0, 0, 0, 0];
+        const velocity = (salesByProduct[i.product_id] || 0) / 6;
         return {
           id: i.id, name: p.name, sku: p.sku, qty, reorder: Number(p.reorder_point),
           status, category: p.category || 'Otros',
-          value: qty * Number(p.unit_cost_usd),
-          movements: movementsByProduct[i.product_id] || [0, 0, 0, 0, 0, 0],
+          value: qty * Number(p.unit_cost_usd), movements: mvmts, velocity,
+          costUsd: Number(p.unit_cost_usd),
         } as StockItem;
       }).filter(Boolean) as StockItem[];
     },
@@ -104,10 +101,8 @@ export default function InventarioPage() {
 
   const items = stockData || [];
   const counts = useMemo(() => ({
-    all: items.length,
-    ok: items.filter(i => i.status === 'ok').length,
-    low: items.filter(i => i.status === 'low').length,
-    out: items.filter(i => i.status === 'out').length,
+    all: items.length, ok: items.filter(i => i.status === 'ok').length,
+    low: items.filter(i => i.status === 'low').length, out: items.filter(i => i.status === 'out').length,
     excess: items.filter(i => i.status === 'excess').length,
   }), [items]);
 
@@ -125,24 +120,29 @@ export default function InventarioPage() {
   }, [items]);
 
   const daysOfSupply = useMemo(() => {
-    return items
-      .map(i => {
-        const totalMovement = i.movements.reduce((a, b) => a + b, 0);
-        const avgMonthly = totalMovement / 6;
-        const days = avgMonthly > 0 ? Math.round((i.qty / avgMonthly) * 30) : 999;
-        return { name: i.name, days: Math.min(days, 120), color: days < 15 ? 'hsl(0, 84%, 60%)' : days < 30 ? 'hsl(38, 92%, 50%)' : 'hsl(160, 84%, 39%)' };
-      })
-      .sort((a, b) => a.days - b.days)
-      .slice(0, 10);
+    return items.map(i => {
+      const avgMonthly = i.velocity;
+      const days = avgMonthly > 0 ? Math.round((i.qty / avgMonthly) * 30) : 999;
+      return { name: i.name, days: Math.min(days, 120), color: days < 15 ? 'hsl(0, 84%, 60%)' : days < 30 ? 'hsl(38, 92%, 50%)' : 'hsl(160, 84%, 39%)' };
+    }).sort((a, b) => a.days - b.days).slice(0, 10);
+  }, [items]);
+
+  // Velocity vs Stock bubble chart data
+  const bubbleData = useMemo(() => {
+    return items.filter(i => i.velocity > 0 || i.qty > 0).map(i => ({
+      x: i.velocity, y: i.qty, z: i.value, name: i.name, status: i.status,
+    }));
   }, [items]);
 
   const abcGroups = useMemo(() => {
-    const byValue = [...items].sort((a, b) => b.value - a.value);
-    const total = byValue.reduce((s, i) => s + i.value, 0);
+    // ABC based on revenue (velocity * price) + velocity
+    const scored = items.map(i => ({ ...i, score: i.velocity * i.costUsd + i.value }));
+    const byScore = [...scored].sort((a, b) => b.score - a.score);
+    const total = byScore.reduce((s, i) => s + i.score, 0);
     let cum = 0;
     const A: StockItem[] = [], B: StockItem[] = [], C: StockItem[] = [];
-    byValue.forEach(i => {
-      cum += i.value;
+    byScore.forEach(i => {
+      cum += i.score;
       if (cum / total <= 0.7) A.push(i);
       else if (cum / total <= 0.9) B.push(i);
       else C.push(i);
@@ -150,15 +150,36 @@ export default function InventarioPage() {
     return { A, B, C };
   }, [items]);
 
+  const generatePO = async () => {
+    setShowPO(true);
+    setPOContent('');
+    setPOLoading(true);
+    try {
+      await streamBusinessAI({
+        action: 'po-recommender',
+        onDelta: (chunk) => setPOContent(prev => prev + chunk),
+        onDone: () => setPOLoading(false),
+      });
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+      setPOLoading(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-5">
-        <div className="flex gap-2 rounded-xl bg-muted p-1 w-fit">
-          {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors', tab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-              {t}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2 rounded-xl bg-muted p-1 w-fit">
+            {tabs.map(t => (
+              <button key={t} onClick={() => setTab(t)} className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors', tab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={generatePO}>
+            <Bot className="w-3.5 h-3.5" /> 🤖 PO Recomendado
+          </Button>
         </div>
 
         {tab === 'Stock' && (
@@ -182,6 +203,7 @@ export default function InventarioPage() {
                     <TableHead className="text-xs text-right">Stock</TableHead>
                     <TableHead className="text-xs text-right">Reorden</TableHead>
                     <TableHead className="text-xs text-right">Valor</TableHead>
+                    <TableHead className="text-xs text-right">Vel/mes</TableHead>
                     <TableHead className="text-xs">Estado</TableHead>
                     <TableHead className="text-xs">Tendencia</TableHead>
                   </TableRow>
@@ -195,6 +217,7 @@ export default function InventarioPage() {
                       <TableCell className="text-xs text-right font-mono font-bold">{item.qty}</TableCell>
                       <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.reorder}</TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.velocity.toFixed(1)}</TableCell>
                       <TableCell><StatusBadge status={item.status} /></TableCell>
                       <TableCell><MiniSparkline data={item.movements} /></TableCell>
                     </TableRow>
@@ -207,41 +230,65 @@ export default function InventarioPage() {
         )}
 
         {tab === 'Analytics' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Valor por Categoría</h2>
-              <div className="flex items-center gap-6">
-                <ResponsiveContainer width={160} height={160}>
-                  <PieChart><Pie data={categoryValues} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
-                    {categoryValues.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2">
-                  {categoryValues.map(c => (
-                    <div key={c.name} className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full shrink-0" style={{ background: c.color }} />
-                      <span className="text-xs text-foreground">{c.name}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{formatUSD(c.value)}</span>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+                <h2 className="text-sm font-semibold text-foreground">Valor por Categoría</h2>
+                <div className="flex items-center gap-6">
+                  <ResponsiveContainer width={160} height={160}>
+                    <PieChart><Pie data={categoryValues} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                      {categoryValues.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-2">
+                    {categoryValues.map(c => (
+                      <div key={c.name} className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full shrink-0" style={{ background: c.color }} />
+                        <span className="text-xs text-foreground">{c.name}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{formatUSD(c.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+                <h2 className="text-sm font-semibold text-foreground">Días de Suministro</h2>
+                <div className="space-y-3">
+                  {daysOfSupply.map(d => (
+                    <div key={d.name} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-foreground truncate mr-2">{d.name}</span>
+                        <span className="text-muted-foreground shrink-0">{d.days >= 120 ? '120+' : d.days}d</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(d.days, 120) / 120 * 100}%`, background: d.color }} />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+
+            {/* Velocity vs Stock bubble chart */}
             <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Días de Suministro</h2>
-              <div className="space-y-3">
-                {daysOfSupply.map(d => (
-                  <div key={d.name} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-foreground truncate mr-2">{d.name}</span>
-                      <span className="text-muted-foreground shrink-0">{d.days >= 120 ? '120+' : d.days}d</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(d.days, 120) / 120 * 100}%`, background: d.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <h2 className="text-sm font-semibold text-foreground">Velocidad vs Stock (Tamaño = Valor)</h2>
+              {bubbleData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <ScatterChart>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 20%, 18%)" />
+                    <XAxis dataKey="x" name="Velocidad/mes" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
+                    <YAxis dataKey="y" name="Stock" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
+                    <ZAxis dataKey="z" range={[40, 400]} name="Valor" />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
+                      if (name === 'Valor') return formatUSD(v);
+                      return v;
+                    }} labelFormatter={() => ''} />
+                    <Scatter data={bubbleData} fill="hsl(217, 91%, 60%)" fillOpacity={0.6} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin datos</div>
+              )}
             </div>
           </div>
         )}
@@ -275,7 +322,8 @@ export default function InventarioPage() {
 
         {tab === 'ABC' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {([['A', abcGroups.A, '70% del valor', 'bg-primary/15 text-primary'] as const,
+            {([
+              ['A', abcGroups.A, '70% del valor', 'bg-primary/15 text-primary'] as const,
               ['B', abcGroups.B, '20% del valor', 'bg-warning/15 text-warning'] as const,
               ['C', abcGroups.C, '10% del valor', 'bg-muted text-muted-foreground'] as const,
             ]).map(([tier, group, desc, style]) => (
@@ -287,16 +335,54 @@ export default function InventarioPage() {
                     <p className="text-xs text-muted-foreground">{group.length} productos</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {group.map(i => (
-                    <span key={i.sku} className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground">{i.name}</span>
-                  ))}
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[10px]">SKU</TableHead>
+                      <TableHead className="text-[10px]">Producto</TableHead>
+                      <TableHead className="text-[10px] text-right">Stock</TableHead>
+                      <TableHead className="text-[10px] text-right">Vel/mes</TableHead>
+                      <TableHead className="text-[10px] text-right">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.slice(0, 8).map(i => (
+                      <TableRow key={i.sku}>
+                        <TableCell className="text-[10px] font-mono">{i.sku}</TableCell>
+                        <TableCell className="text-[10px]">{i.name}</TableCell>
+                        <TableCell className="text-[10px] text-right font-mono">{i.qty}</TableCell>
+                        <TableCell className="text-[10px] text-right font-mono">{i.velocity.toFixed(1)}</TableCell>
+                        <TableCell className="text-[10px] text-right font-mono">{formatUSD(i.value)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* AI PO Recommender Dialog */}
+      <Dialog open={showPO} onOpenChange={setShowPO}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="w-4 h-4" /> 🤖 PO Recomendado
+              <Button size="sm" variant="ghost" onClick={generatePO} disabled={poLoading} className="ml-auto">
+                <RefreshCw className={`w-3.5 h-3.5 ${poLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm prose-invert max-w-none">
+            {poContent ? <ReactMarkdown>{poContent}</ReactMarkdown> : (
+              <div className="text-center text-muted-foreground py-8">
+                {poLoading ? <p className="animate-pulse">Analizando inventario y generando PO...</p> : <p>Generando...</p>}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

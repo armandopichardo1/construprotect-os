@@ -5,7 +5,10 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { type Activity, type ActivityType, ACTIVITY_TYPES } from '@/lib/crm-utils';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle2, Circle, Bot, RefreshCw } from 'lucide-react';
+import { streamBusinessAI } from '@/lib/business-ai';
+import ReactMarkdown from 'react-markdown';
 
 interface AgendaTabProps {
   activities: Activity[];
@@ -25,6 +28,10 @@ export function AgendaTab({ activities }: AgendaTabProps) {
   const thisWeek = pending.filter(a => a.due_date && a.due_date > todayStr && a.due_date <= weekEndStr);
   const upcoming = pending.filter(a => !a.due_date || a.due_date > weekEndStr);
 
+  const [showAiAgenda, setShowAiAgenda] = useState(false);
+  const [aiContent, setAiContent] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
   const toggleComplete = async (activity: Activity) => {
     const { error } = await supabase.from('activities').update({
       is_completed: !activity.is_completed,
@@ -34,45 +41,80 @@ export function AgendaTab({ activities }: AgendaTabProps) {
     queryClient.invalidateQueries({ queryKey: ['crm-activities'] });
   };
 
+  const generateAiAgenda = async () => {
+    setShowAiAgenda(true);
+    setAiContent('');
+    setAiLoading(true);
+    try {
+      await streamBusinessAI({
+        action: 'weekly-agenda',
+        onDelta: (chunk) => setAiContent(prev => prev + chunk),
+        onDone: () => setAiLoading(false),
+      });
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* AI Weekly Summary placeholder */}
-      <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3.5">
-        <p className="text-xs font-semibold text-primary mb-1.5">🤖 Agenda Inteligente</p>
-        <p className="text-[10px] text-muted-foreground">
-          {overdue.length > 0 && `⚠️ ${overdue.length} actividades vencidas. `}
-          {today.length > 0 && `📋 ${today.length} para hoy. `}
-          {thisWeek.length > 0 && `📅 ${thisWeek.length} esta semana. `}
-          {pending.length === 0 && '✅ No hay actividades pendientes.'}
-        </p>
+      {/* AI Weekly Agenda button */}
+      <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-3.5 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-primary mb-0.5">🤖 Agenda Inteligente</p>
+          <p className="text-[10px] text-muted-foreground">
+            {overdue.length > 0 && `⚠️ ${overdue.length} vencidas. `}
+            {today.length > 0 && `📋 ${today.length} para hoy. `}
+            {thisWeek.length > 0 && `📅 ${thisWeek.length} esta semana. `}
+            {pending.length === 0 && '✅ Sin pendientes.'}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={generateAiAgenda}>
+          <Bot className="w-3.5 h-3.5" /> AI Agenda Semanal
+        </Button>
       </div>
 
-      {/* Overdue */}
       {overdue.length > 0 && (
         <Section title="⚠️ Vencidas" count={overdue.length} variant="destructive">
           {overdue.map(a => <ActivityRow key={a.id} activity={a} onToggle={toggleComplete} />)}
         </Section>
       )}
-
-      {/* Today */}
       <Section title="📋 Hoy" count={today.length}>
         {today.length === 0 && <p className="text-[10px] text-muted-foreground py-2">Sin actividades para hoy</p>}
         {today.map(a => <ActivityRow key={a.id} activity={a} onToggle={toggleComplete} />)}
       </Section>
-
-      {/* This week */}
       {thisWeek.length > 0 && (
         <Section title="📅 Esta semana" count={thisWeek.length}>
           {thisWeek.map(a => <ActivityRow key={a.id} activity={a} onToggle={toggleComplete} />)}
         </Section>
       )}
-
-      {/* Upcoming / no date */}
       {upcoming.length > 0 && (
         <Section title="🔮 Próximas" count={upcoming.length}>
           {upcoming.map(a => <ActivityRow key={a.id} activity={a} onToggle={toggleComplete} />)}
         </Section>
       )}
+
+      {/* AI Agenda Dialog */}
+      <Dialog open={showAiAgenda} onOpenChange={setShowAiAgenda}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="w-4 h-4" /> AI Agenda Semanal
+              <Button size="sm" variant="ghost" onClick={generateAiAgenda} disabled={aiLoading} className="ml-auto">
+                <RefreshCw className={`w-3.5 h-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm prose-invert max-w-none">
+            {aiContent ? <ReactMarkdown>{aiContent}</ReactMarkdown> : (
+              <div className="text-center text-muted-foreground py-8">
+                {aiLoading ? <p className="animate-pulse">Generando agenda...</p> : <p>Generando...</p>}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -92,14 +134,12 @@ function Section({ title, count, variant, children }: { title: string; count: nu
 function ActivityRow({ activity, onToggle }: { activity: Activity; onToggle: (a: Activity) => void }) {
   const cfg = ACTIVITY_TYPES[activity.activity_type] || { label: activity.activity_type, emoji: '📌' };
   const isOverdue = activity.due_date && activity.due_date < new Date().toISOString().split('T')[0] && !activity.is_completed;
-
   return (
     <div className={cn('rounded-xl bg-card border p-2.5 flex items-start gap-2.5', isOverdue ? 'border-destructive/30' : 'border-border')}>
       <button onClick={() => onToggle(activity)} className="mt-0.5 shrink-0">
         {activity.is_completed
           ? <CheckCircle2 className="w-4 h-4 text-success" />
-          : <Circle className={cn('w-4 h-4', isOverdue ? 'text-destructive' : 'text-muted-foreground')} />
-        }
+          : <Circle className={cn('w-4 h-4', isOverdue ? 'text-destructive' : 'text-muted-foreground')} />}
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
