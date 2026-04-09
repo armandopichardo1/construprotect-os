@@ -163,3 +163,26 @@ export const EXPECTED_COLUMNS = [
   { header: 'Cobertura m²', field: 'coverage_m2', required: false },
   { header: 'Punto Reorden', field: 'reorder_point', required: false },
 ];
+
+export function downloadProductTemplate() {
+  const headers = [
+    'SKU', 'Nombre', 'Marca', 'Categoría', 'Costo', 'Costo Total',
+    'Precio Lista', 'Precio Arquitecto', 'Precio Proyecto', 'Precio Mayoreo',
+    'Margen Lista', 'Margen Arquitecto', 'Margen Proyecto', 'Margen Mayoreo',
+    'Cobertura m²', 'Dimensiones', 'Unidades Paquete', 'Punto Reorden',
+    'Cantidad Reorden', 'Lead Time',
+  ];
+  const example = [
+    'PIR-6060-BG', 'Porcelanato Beige 60x60', 'Porcelanosa', 'Pisos',
+    12.5, 15.0, 28.0, 22.0, 20.0, 18.0,
+    45, 35, 30, 20, 1.44, '60x60cm', 6, 10, 50, 21,
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+
+  // Column widths
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.writeFile(wb, 'plantilla_productos.xlsx');
+}
