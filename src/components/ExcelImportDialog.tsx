@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { parseExcelFile, EXPECTED_COLUMNS, type ImportResult, type ProductRow } from '@/lib/excel-import';
+import { parseExcelFile, EXPECTED_COLUMNS, downloadProductTemplate, type ImportResult, type ProductRow } from '@/lib/excel-import';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
