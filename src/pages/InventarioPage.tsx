@@ -2,11 +2,17 @@ import { useState, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ExcelImportDialog } from '@/components/ExcelImportDialog';
+import { toast } from 'sonner';
 
-const tabs = ['Stock', 'Analytics', 'Envíos', 'ABC'];
+const tabs = ['Stock', 'Productos', 'Analytics', 'Envíos', 'ABC'];
+const productCategories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
 
 const shipments = [
   { id: 'ENV-2847', supplier: 'Porcelanosa España', items: 12, eta: '2026-04-18', step: 2, steps: ['Ordenado', 'Tránsito', 'Aduanas', 'Almacén', 'Recibido'] },
