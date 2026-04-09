@@ -225,6 +225,19 @@ type StockItem = {
           </div>
         )}
 
+        {tab === 'Productos' && <ProductosTab
+          products={allProducts}
+          search={prodSearch}
+          setSearch={setProdSearch}
+          catFilter={prodCatFilter}
+          setCatFilter={setProdCatFilter}
+          dialogOpen={prodDialogOpen}
+          setDialogOpen={setProdDialogOpen}
+          importOpen={importOpen}
+          setImportOpen={setImportOpen}
+          addMutation={addProductMutation}
+        />}
+
         {tab === 'Analytics' && (
           <div className="space-y-4">
             <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
