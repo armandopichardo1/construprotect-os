@@ -54,9 +54,34 @@ type StockItem = {
   status: string; category: string; value: number; movements: number[];
 };
 
-export default function InventarioPage() {
-  const [tab, setTab] = useState('Stock');
-  const [filter, setFilter] = useState('all');
+  const [prodSearch, setProdSearch] = useState('');
+  const [prodCatFilter, setProdCatFilter] = useState('');
+  const [prodDialogOpen, setProdDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addProductMutation = useMutation({
+    mutationFn: async (product: any) => {
+      const { error } = await supabase.from('products').insert(product);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      setProdDialogOpen(false);
+      toast.success('Producto creado');
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const { data: stockData } = useQuery({
     queryKey: ['inventory-stock'],
