@@ -151,6 +151,7 @@ export default function ProductosPage() {
             ))}
           </div>
         )}
+        <ExcelImportDialog open={importOpen} onOpenChange={setImportOpen} />
       </div>
     </AppLayout>
   );
