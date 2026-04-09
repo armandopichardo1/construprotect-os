@@ -4,21 +4,33 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
+const USERNAME_MAP: Record<string, string> = {
+  apichardo: 'apichardo@construprotect.com',
+  lazar: 'lazar@construprotect.com',
+  dazar: 'dazar@construprotect.com',
+};
+
 export default function LoginPage() {
   const { signIn, signUp } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const resolveEmail = (input: string): string => {
+    const lower = input.trim().toLowerCase();
+    return USERNAME_MAP[lower] || (lower.includes('@') ? lower : `${lower}@construprotect.com`);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const email = resolveEmail(username);
       if (isSignUp) {
         await signUp(email, password, fullName);
-        toast.success('Cuenta creada. Revisa tu email para confirmar.');
+        toast.success('Cuenta creada.');
       } else {
         await signIn(email, password);
         toast.success('Sesión iniciada');
@@ -49,11 +61,11 @@ export default function LoginPage() {
             />
           )}
           <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Usuario o email"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
+            autoCapitalize="none"
           />
           <Input
             type="password"
@@ -67,15 +79,22 @@ export default function LoginPage() {
             {loading ? 'Cargando...' : isSignUp ? 'Registrarse' : 'Entrar'}
           </Button>
         </form>
-        <p className="text-center text-sm text-muted-foreground">
-          {isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}{' '}
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-primary hover:underline font-medium"
-          >
-            {isSignUp ? 'Iniciar sesión' : 'Registrarse'}
-          </button>
-        </p>
+        <div className="text-center space-y-2">
+          <p className="text-sm text-muted-foreground">
+            {isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}{' '}
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-primary hover:underline font-medium"
+            >
+              {isSignUp ? 'Iniciar sesión' : 'Registrarse'}
+            </button>
+          </p>
+          {!isSignUp && (
+            <p className="text-[10px] text-muted-foreground/60">
+              Usuarios: apichardo, lazar, dazar
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
