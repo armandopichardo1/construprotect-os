@@ -54,6 +54,9 @@ type StockItem = {
   status: string; category: string; value: number; movements: number[];
 };
 
+export default function InventarioPage() {
+  const [tab, setTab] = useState('Stock');
+  const [filter, setFilter] = useState('all');
   const [prodSearch, setProdSearch] = useState('');
   const [prodCatFilter, setProdCatFilter] = useState('');
   const [prodDialogOpen, setProdDialogOpen] = useState(false);
