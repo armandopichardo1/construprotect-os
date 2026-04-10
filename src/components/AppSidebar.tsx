@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Users, DollarSign, Settings, LogOut, Boxes } from 'lucide-react';
+import { LayoutDashboard, Package, Users, DollarSign, Settings, LogOut, Boxes, Database } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +22,7 @@ const mainItems = [
   { title: 'Productos', url: '/productos', icon: Package },
   { title: 'CRM', url: '/crm', icon: Users },
   { title: 'Finanzas', url: '/finanzas', icon: DollarSign },
+  { title: 'Maestras', url: '/maestras', icon: Database },
 ];
 
 const settingsItems = [
