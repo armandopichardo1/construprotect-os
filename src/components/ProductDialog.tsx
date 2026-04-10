@@ -91,6 +91,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
       margin_architect_pct: Number(form.margin_architect_pct) || 0,
       margin_project_pct: Number(form.margin_project_pct) || 0,
       margin_wholesale_pct: Number(form.margin_wholesale_pct) || 0,
+      cbm_per_unit: Number(form.cbm_per_unit) || 0,
+      weight_kg_per_unit: Number(form.weight_kg_per_unit) || 0,
+      min_order_qty: Number(form.min_order_qty) || 1,
+      reorder_qty: Number(form.reorder_qty) || 50,
     };
 
     const { error } = isEdit
