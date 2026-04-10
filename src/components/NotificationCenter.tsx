@@ -163,7 +163,11 @@ export function NotificationCenter() {
                     const cfg = CATEGORY_CONFIG[item.category] || { icon: Bell, label: item.category, color: 'text-muted-foreground' };
                     const Icon = cfg.icon;
                     return (
-                      <div key={item.id} className="px-4 py-2.5 hover:bg-muted/50 transition-colors flex items-start gap-3">
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavigate(item.category)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-muted/50 transition-colors flex items-start gap-3 cursor-pointer"
+                      >
                         <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5', 
                           item.severity === 'critical' ? 'bg-destructive/10' : 'bg-warning/10'
                         )}>
@@ -186,9 +190,10 @@ export function NotificationCenter() {
                             {item.alert_count > 1 && (
                               <span className="text-[9px] text-muted-foreground/60">×{item.alert_count}</span>
                             )}
+                            <ExternalLink className="w-2.5 h-2.5 text-muted-foreground/40 ml-auto" />
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
