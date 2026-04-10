@@ -648,3 +648,144 @@ function TerritoryCoverageSection({ data }: { data: { name: string; count: numbe
     </div>
   );
 }
+
+// ========== Alerts Configuration ==========
+function AlertsConfigSection() {
+  const queryClient = useQueryClient();
+  const { data: rules = [] } = useQuery({
+    queryKey: ['alert-rules'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'alert_rules').maybeSingle();
+      if (data?.value && Array.isArray(data.value)) {
+        const saved = data.value as unknown as any[];
+        const defaults = [
+          { id: 'low_margin', label: 'Margen bajo por producto', description: 'Alerta cuando un producto tiene margen real menor al umbral', category: 'margin', enabled: true, threshold: 20, unit: '%' },
+          { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
+          { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+          { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+          { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
+          { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
+          { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+          { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
+          { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+        ];
+        const savedMap = Object.fromEntries(saved.map((r: any) => [r.id, r]));
+        return defaults.map(d => savedMap[d.id] ? { ...d, ...savedMap[d.id] } : d);
+      }
+      return [
+        { id: 'low_margin', label: 'Margen bajo por producto', description: 'Alerta cuando un producto tiene margen real menor al umbral', category: 'margin', enabled: true, threshold: 20, unit: '%' },
+        { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
+        { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+        { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+        { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
+        { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
+        { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+        { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
+        { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+      ];
+    },
+  });
+
+  const [localRules, setLocalRules] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (rules.length > 0 && localRules.length === 0) setLocalRules(rules);
+  }, [rules]);
+
+  const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
+    margin: { label: 'Márgenes', icon: '📊' },
+    concentration: { label: 'Concentración', icon: '⚖️' },
+    inventory: { label: 'Inventario', icon: '📦' },
+    crm: { label: 'CRM', icon: '🤝' },
+    finance: { label: 'Finanzas', icon: '💰' },
+  };
+
+  const categories = [...new Set(localRules.map(r => r.category))];
+
+  const toggleRule = (id: string) => {
+    setLocalRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
+  };
+
+  const updateThreshold = (id: string, value: number) => {
+    setLocalRules(prev => prev.map(r => r.id === id ? { ...r, threshold: value } : r));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase.from('settings').upsert(
+      { key: 'alert_rules', value: localRules as any },
+      { onConflict: 'key' }
+    );
+    setSaving(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success('Configuración de alertas guardada');
+    queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
+    queryClient.invalidateQueries({ queryKey: ['computed-alerts'] });
+  };
+
+  const hasThreshold = (rule: any) => !['out_of_stock', 'overdue_activities', 'overdue_payments', 'negative_cashflow'].includes(rule.id);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Configuración de Alertas</h2>
+          <p className="text-xs text-muted-foreground">Activa/desactiva alertas y ajusta los umbrales según tu operación</p>
+        </div>
+        <Button size="sm" onClick={handleSave} disabled={saving}>
+          <Save className="w-3.5 h-3.5 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
+        </Button>
+      </div>
+
+      {categories.map(cat => {
+        const cfg = CATEGORY_LABELS[cat] || { label: cat, icon: '⚙️' };
+        const catRules = localRules.filter(r => r.category === cat);
+        return (
+          <div key={cat} className="rounded-2xl bg-card border border-border p-5 space-y-3">
+            <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+              <span>{cfg.icon}</span> {cfg.label}
+            </h3>
+            <div className="space-y-2">
+              {catRules.map(rule => (
+                <div key={rule.id} className={cn(
+                  'rounded-xl border px-4 py-3 flex items-center gap-4 transition-colors',
+                  rule.enabled ? 'border-border bg-muted/20' : 'border-border/50 bg-muted/5 opacity-60'
+                )}>
+                  <button
+                    onClick={() => toggleRule(rule.id)}
+                    className={cn(
+                      'w-10 h-5 rounded-full transition-colors relative shrink-0',
+                      rule.enabled ? 'bg-primary' : 'bg-muted-foreground/30'
+                    )}
+                  >
+                    <span className={cn(
+                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                      rule.enabled ? 'left-5' : 'left-0.5'
+                    )} />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground">{rule.label}</p>
+                    <p className="text-[10px] text-muted-foreground">{rule.description}</p>
+                  </div>
+                  {hasThreshold(rule) && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Input
+                        type="number"
+                        value={rule.threshold}
+                        onChange={e => updateThreshold(rule.id, Number(e.target.value))}
+                        className="w-20 h-7 text-xs text-right"
+                        disabled={!rule.enabled}
+                      />
+                      <span className="text-[10px] text-muted-foreground w-8">{rule.unit}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
