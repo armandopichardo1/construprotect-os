@@ -59,7 +59,7 @@ export function GlobalSearch() {
     const [contacts, deals, products] = await Promise.all([
       supabase.from('contacts').select('id, contact_name, company_name, segment').or(`contact_name.ilike.${like},company_name.ilike.${like},email.ilike.${like},phone.ilike.${like}`).limit(5),
       supabase.from('deals').select('id, title, value_usd, stage, contacts(contact_name)').or(`title.ilike.${like},project_name.ilike.${like}`).limit(5),
-      supabase.from('products').select('id, name, sku, brand, category').or(`name.ilike.${like},sku.ilike.${like},brand.ilike.${like}`).limit(5),
+      supabase.from('products').select('id, name, sku, brand, category').or(`name.ilike.${like},sku.ilike.${like},brand.ilike.${like},category.ilike.${like}`).limit(5),
     ]);
 
     const mapped: SearchResult[] = [];
