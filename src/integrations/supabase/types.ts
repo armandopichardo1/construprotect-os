@@ -1035,12 +1035,15 @@ export type Database = {
           actual_arrival: string | null
           created_at: string
           created_by: string | null
+          customs_cost_usd: number | null
           estimated_arrival: string | null
           id: string
           notes: string | null
           order_date: string
           po_number: string | null
+          shipping_cost_usd: number | null
           status: Database["public"]["Enums"]["shipment_status"]
+          supplier_id: string | null
           supplier_name: string
           total_cost_usd: number | null
           updated_at: string
@@ -1049,12 +1052,15 @@ export type Database = {
           actual_arrival?: string | null
           created_at?: string
           created_by?: string | null
+          customs_cost_usd?: number | null
           estimated_arrival?: string | null
           id?: string
           notes?: string | null
           order_date?: string
           po_number?: string | null
+          shipping_cost_usd?: number | null
           status?: Database["public"]["Enums"]["shipment_status"]
+          supplier_id?: string | null
           supplier_name: string
           total_cost_usd?: number | null
           updated_at?: string
@@ -1063,14 +1069,64 @@ export type Database = {
           actual_arrival?: string | null
           created_at?: string
           created_by?: string | null
+          customs_cost_usd?: number | null
           estimated_arrival?: string | null
           id?: string
           notes?: string | null
           order_date?: string
           po_number?: string | null
+          shipping_cost_usd?: number | null
           status?: Database["public"]["Enums"]["shipment_status"]
+          supplier_id?: string | null
           supplier_name?: string
           total_cost_usd?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
