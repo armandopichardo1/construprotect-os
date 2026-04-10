@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
-  LineChart, Line, ComposedChart, Legend, LabelList,
+  LineChart, Line, ComposedChart, Legend, LabelList, ReferenceLine,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -49,6 +49,14 @@ export default function DashboardPage() {
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
   const alertsNotifiedRef = useRef(false);
+
+  const { data: targetMargin } = useQuery({
+    queryKey: ['target-margin'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margin').maybeSingle();
+      return (data?.value as { value: number })?.value ?? 30;
+    },
+  });
 
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
@@ -342,7 +350,11 @@ export default function DashboardPage() {
                   </Line>
                   <Line yAxisId="right" type="monotone" dataKey="netMargin" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: 'hsl(38, 92%, 50%)' }} name="Margen Neto">
                     <LabelList dataKey="netMargin" position="bottom" formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 9 }} />
-                  </Line>
+                   </Line>
+                  {targetMargin != null && (
+                    <ReferenceLine yAxisId="right" y={targetMargin} stroke="hsl(160, 84%, 39%)" strokeDasharray="6 4" strokeWidth={1.5} strokeOpacity={0.6}
+                      label={{ value: `Meta ${targetMargin}%`, position: 'right', fill: 'hsl(160, 84%, 50%)', fontSize: 9 }} />
+                  )}
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
