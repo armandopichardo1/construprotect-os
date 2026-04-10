@@ -488,6 +488,31 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Category Trend */}
+        {revenueData && revenueData.categoryTrend && revenueData.topCats && revenueData.topCats.length > 0 && (
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Tendencia Mensual por Categoría</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={revenueData.categoryTrend}>
+                <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `RD$${(v * rate / 1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmt(v)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {revenueData.topCats.map((cat, i) => (
+                  <Area
+                    key={cat}
+                    type="monotone"
+                    dataKey={cat}
+                    stackId="1"
+                    fill={CATEGORY_COLORS[cat] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1]}
+                    stroke={CATEGORY_COLORS[cat] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1]}
+                    fillOpacity={0.6}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
       </div>
 
       {/* AI Business Review Dialog */}
