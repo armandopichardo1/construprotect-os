@@ -273,25 +273,35 @@ export function CashFlowTab({ sales, expenses }: Props) {
           ))}
         </div>
 
-        {/* Projection chart */}
-        <ResponsiveContainer width="100%" height={260}>
+        {/* Projection chart with scenarios */}
+        <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={projection.rows}>
             <defs>
               <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.2} />
                 <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="optGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="pesGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" strokeDasharray="3 3" />
-            <Area type="monotone" dataKey="cumulative" name="Acumulado Proyectado" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2} />
-            <Line type="monotone" dataKey="netProjected" name="Flujo Neto Proyectado" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 4, fill: 'hsl(160, 84%, 39%)' }} />
+            <Area type="monotone" dataKey="cumOptimista" name="Optimista (+20%)" stroke="hsl(160, 84%, 39%)" fill="url(#optGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
+            <Area type="monotone" dataKey="cumulative" name="Base" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(217, 91%, 60%)' }} />
+            <Area type="monotone" dataKey="cumPesimista" name="Pesimista (-20%)" stroke="hsl(0, 84%, 60%)" fill="url(#pesGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
 
-        {/* Projection table */}
+        {/* Projection table with scenarios */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader>
@@ -301,8 +311,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
                 <TableHead className="text-xs text-right">Ventas Est.</TableHead>
                 <TableHead className="text-xs text-right">G. Recurrentes</TableHead>
                 <TableHead className="text-xs text-right">Otros Gastos</TableHead>
-                <TableHead className="text-xs text-right">Neto Proy.</TableHead>
-                <TableHead className="text-xs text-right">Acumulado</TableHead>
+                <TableHead className="text-xs text-right text-success">Optimista</TableHead>
+                <TableHead className="text-xs text-right">Base</TableHead>
+                <TableHead className="text-xs text-right text-destructive">Pesimista</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -313,8 +324,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
                   <TableCell className="text-xs text-right font-mono text-success">{formatUSD(r.newSales)}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(r.recurring)}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(r.otherExpenses)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono font-semibold', r.netProjected >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(r.netProjected)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono', r.cumulative >= 0 ? 'text-foreground' : 'text-destructive')}>{formatUSD(r.cumulative)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-success font-semibold">{formatUSD(r.cumOptimista)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono font-bold', r.cumulative >= 0 ? 'text-primary' : 'text-destructive')}>{formatUSD(r.cumulative)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-destructive font-semibold">{formatUSD(r.cumPesimista)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
