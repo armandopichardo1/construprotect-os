@@ -126,11 +126,11 @@ export default function FinanzasPage() {
   const mtdSales = sales.filter((s: any) => s.date?.startsWith(thisMonth));
   const mtdExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth));
   const revenueMTD = mtdSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
-  const expensesMTD = mtdExpenses.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
   const cogsMTD = saleItems.filter((si: any) => si.sales?.date?.startsWith(thisMonth))
     .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
   const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD) / revenueMTD * 100) : 0;
-  const netIncome = revenueMTD - cogsMTD - expensesMTD;
+  const netIncome = (revenueMTD - cogsMTD) * rate - expensesMTD_dop;
 
   const monthlyData = useMemo(() => {
     const months: { month: string; revenue: number; cogs: number; expenses: number; profit: number }[] = [];
