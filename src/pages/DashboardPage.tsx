@@ -352,9 +352,8 @@ export default function DashboardPage() {
                     <LabelList dataKey="netMargin" position="bottom" formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 9 }} />
                    </Line>
                   {targetMargin != null && (
-                    <ReferenceLine yAxisId="right" y={targetMargin} stroke="hsl(160, 84%, 39%)" strokeDasharray="6 4" strokeWidth={1.5} strokeOpacity={0.6}>
-                      <label value={`Meta ${targetMargin}%`} position="right" fill="hsl(160, 84%, 50%)" fontSize={9} />
-                    </ReferenceLine>
+                    <ReferenceLine yAxisId="right" y={targetMargin} stroke="hsl(160, 84%, 39%)" strokeDasharray="6 4" strokeWidth={1.5} strokeOpacity={0.6}
+                      label={{ value: `Meta ${targetMargin}%`, position: 'right', fill: 'hsl(160, 84%, 50%)', fontSize: 9 }} />
                   )}
                 </ComposedChart>
               </ResponsiveContainer>
