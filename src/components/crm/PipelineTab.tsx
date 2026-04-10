@@ -283,13 +283,24 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
 
   return (
     <>
-      <div className={cn('rounded-lg bg-card border p-2.5 space-y-1.5 shadow-sm transition-all', rottingBorder, isDragging && 'shadow-lg ring-2 ring-primary/40')}>
+      <div className={cn('group/card rounded-lg bg-card border p-2.5 space-y-1.5 shadow-sm transition-all', rottingBorder, isDragging && 'shadow-lg ring-2 ring-primary/40')}>
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
             <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.contact_name} · {deal.contacts?.company_name || ''}</p>
           </div>
           <div className="flex gap-0.5 shrink-0">
+            <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
+            <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
+          <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
+        </div>
+        {/* Contact + AI actions — visible on hover */}
+        <div className="flex items-center justify-between opacity-0 group-hover/card:opacity-100 transition-opacity h-0 group-hover/card:h-auto overflow-hidden group-hover/card:pt-1 border-t border-transparent group-hover/card:border-border/50">
+          <div className="flex gap-0.5">
             {deal.contacts?.phone && (
               <a href={`tel:${deal.contacts.phone.replace(/\D/g, '')}`} className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" onClick={(e) => e.stopPropagation()} title="Llamar"><Phone className="w-3 h-3" /></a>
             )}
@@ -299,22 +310,11 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
             {deal.contacts?.email && (
               <a href={`mailto:${deal.contacts.email}`} className="p-1 rounded text-muted-foreground hover:text-warning hover:bg-warning/10 transition-colors" onClick={(e) => e.stopPropagation()} title="Email"><Mail className="w-3 h-3" /></a>
             )}
-            <button onClick={generatePlan} className="p-1 rounded text-primary hover:text-primary/80" title="AI Game Plan"><Bot className="w-3 h-3" /></button>
-            <button onClick={generatePitch} className="p-1 rounded text-accent-foreground hover:text-primary" title="AI Pitch"><Megaphone className="w-3 h-3" /></button>
-            <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-            <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
           </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
-          <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Select value={deal.stage} onValueChange={(v) => onStageChange(deal.id, v as DealStage)}>
-            <SelectTrigger className="h-5 text-[9px] w-auto min-w-[80px] rounded border-0 bg-muted px-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>{PIPELINE_STAGES.map(s => (<SelectItem key={s} value={s} className="text-[10px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>))}</SelectContent>
-          </Select>
-          <span className="text-[9px] text-muted-foreground">{deal.probability}%</span>
+          <div className="flex gap-0.5">
+            <button onClick={generatePlan} className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10" title="AI Game Plan"><Bot className="w-3 h-3" /></button>
+            <button onClick={generatePitch} className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10" title="AI Pitch"><Megaphone className="w-3 h-3" /></button>
+          </div>
         </div>
       </div>
 
