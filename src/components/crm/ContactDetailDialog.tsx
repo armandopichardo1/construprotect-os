@@ -187,9 +187,9 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
             <p className="text-xs font-semibold text-foreground">Información</p>
             <div className="space-y-1.5 text-xs text-muted-foreground">
               {contact.company_name && <div className="flex items-center gap-1.5"><Building2 className="w-3 h-3" /> {contact.company_name}</div>}
-              {contact.phone && <div className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {contact.phone}</div>}
-              {contact.email && <div className="flex items-center gap-1.5"><Mail className="w-3 h-3" /> {contact.email}</div>}
-              {contact.whatsapp && <div className="flex items-center gap-1.5"><MessageCircle className="w-3 h-3" /> {contact.whatsapp}</div>}
+              {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-1.5 hover:text-primary transition-colors"><Phone className="w-3 h-3" /> {contact.phone}</a>}
+              {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-1.5 hover:text-primary transition-colors"><Mail className="w-3 h-3" /> {contact.email}</a>}
+              {contact.whatsapp && <a href={`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-green-500 transition-colors"><MessageCircle className="w-3 h-3" /> {contact.whatsapp}</a>}
               {contact.address && <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {contact.address}</div>}
             </div>
           </div>
