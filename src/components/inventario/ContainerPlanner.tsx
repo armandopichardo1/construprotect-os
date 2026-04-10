@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download } from 'lucide-react';
 
 const CONTAINER_TYPES = {
   '20ft': { label: '20\' Standard', maxCbm: 33.2, maxKg: 21770, costEstimate: 3500 },
@@ -133,6 +134,28 @@ export function ContainerPlanner() {
 
   const clearAll = () => setOrderLines({});
 
+  const handleExport = () => {
+    const data = activeLines.map(p => ({
+      SKU: p.sku,
+      Producto: p.name,
+      Categoría: p.category,
+      'Stock Actual': p.currentStock,
+      'Vel/Mes': Number(p.avgMonthly.toFixed(1)),
+      'Días Stock': p.daysOfSupply >= 999 ? '∞' : p.daysOfSupply,
+      Urgencia: urgencyLabel(p),
+      'Min Batch': p.minOrderQty,
+      'Qty Sugerida': p.suggestedQty || 0,
+      'Qty Ordenar': p.qty,
+      'CBM/Unidad': p.cbmPerUnit,
+      'CBM Total': p.cbmPerUnit > 0 ? Number((p.qty * p.cbmPerUnit).toFixed(3)) : 0,
+      'Peso/Unidad (kg)': p.weightPerUnit,
+      'Peso Total (kg)': p.weightPerUnit > 0 ? Number((p.qty * p.weightPerUnit).toFixed(1)) : 0,
+      'Costo Unit (USD)': p.unitCost,
+      'Costo Total (USD)': Number((p.qty * p.unitCost).toFixed(2)),
+    }));
+    exportToExcel(data, `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
+  };
+
   const urgencyColor = (p: typeof lines[0]) => {
     if (p.currentStock === 0) return 'text-destructive';
     if (p.daysOfSupply < p.leadTime) return 'text-destructive';
@@ -239,6 +262,11 @@ export function ContainerPlanner() {
           <Truck className="w-3.5 h-3.5" /> Auto-llenar sugeridos
         </Button>
         <Button size="sm" variant="ghost" onClick={clearAll} className="text-xs text-muted-foreground">Limpiar</Button>
+        {activeLines.length > 0 && (
+          <Button size="sm" variant="outline" onClick={handleExport} className="gap-1.5 text-xs ml-auto">
+            <Download className="w-3.5 h-3.5" /> Exportar Excel
+          </Button>
+        )}
       </div>
 
       {/* Product table */}
