@@ -91,7 +91,14 @@ export function GlobalSearch() {
   const handleSelect = (r: SearchResult) => {
     setOpen(false);
     setQuery('');
-    navigate(TYPE_CONFIG[r.type].route);
+    const cfg = TYPE_CONFIG[r.type];
+    if (r.type === 'contact') {
+      navigate(`${cfg.route}?tab=contacts&viewContact=${r.id}`);
+    } else if (r.type === 'deal') {
+      navigate(`${cfg.route}?tab=pipeline`);
+    } else {
+      navigate(cfg.route);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

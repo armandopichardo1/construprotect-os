@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +24,8 @@ import { exportToExcel } from '@/lib/export-utils';
 type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes' | 'projects';
 
 export default function CrmPage() {
-  const [tab, setTab] = useState<Tab>('pipeline');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'pipeline');
   const queryClient = useQueryClient();
 
   const [showContactDialog, setShowContactDialog] = useState(false);
@@ -46,6 +48,22 @@ export default function CrmPage() {
       return data as Contact[];
     },
   });
+
+  // Auto-open contact detail from URL params (e.g., from global search)
+  useEffect(() => {
+    const viewId = searchParams.get('viewContact');
+    if (viewId && contacts.length > 0) {
+      const found = contacts.find(c => c.id === viewId);
+      if (found) {
+        setViewContact(found);
+        setTab('contacts');
+      }
+      // Clean URL params after opening
+      searchParams.delete('viewContact');
+      searchParams.delete('tab');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [contacts, searchParams]);
 
   const { data: deals = [] } = useQuery({
     queryKey: ['crm-deals'],
