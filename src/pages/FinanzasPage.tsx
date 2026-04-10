@@ -15,7 +15,8 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { toast } from 'sonner';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import ReactMarkdown from 'react-markdown';
-import { Bot, Send, X, Check, Pencil, Trash2 } from 'lucide-react';
+import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/export-utils';
 
 const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
@@ -195,9 +196,25 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'Ventas' && <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} />}
-        {tab === 'Gastos' && <GastosTab expenses={expenses} queryClient={queryClient} rate={latestRate} />}
-        {tab === 'P&L' && <PLTab monthlyData={monthlyData} revenueMTD={revenueMTD} cogsMTD={cogsMTD} expensesMTD={expensesMTD} expenses={expenses} />}
+        {tab === 'Ventas' && <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} onExport={() => {
+          exportToExcel(sales.map((s: any) => ({
+            Fecha: s.date, Ref: s.invoice_ref, Cliente: s.crm_clients?.name,
+            'Subtotal USD': s.subtotal_usd, 'ITBIS USD': s.itbis_usd, 'Total USD': s.total_usd,
+            Estado: s.payment_status,
+          })), 'ventas', 'Ventas');
+        }} />}
+        {tab === 'Gastos' && <GastosTab expenses={expenses} queryClient={queryClient} rate={latestRate} onExport={() => {
+          exportToExcel(expenses.map((e: any) => ({
+            Fecha: e.date, Descripción: e.description, Categoría: e.category,
+            Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
+          })), 'gastos', 'Gastos');
+        }} />}
+        {tab === 'P&L' && <PLTab monthlyData={monthlyData} revenueMTD={revenueMTD} cogsMTD={cogsMTD} expensesMTD={expensesMTD} expenses={expenses} onExport={() => {
+          exportToExcel(monthlyData.map((m: any) => ({
+            Mes: m.month, 'Ingresos USD': m.revenue, 'COGS USD': m.cogs,
+            'Gastos USD': m.expenses, 'Utilidad USD': m.profit,
+          })), 'estado_resultados', 'P&L');
+        }} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
