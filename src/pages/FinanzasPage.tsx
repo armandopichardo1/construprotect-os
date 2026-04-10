@@ -1627,6 +1627,7 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
 function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[]; rate: any; rateForMonth: (ym: string) => number }) {
   const [view, setView] = useState<'pl_detail' | 'margin' | 'aging' | 'monthly' | 'clientes' | 'productos'>('pl_detail');
   const [periodFilter, setPeriodFilter] = useState('ytd');
+  const [trendMode, setTrendMode] = useState<'bars' | 'margin'>('bars');
   const now = useMemo(() => new Date(), []);
   const xr = Number(rate?.usd_sell) || 60.76;
 
