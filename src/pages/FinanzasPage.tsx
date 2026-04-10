@@ -167,16 +167,18 @@ export default function FinanzasPage() {
 
   const mtdSales = sales.filter((s: any) => s.date?.startsWith(thisMonth));
   const mtdExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth));
+  const mtdCosts = costs.filter((c: any) => c.date?.startsWith(thisMonth));
   const thisMonthRate = rateForMonth(thisMonth);
   const revenueMTD = mtdSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * thisMonthRate), 0);
   const cogsMTD = saleItems.filter((si: any) => si.sales?.date?.startsWith(thisMonth))
     .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-  const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD) / revenueMTD * 100) : 0;
-  const netIncome = (revenueMTD - cogsMTD) * thisMonthRate - expensesMTD_dop;
+  const directCostsMTD = mtdCosts.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD - directCostsMTD) / revenueMTD * 100) : 0;
+  const netIncome = (revenueMTD - cogsMTD - directCostsMTD) * thisMonthRate - expensesMTD_dop;
 
   const monthlyData = useMemo(() => {
-    const months: { month: string; revenue: number; cogs: number; expenses: number; profit: number }[] = [];
+    const months: { month: string; revenue: number; cogs: number; directCosts: number; expenses: number; profit: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -185,11 +187,12 @@ export default function FinanzasPage() {
       const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * mRate;
       const cogs = saleItems.filter((si: any) => si.sales?.date?.startsWith(key))
         .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * mRate;
+      const dc = costs.filter((c: any) => c.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0) * mRate;
       const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * mRate), 0);
-      months.push({ month: label, revenue: rev, cogs, expenses: exp, profit: rev - cogs - exp });
+      months.push({ month: label, revenue: rev, cogs, directCosts: dc, expenses: exp, profit: rev - cogs - dc - exp });
     }
     return months;
-  }, [sales, expenses, saleItems, rateForMonth]);
+  }, [sales, expenses, costs, saleItems, rateForMonth]);
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
