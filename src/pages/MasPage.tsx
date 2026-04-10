@@ -75,9 +75,23 @@ export default function MasPage() {
   const [marginInput, setMarginInput] = useState('');
   const [savingMargin, setSavingMargin] = useState(false);
 
+  const { data: targetMargin, refetch: refetchTarget } = useQuery({
+    queryKey: ['target-margin'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margin').maybeSingle();
+      return (data?.value as { value: number })?.value ?? 30;
+    },
+  });
+  const [targetInput, setTargetInput] = useState('');
+  const [savingTarget, setSavingTarget] = useState(false);
+
   useEffect(() => {
     if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
   }, [marginThreshold]);
+
+  useEffect(() => {
+    if (targetMargin !== undefined) setTargetInput(String(targetMargin));
+  }, [targetMargin]);
 
   const { data: productRequests = [], refetch: refetchRequests } = useQuery({
     queryKey: ['product-requests'],
@@ -174,6 +188,18 @@ export default function MasPage() {
     toast.success(`Umbral de margen actualizado a ${val}%`);
     refetchMargin();
     queryClient.invalidateQueries({ queryKey: ['margin-threshold'] });
+  };
+
+  const handleSaveTarget = async () => {
+    const val = Number(targetInput);
+    if (isNaN(val) || val < 0 || val > 100) { toast.error('Ingresa un valor entre 0 y 100'); return; }
+    setSavingTarget(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'target_margin', value: { value: val } as any }, { onConflict: 'key' });
+    setSavingTarget(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success(`Meta de margen actualizada a ${val}%`);
+    refetchTarget();
+    queryClient.invalidateQueries({ queryKey: ['target-margin'] });
   };
 
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
@@ -279,24 +305,32 @@ export default function MasPage() {
 
             {/* Margin Threshold */}
             <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Umbral Mínimo de Margen</h2>
-              <p className="text-xs text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <Label className="text-xs">Margen mínimo (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={marginInput}
-                    onChange={e => setMarginInput(e.target.value)}
-                    className="h-8 text-xs mt-1 max-w-[120px]"
-                  />
+              <h2 className="text-sm font-semibold text-foreground">Márgenes</h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Label className="text-xs">Umbral mínimo (%)</Label>
+                      <Input type="number" min={0} max={100} step={0.5} value={marginInput} onChange={e => setMarginInput(e.target.value)} className="h-8 text-xs mt-1 max-w-[120px]" />
+                    </div>
+                    <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
+                      <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+                    </Button>
+                  </div>
                 </div>
-                <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
-                  <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
-                </Button>
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs text-muted-foreground mb-2">Línea de meta de margen bruto en el gráfico del Dashboard.</p>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Label className="text-xs">Meta de margen bruto (%)</Label>
+                      <Input type="number" min={0} max={100} step={0.5} value={targetInput} onChange={e => setTargetInput(e.target.value)} className="h-8 text-xs mt-1 max-w-[120px]" />
+                    </div>
+                    <Button size="sm" onClick={handleSaveTarget} disabled={savingTarget || targetInput === String(targetMargin)}>
+                      <Save className="w-3.5 h-3.5 mr-1" /> {savingTarget ? 'Guardando...' : 'Guardar'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
