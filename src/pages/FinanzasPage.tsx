@@ -210,10 +210,13 @@ export default function FinanzasPage() {
               </button>
             ))}
           </div>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAiOpen(true)}>
-            <Bot className="w-3.5 h-3.5" /> AI Asistente
-          </Button>
         </div>
+
+        {tab === 'Crear Transacción' && (
+          <CrearTransaccionTab rate={latestRate}
+            onEditSale={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
+            onEditExpense={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
+        )}
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
