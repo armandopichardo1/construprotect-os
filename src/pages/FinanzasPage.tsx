@@ -1404,7 +1404,7 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }
 const TREND_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems: any[]; view: 'clientes' | 'productos' }) {
-  const [metric, setMetric] = useState<'ingresos' | 'margen'>('ingresos');
+  const [metric, setMetric] = useState<'ingresos' | 'margen' | 'gm_pct'>('ingresos');
 
   const trendData = useMemo(() => {
     const now = new Date();
