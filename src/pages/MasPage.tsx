@@ -277,6 +277,29 @@ export default function MasPage() {
               </div>
             </div>
 
+            {/* Margin Threshold */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <h2 className="text-sm font-semibold text-foreground">Umbral Mínimo de Margen</h2>
+              <p className="text-xs text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Label className="text-xs">Margen mínimo (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={marginInput}
+                    onChange={e => setMarginInput(e.target.value)}
+                    className="h-8 text-xs mt-1 max-w-[120px]"
+                  />
+                </div>
+                <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+
             {/* Data Export */}
             <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
               <h2 className="text-sm font-semibold text-foreground">Exportar Datos</h2>
