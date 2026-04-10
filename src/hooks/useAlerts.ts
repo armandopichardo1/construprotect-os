@@ -174,7 +174,45 @@ export function useAlerts() {
               message: `${low.length} producto(s) bajo punto de reorden: ${low.slice(0, 3).map((i: any) => i.products?.name).join(', ')}`,
               navigateTo: '/inventario',
             });
+        if (ruleMap['reorder_needed']) {
+          const reorder = inventory.filter((i: any) => {
+            const rp = Number(i.products?.reorder_point || 0);
+            return rp > 0 && i.quantity_on_hand > 0 && i.quantity_on_hand <= rp;
+          });
+          if (reorder.length > 0) {
+            alerts.push({
+              ruleId: 'reorder_needed',
+              label: 'Reorden necesario',
+              category: 'inventory',
+              severity: 'warning',
+              count: reorder.length,
+              message: `${reorder.length} producto(s) alcanzaron su punto de reorden: ${reorder.slice(0, 3).map((i: any) => `${i.products?.name} (${i.quantity_on_hand} uds)`).join(', ')}`,
+              navigateTo: '/inventario',
+            });
           }
+        }
+      }
+
+      // 3b. Delayed shipments
+      if (ruleMap['shipment_delayed'] && shipments?.length) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const delayed = shipments.filter((s: any) => s.estimated_arrival && s.estimated_arrival < todayStr && s.status !== 'received');
+        if (delayed.length > 0) {
+          const details = delayed.slice(0, 3).map((s: any) => {
+            const daysLate = Math.floor((Date.now() - new Date(s.estimated_arrival).getTime()) / 86400000);
+            return `${s.po_number || s.supplier_name} (${daysLate}d tarde)`;
+          });
+          alerts.push({
+            ruleId: 'shipment_delayed',
+            label: 'Envíos retrasados',
+            category: 'inventory',
+            severity: 'critical',
+            count: delayed.length,
+            message: `${delayed.length} envío(s) pasaron su ETA: ${details.join(', ')}`,
+            navigateTo: '/inventario',
+          });
+        }
+      }
         }
       }
 
