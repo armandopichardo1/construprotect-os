@@ -23,6 +23,7 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
   { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
   { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
   { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+  { id: 'client_declining', label: 'Cliente sin compras recientes', description: 'Alerta cuando un cliente activo no compra en X días', category: 'crm', enabled: true, threshold: 30, unit: 'days' },
 ];
 
 export interface AlertItem {
@@ -174,6 +175,8 @@ export function useAlerts() {
               message: `${low.length} producto(s) bajo punto de reorden: ${low.slice(0, 3).map((i: any) => i.products?.name).join(', ')}`,
               navigateTo: '/inventario',
             });
+          }
+        }
         if (ruleMap['reorder_needed']) {
           const reorder = inventory.filter((i: any) => {
             const rp = Number(i.products?.reorder_point || 0);
@@ -211,8 +214,6 @@ export function useAlerts() {
             message: `${delayed.length} envío(s) pasaron su ETA: ${details.join(', ')}`,
             navigateTo: '/inventario',
           });
-        }
-      }
         }
       }
 
@@ -309,7 +310,37 @@ export function useAlerts() {
         }
       }
 
-      // Sort: critical first
+      // 9. Client declining — no purchases in X days
+      if (ruleMap['client_declining'] && sales?.length) {
+        const threshold = ruleMap['client_declining'].threshold;
+        const now = Date.now();
+        // Group sales by contact_id → find last purchase date
+        const lastPurchase: Record<string, { name: string; lastDate: string }> = {};
+        sales.forEach((s: any) => {
+          const cid = s.contact_id;
+          if (!cid) return;
+          if (!lastPurchase[cid] || s.date > lastPurchase[cid].lastDate) {
+            lastPurchase[cid] = { name: s.crm_clients?.name || '?', lastDate: s.date };
+          }
+        });
+        const inactive = Object.values(lastPurchase).filter(c => {
+          const daysSince = (now - new Date(c.lastDate).getTime()) / 86400000;
+          return daysSince > threshold;
+        });
+        if (inactive.length > 0) {
+          const sorted = inactive.sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+          alerts.push({
+            ruleId: 'client_declining',
+            label: 'Clientes inactivos',
+            category: 'crm',
+            severity: 'warning',
+            count: inactive.length,
+            message: `${inactive.length} cliente(s) sin compras en ${threshold}+ días: ${sorted.slice(0, 3).map(c => c.name).join(', ')}`,
+            navigateTo: '/finanzas',
+          });
+        }
+      }
+
       alerts.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
       return alerts;
     },
