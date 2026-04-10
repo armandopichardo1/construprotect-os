@@ -407,6 +407,51 @@ export function ContainerPlanner() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Create Shipment Dialog */}
+      <Dialog open={showShipmentDialog} onOpenChange={setShowShipmentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Ship className="w-4 h-4 text-primary" /> Crear Envío desde Contenedor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs space-y-1">
+              <p><b>{activeLines.length}</b> productos · <b>{activeLines.reduce((s, l) => s + l.qty, 0).toLocaleString()}</b> unidades</p>
+              <p>Costo producto: <b>{formatUSD(totalCost)}</b> · Flete est: <b>{formatUSD(container.costEstimate)}</b></p>
+              <p>Contenedor: <b>{CONTAINER_TYPES[containerType].label}</b> · Llenado: <b>{fillPct.toFixed(0)}%</b></p>
+            </div>
+            <div>
+              <Label className="text-xs">Proveedor *</Label>
+              <Select value={shipmentSupplierId} onValueChange={setShipmentSupplierId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">PO Number</Label>
+                <Input value={shipmentPoNumber} onChange={e => setShipmentPoNumber(e.target.value)} className="mt-1" placeholder="PO-2026-001" />
+              </div>
+              <div>
+                <Label className="text-xs">ETA</Label>
+                <Input type="date" value={shipmentEta} onChange={e => setShipmentEta(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Notas</Label>
+              <Input value={shipmentNotes} onChange={e => setShipmentNotes(e.target.value)} className="mt-1" placeholder="Opcional" />
+            </div>
+            <Button onClick={handleCreateShipment} disabled={creatingShipment} className="w-full gap-2">
+              <Ship className="w-4 h-4" />
+              {creatingShipment ? 'Creando...' : `Crear Envío (${formatUSD(totalCost + container.costEstimate)})`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
