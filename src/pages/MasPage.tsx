@@ -27,7 +27,7 @@ const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = 
   declined: { label: 'Declinado', color: 'bg-destructive/15 text-destructive' },
 };
 
-type Tab = 'general' | 'requests' | 'competitors' | 'territory' | 'alerts';
+type Tab = 'general' | 'requests' | 'alerts';
 
 export default function MasPage() {
   const { user, signOut } = useAuth();
