@@ -268,13 +268,18 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'Ventas' && <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} prefill={salePrefill} clearPrefill={() => setSalePrefill(null)} onExport={() => {
-          exportToExcel(sales.map((s: any) => ({
-            Fecha: s.date, Ref: s.invoice_ref, Cliente: s.crm_clients?.name,
-            'Subtotal USD': s.subtotal_usd, 'ITBIS USD': s.itbis_usd, 'Total USD': s.total_usd,
-            Estado: s.payment_status,
-          })), 'ventas', 'Ventas');
-        }} />}
+        {tab === 'Ventas' && (
+          <div className="space-y-6">
+            <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} prefill={salePrefill} clearPrefill={() => setSalePrefill(null)} onExport={() => {
+              exportToExcel(sales.map((s: any) => ({
+                Fecha: s.date, Ref: s.invoice_ref, Cliente: s.crm_clients?.name,
+                'Subtotal USD': s.subtotal_usd, 'ITBIS USD': s.itbis_usd, 'Total USD': s.total_usd,
+                Estado: s.payment_status,
+              })), 'ventas', 'Ventas');
+            }} />
+            <TerritoryCoverageSection data={territoryData} />
+          </div>
+        )}
         {tab === 'Gastos' && <GastosTab expenses={expenses} queryClient={queryClient} rate={latestRate} onExport={() => {
           exportToExcel(expenses.map((e: any) => ({
             Fecha: e.date, Descripción: e.description, Categoría: e.category,
