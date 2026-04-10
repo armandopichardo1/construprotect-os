@@ -14,7 +14,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
 
-const categories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
+const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
