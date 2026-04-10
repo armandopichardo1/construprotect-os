@@ -285,6 +285,20 @@ export function CashFlowTab({ sales, expenses }: Props) {
           ))}
         </div>
 
+        {/* Threshold warning banner */}
+        {thresholdEnabled && breachMonths.length > 0 && (
+          <div className="flex items-start gap-3 rounded-xl bg-destructive/10 border border-destructive/30 p-4">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Alerta de flujo de caja</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                El flujo acumulado proyectado baja de <span className="font-mono font-medium text-foreground">{formatUSD(thresholdValue)}</span> en {breachMonths.length} mes(es): {breachMonths.map(m => m.month).join(', ')}.
+                <span className="opacity-70"> Configura el umbral en Más &gt; Alertas.</span>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Projection chart with scenarios */}
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={projection.rows}>
@@ -307,6 +321,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" strokeDasharray="3 3" />
+            {thresholdEnabled && (
+              <ReferenceLine y={thresholdValue} stroke="hsl(38, 92%, 50%)" strokeDasharray="6 3" strokeWidth={2} label={{ value: `Umbral $${(thresholdValue/1000).toFixed(0)}K`, position: 'right', fill: 'hsl(38, 92%, 50%)', fontSize: 10 }} />
+            )}
             <Area type="monotone" dataKey="cumOptimista" name="Optimista (+20%)" stroke="hsl(160, 84%, 39%)" fill="url(#optGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
             <Area type="monotone" dataKey="cumulative" name="Base" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(217, 91%, 60%)' }} />
             <Area type="monotone" dataKey="cumPesimista" name="Pesimista (-20%)" stroke="hsl(0, 84%, 60%)" fill="url(#pesGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
