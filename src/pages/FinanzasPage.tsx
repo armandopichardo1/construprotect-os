@@ -1041,11 +1041,14 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
   }, [filteredSales]);
 
   const productData = useMemo(() => {
-    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number }> = {};
+    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetMargin: number }> = {};
     filteredItems.forEach((si: any) => {
       const key = si.product_id || 'unknown';
       const name = si.products?.name || 'Producto Desconocido';
-      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0 };
+      const prod = si.products || {};
+      const avgTarget = [prod.margin_list_pct, prod.margin_architect_pct, prod.margin_project_pct, prod.margin_wholesale_pct]
+        .filter((v: any) => v != null && v > 0).reduce((a: number, b: number, _: number, arr: number[]) => a + b / arr.length, 0);
+      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0, targetMargin: avgTarget || 0 };
       map[key].revenue += Number(si.line_total_usd || 0);
       map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
       map[key].units += Number(si.quantity || 0);
