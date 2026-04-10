@@ -33,6 +33,8 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [estimatedArrival, setEstimatedArrival] = useState('');
   const [notes, setNotes] = useState('');
+  const [shippingCost, setShippingCost] = useState('0');
+  const [customsCost, setCustomsCost] = useState('0');
   const [items, setItems] = useState<{ product_id: string; quantity_ordered: number; unit_cost_usd: number }[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -52,13 +54,15 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
       setOrderDate(editShipment.order_date || '');
       setEstimatedArrival(editShipment.estimated_arrival || '');
       setNotes(editShipment.notes || '');
+      setShippingCost(String(editShipment.shipping_cost_usd || 0));
+      setCustomsCost(String(editShipment.customs_cost_usd || 0));
       setItems(editShipment.shipment_items?.map((si: any) => ({
         product_id: si.product_id, quantity_ordered: si.quantity_ordered, unit_cost_usd: Number(si.unit_cost_usd),
       })) || []);
     } else {
       setSupplierName(''); setPoNumber(''); setStatus('ordered');
       setOrderDate(new Date().toISOString().split('T')[0]);
-      setEstimatedArrival(''); setNotes(''); setItems([]);
+      setEstimatedArrival(''); setNotes(''); setShippingCost('0'); setCustomsCost('0'); setItems([]);
     }
   }, [editShipment, open]);
 
@@ -74,18 +78,23 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
     setItems(copy);
   };
 
-  const totalCost = items.reduce((s, i) => s + i.quantity_ordered * i.unit_cost_usd, 0);
+  const productCost = items.reduce((s, i) => s + i.quantity_ordered * i.unit_cost_usd, 0);
+  const totalCost = productCost + (Number(shippingCost) || 0) + (Number(customsCost) || 0);
 
   const handleSave = async () => {
     if (!supplierName.trim()) { toast.error('Ingresa el proveedor'); return; }
     setSaving(true);
     try {
+      const payload = {
+        supplier_name: supplierName, po_number: poNumber, status: status as any,
+        order_date: orderDate, estimated_arrival: estimatedArrival || null,
+        total_cost_usd: totalCost, notes: notes || null,
+        shipping_cost_usd: Number(shippingCost) || 0,
+        customs_cost_usd: Number(customsCost) || 0,
+      };
+
       if (isEdit) {
-        await supabase.from('shipments').update({
-          supplier_name: supplierName, po_number: poNumber, status: status as any,
-          order_date: orderDate, estimated_arrival: estimatedArrival || null,
-          total_cost_usd: totalCost, notes: notes || null,
-        }).eq('id', editShipment.id);
+        await supabase.from('shipments').update(payload).eq('id', editShipment.id);
         await supabase.from('shipment_items').delete().eq('shipment_id', editShipment.id);
         if (items.length > 0) {
           await supabase.from('shipment_items').insert(items.filter(i => i.product_id).map(i => ({
@@ -94,11 +103,7 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
           })));
         }
       } else {
-        const { data: shipment, error } = await supabase.from('shipments').insert({
-          supplier_name: supplierName, po_number: poNumber, status: status as any,
-          order_date: orderDate, estimated_arrival: estimatedArrival || null,
-          total_cost_usd: totalCost, notes: notes || null,
-        }).select().single();
+        const { data: shipment, error } = await supabase.from('shipments').insert(payload).select().single();
         if (error) throw error;
         if (items.length > 0) {
           await supabase.from('shipment_items').insert(items.filter(i => i.product_id).map(i => ({
@@ -138,6 +143,15 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
             <div><Label className="text-xs">Notas</Label><Input value={notes} onChange={e => setNotes(e.target.value)} /></div>
           </div>
 
+          {/* Cost breakdown */}
+          <div className="grid grid-cols-3 gap-4">
+            <div><Label className="text-xs">Costo Envío (USD)</Label><Input type="number" step="0.01" value={shippingCost} onChange={e => setShippingCost(e.target.value)} /></div>
+            <div><Label className="text-xs">Costo Aduanas (USD)</Label><Input type="number" step="0.01" value={customsCost} onChange={e => setCustomsCost(e.target.value)} /></div>
+            <div className="flex items-end">
+              <p className="text-xs text-muted-foreground pb-2">Productos: ${productCost.toFixed(2)}</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold">Productos</Label>
@@ -155,7 +169,7 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
               </div>
             ))}
             {items.length > 0 && (
-              <p className="text-xs text-muted-foreground text-right">Total estimado: <span className="font-bold text-foreground">${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
+              <p className="text-xs text-muted-foreground text-right">Total (productos + envío + aduanas): <span className="font-bold text-foreground">${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
             )}
           </div>
 
