@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatte
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Bot, RefreshCw } from 'lucide-react';
+import { Bot, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
@@ -37,21 +37,70 @@ function MiniSparkline({ data }: { data: number[] }) {
   );
 }
 
+/** Horizontal thermometer: shows current stock vs reorder point */
+function StockThermometer({ qty, reorder, maxQty }: { qty: number; reorder: number; maxQty: number }) {
+  const barMax = Math.max(maxQty, reorder * 2, qty, 1);
+  const qtyPct = Math.min((qty / barMax) * 100, 100);
+  const reorderPct = Math.min((reorder / barMax) * 100, 100);
+  const color = qty === 0 ? 'hsl(0, 84%, 60%)' : qty <= reorder ? 'hsl(38, 92%, 50%)' : 'hsl(160, 84%, 39%)';
+
+  return (
+    <div className="relative h-4 w-full">
+      {/* Background track */}
+      <div className="absolute inset-0 rounded-full bg-muted" />
+      {/* Fill bar */}
+      <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${qtyPct}%`, background: color }} />
+      {/* Reorder point marker */}
+      <div
+        className="absolute top-[-2px] bottom-[-2px] w-0.5 bg-destructive z-10"
+        style={{ left: `${reorderPct}%` }}
+        title={`Reorden: ${reorder}`}
+      />
+      {/* Reorder label */}
+      <div className="absolute text-[8px] text-destructive font-bold" style={{ left: `${reorderPct}%`, top: '-12px', transform: 'translateX(-50%)' }}>
+        {reorder}
+      </div>
+    </div>
+  );
+}
+
 type StockItem = {
   id: string; name: string; sku: string; qty: number; reorder: number;
   status: string; category: string; value: number; movements: number[];
   velocity: number; costUsd: number;
 };
 
+type SortField = 'status' | 'name' | 'category' | 'qty' | 'value' | 'velocity';
+type SortDir = 'asc' | 'desc';
+
+const ABC_DEFINITIONS: Record<string, { title: string; desc: string; color: string }> = {
+  A: {
+    title: 'Clase A — Alta prioridad (70% del valor)',
+    desc: 'Productos que generan la mayor parte del valor del inventario. Requieren monitoreo constante, reabastecimiento frecuente y revisión semanal de stock. Nunca deben agotarse.',
+    color: 'bg-primary/15 text-primary',
+  },
+  B: {
+    title: 'Clase B — Prioridad media (20% del valor)',
+    desc: 'Productos con demanda moderada y valor intermedio. Se revisan cada 2 semanas. Mantener stock de seguridad estándar.',
+    color: 'bg-warning/15 text-warning',
+  },
+  C: {
+    title: 'Clase C — Baja prioridad (10% del valor)',
+    desc: 'Productos de bajo valor o baja rotación. Comprar en cantidades mayores con menor frecuencia. Revisar mensualmente y considerar descontinuar los de menor demanda.',
+    color: 'bg-muted text-muted-foreground',
+  },
+};
+
 export default function InventarioPage() {
   const [tab, setTab] = useState('Stock');
   const [filter, setFilter] = useState('all');
+  const [sortField, setSortField] = useState<SortField>('status');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [showPO, setShowPO] = useState(false);
   const [poContent, setPOContent] = useState('');
   const [poLoading, setPOLoading] = useState(false);
   const queryClient = useQueryClient();
 
-  // Realtime: auto-refresh inventory when any user makes changes
   useEffect(() => {
     const channel = supabase
       .channel('inventory-realtime')
@@ -117,10 +166,29 @@ export default function InventarioPage() {
   }), [items]);
 
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter);
-  const sorted = [...filtered].sort((a, b) => {
-    const order = { out: 0, low: 1, excess: 2, ok: 3 };
-    return (order[a.status as keyof typeof order] ?? 4) - (order[b.status as keyof typeof order] ?? 4);
-  });
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  };
+
+  const sorted = useMemo(() => {
+    const statusOrder: Record<string, number> = { out: 0, low: 1, excess: 2, ok: 3 };
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'status': cmp = (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4); break;
+        case 'name': cmp = a.name.localeCompare(b.name); break;
+        case 'category': cmp = a.category.localeCompare(b.category); break;
+        case 'qty': cmp = a.qty - b.qty; break;
+        case 'value': cmp = a.value - b.value; break;
+        case 'velocity': cmp = a.velocity - b.velocity; break;
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [filtered, sortField, sortDir]);
+
+  const maxQty = useMemo(() => Math.max(...items.map(i => i.qty), 1), [items]);
 
   const categoryValues = useMemo(() => {
     const cats: Record<string, number> = {};
@@ -129,15 +197,6 @@ export default function InventarioPage() {
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value, color: colors[i] || colors[4] }));
   }, [items]);
 
-  const daysOfSupply = useMemo(() => {
-    return items.map(i => {
-      const avgMonthly = i.velocity;
-      const days = avgMonthly > 0 ? Math.round((i.qty / avgMonthly) * 30) : 999;
-      return { name: i.name, days: Math.min(days, 120), color: days < 15 ? 'hsl(0, 84%, 60%)' : days < 30 ? 'hsl(38, 92%, 50%)' : 'hsl(160, 84%, 39%)' };
-    }).sort((a, b) => a.days - b.days).slice(0, 10);
-  }, [items]);
-
-  // Velocity vs Stock bubble chart data
   const bubbleData = useMemo(() => {
     return items.filter(i => i.velocity > 0 || i.qty > 0).map(i => ({
       x: i.velocity, y: i.qty, z: i.value, name: i.name, status: i.status,
@@ -145,7 +204,6 @@ export default function InventarioPage() {
   }, [items]);
 
   const abcGroups = useMemo(() => {
-    // ABC based on revenue (velocity * price) + velocity
     const scored = items.map(i => ({ ...i, score: i.velocity * i.costUsd + i.value }));
     const byScore = [...scored].sort((a, b) => b.score - a.score);
     const total = byScore.reduce((s, i) => s + i.score, 0);
@@ -159,6 +217,22 @@ export default function InventarioPage() {
     });
     return { A, B, C };
   }, [items]);
+
+  // Parse PO content into table rows
+  const poTableData = useMemo(() => {
+    if (!poContent) return null;
+    // Try to parse markdown table from PO content
+    const lines = poContent.split('\n').filter(l => l.trim());
+    const tableLines = lines.filter(l => l.includes('|'));
+    if (tableLines.length < 3) return null; // Need header + separator + at least 1 row
+    
+    const parseRow = (line: string) => line.split('|').map(c => c.trim()).filter(Boolean);
+    const headers = parseRow(tableLines[0]);
+    const rows = tableLines.slice(2).map(parseRow).filter(r => r.length >= 2);
+    
+    if (rows.length === 0) return null;
+    return { headers, rows };
+  }, [poContent]);
 
   const generatePO = async () => {
     setShowPO(true);
@@ -175,6 +249,15 @@ export default function InventarioPage() {
       setPOLoading(false);
     }
   };
+
+  const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <TableHead className="text-xs cursor-pointer select-none hover:text-foreground" onClick={() => toggleSort(field)}>
+      <div className="flex items-center gap-1">
+        {children}
+        <ArrowUpDown className={cn('w-3 h-3', sortField === field ? 'text-primary' : 'text-muted-foreground/40')} />
+      </div>
+    </TableHead>
+  );
 
   return (
     <AppLayout>
@@ -208,13 +291,13 @@ export default function InventarioPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-xs">SKU</TableHead>
-                    <TableHead className="text-xs">Producto</TableHead>
-                    <TableHead className="text-xs">Categoría</TableHead>
-                    <TableHead className="text-xs text-right">Stock</TableHead>
-                    <TableHead className="text-xs text-right">Reorden</TableHead>
-                    <TableHead className="text-xs text-right">Valor</TableHead>
-                    <TableHead className="text-xs text-right">Vel/mes</TableHead>
-                    <TableHead className="text-xs">Estado</TableHead>
+                    <SortHeader field="name">Producto</SortHeader>
+                    <SortHeader field="category">Categoría</SortHeader>
+                    <SortHeader field="qty">Stock</SortHeader>
+                    <TableHead className="text-xs w-[180px]">Nivel</TableHead>
+                    <SortHeader field="value">Valor</SortHeader>
+                    <SortHeader field="velocity">Vel/mes</SortHeader>
+                    <SortHeader field="status">Estado</SortHeader>
                     <TableHead className="text-xs">Tendencia</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -225,7 +308,9 @@ export default function InventarioPage() {
                       <TableCell className="text-xs font-medium">{item.name}</TableCell>
                       <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{item.category}</span></TableCell>
                       <TableCell className="text-xs text-right font-mono font-bold">{item.qty}</TableCell>
-                      <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.reorder}</TableCell>
+                      <TableCell className="px-2">
+                        <StockThermometer qty={item.qty} reorder={item.reorder} maxQty={maxQty} />
+                      </TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
                       <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.velocity.toFixed(1)}</TableCell>
                       <TableCell><StatusBadge status={item.status} /></TableCell>
@@ -261,20 +346,34 @@ export default function InventarioPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Thermometer overview by product */}
               <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
-                <h2 className="text-sm font-semibold text-foreground">Días de Suministro</h2>
-                <div className="space-y-3">
-                  {daysOfSupply.map(d => (
-                    <div key={d.name} className="space-y-1">
+                <h2 className="text-sm font-semibold text-foreground">Stock vs Punto de Reorden</h2>
+                <div className="space-y-4">
+                  {[...items].sort((a, b) => (a.qty / Math.max(a.reorder, 1)) - (b.qty / Math.max(b.reorder, 1))).slice(0, 10).map(item => (
+                    <div key={item.id} className="space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="text-foreground truncate mr-2">{d.name}</span>
-                        <span className="text-muted-foreground shrink-0">{d.days >= 120 ? '120+' : d.days}d</span>
+                        <span className="text-foreground truncate mr-2">{item.name}</span>
+                        <span className="text-muted-foreground font-mono shrink-0">{item.qty} / {item.reorder}</span>
                       </div>
-                      <div className="h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(d.days, 120) / 120 * 100}%`, background: d.color }} />
-                      </div>
+                      <StockThermometer qty={item.qty} reorder={item.reorder} maxQty={Math.max(item.reorder * 3, item.qty)} />
                     </div>
                   ))}
+                </div>
+                <div className="flex items-center gap-4 pt-2 border-t border-border">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-0.5 bg-destructive" />
+                    <span className="text-[10px] text-muted-foreground">Punto de reorden</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-2 rounded-sm bg-success" />
+                    <span className="text-[10px] text-muted-foreground">Sobre reorden</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-2 rounded-sm bg-warning" />
+                    <span className="text-[10px] text-muted-foreground">Bajo reorden</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -306,51 +405,69 @@ export default function InventarioPage() {
         {tab === 'Envíos' && <ShipmentsTab />}
 
         {tab === 'ABC' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {([
-              ['A', abcGroups.A, '70% del valor', 'bg-primary/15 text-primary'] as const,
-              ['B', abcGroups.B, '20% del valor', 'bg-warning/15 text-warning'] as const,
-              ['C', abcGroups.C, '10% del valor', 'bg-muted text-muted-foreground'] as const,
-            ]).map(([tier, group, desc, style]) => (
-              <div key={tier} className="rounded-2xl bg-card border border-border p-5 space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className={cn('h-10 w-10 rounded-lg flex items-center justify-center text-lg font-bold', style)}>{tier}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Clase {tier} — {desc}</p>
-                    <p className="text-xs text-muted-foreground">{group.length} productos</p>
+          <div className="space-y-4">
+            {/* ABC definitions info */}
+            <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
+              <h2 className="text-sm font-semibold text-foreground">¿Qué es el Análisis ABC?</h2>
+              <p className="text-xs text-muted-foreground">
+                El análisis ABC clasifica productos según su contribución al valor total del inventario, combinando el valor en stock y la velocidad de venta. Permite priorizar la gestión de los productos más importantes.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(['A', 'B', 'C'] as const).map(tier => (
+                  <div key={tier} className={cn('rounded-xl p-3 space-y-1', ABC_DEFINITIONS[tier].color.split(' ')[0])}>
+                    <p className={cn('text-xs font-bold', ABC_DEFINITIONS[tier].color.split(' ')[1])}>{ABC_DEFINITIONS[tier].title}</p>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">{ABC_DEFINITIONS[tier].desc}</p>
                   </div>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-[10px]">SKU</TableHead>
-                      <TableHead className="text-[10px]">Producto</TableHead>
-                      <TableHead className="text-[10px] text-right">Stock</TableHead>
-                      <TableHead className="text-[10px] text-right">Vel/mes</TableHead>
-                      <TableHead className="text-[10px] text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.slice(0, 8).map(i => (
-                      <TableRow key={i.sku}>
-                        <TableCell className="text-[10px] font-mono">{i.sku}</TableCell>
-                        <TableCell className="text-[10px]">{i.name}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono">{i.qty}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono">{i.velocity.toFixed(1)}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono">{formatUSD(i.value)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {([
+                ['A', abcGroups.A, '70% del valor', 'bg-primary/15 text-primary'] as const,
+                ['B', abcGroups.B, '20% del valor', 'bg-warning/15 text-warning'] as const,
+                ['C', abcGroups.C, '10% del valor', 'bg-muted text-muted-foreground'] as const,
+              ]).map(([tier, group, desc, style]) => (
+                <div key={tier} className="rounded-2xl bg-card border border-border p-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className={cn('h-10 w-10 rounded-lg flex items-center justify-center text-lg font-bold', style)}>{tier}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Clase {tier} — {desc}</p>
+                      <p className="text-xs text-muted-foreground">{group.length} productos</p>
+                    </div>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-[10px]">SKU</TableHead>
+                        <TableHead className="text-[10px]">Producto</TableHead>
+                        <TableHead className="text-[10px] text-right">Stock</TableHead>
+                        <TableHead className="text-[10px] text-right">Vel/mes</TableHead>
+                        <TableHead className="text-[10px] text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {group.slice(0, 8).map(i => (
+                        <TableRow key={i.sku}>
+                          <TableCell className="text-[10px] font-mono">{i.sku}</TableCell>
+                          <TableCell className="text-[10px]">{i.name}</TableCell>
+                          <TableCell className="text-[10px] text-right font-mono">{i.qty}</TableCell>
+                          <TableCell className="text-[10px] text-right font-mono">{i.velocity.toFixed(1)}</TableCell>
+                          <TableCell className="text-[10px] text-right font-mono">{formatUSD(i.value)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
       {/* AI PO Recommender Dialog */}
       <Dialog open={showPO} onOpenChange={setShowPO}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-4 h-4" /> 🤖 PO Recomendado
@@ -359,13 +476,49 @@ export default function InventarioPage() {
               </Button>
             </DialogTitle>
           </DialogHeader>
-          <div className="prose prose-sm prose-invert max-w-none">
-            {poContent ? <ReactMarkdown>{poContent}</ReactMarkdown> : (
-              <div className="text-center text-muted-foreground py-8">
-                {poLoading ? <p className="animate-pulse">Analizando inventario y generando PO...</p> : <p>Generando...</p>}
+          
+          {poContent ? (
+            poTableData ? (
+              <div className="space-y-4">
+                {/* Render non-table content above */}
+                {poContent.split('\n').filter(l => !l.includes('|') && !l.match(/^[\s-]+$/)).filter(l => l.trim()).length > 0 && (
+                  <div className="prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown>
+                      {poContent.split('\n').filter(l => !l.includes('|') && !l.match(/^[\s-]+$/)).join('\n')}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {poTableData.headers.map((h, i) => (
+                          <TableHead key={i} className="text-xs font-semibold">{h}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {poTableData.rows.map((row, ri) => (
+                        <TableRow key={ri}>
+                          {row.map((cell, ci) => (
+                            <TableCell key={ci} className="text-xs">{cell}</TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            )}
-          </div>
+            ) : (
+              <div className="prose prose-sm prose-invert max-w-none">
+                <ReactMarkdown>{poContent}</ReactMarkdown>
+              </div>
+            )
+          ) : (
+            <div className="text-center text-muted-foreground py-8">
+              {poLoading ? <p className="animate-pulse">Analizando inventario y generando PO...</p> : <p>Generando...</p>}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </AppLayout>
