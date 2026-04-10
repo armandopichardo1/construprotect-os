@@ -8,14 +8,16 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatte
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Bot, RefreshCw, ArrowUpDown } from 'lucide-react';
+import { Bot, RefreshCw, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { ShipmentsTab } from '@/components/inventario/ShipmentsTab';
 import { MovimientosTab } from '@/components/inventario/MovimientosTab';
+import { SuppliersTab } from '@/components/inventario/SuppliersTab';
+import { DaysOfSupplyChart, OverstockWarnings } from '@/components/inventario/InventoryAnalytics';
 
-const tabs = ['Stock', 'Movimientos', 'Analytics', 'Envíos', 'ABC'];
+const tabs = ['Stock', 'Movimientos', 'Analytics', 'Envíos', 'Proveedores', 'ABC'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 function StatusBadge({ status }: { status: string }) {
