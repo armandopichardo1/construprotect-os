@@ -1099,7 +1099,7 @@ function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], start
   return { revenue, cogs, grossProfit, cogsByProduct, directCosts, costsByCategory, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
 }
 
-function getDateRange(period: string, now: Date): { start: string; end: string; label: string } {
+function getDateRange(period: string, now: Date, customFrom?: Date, customTo?: Date): { start: string; end: string; label: string } {
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const y = now.getFullYear(), m = now.getMonth();
   switch (period) {
@@ -1107,6 +1107,11 @@ function getDateRange(period: string, now: Date): { start: string; end: string; 
     case 'ytd': return { start: `${y}-01-01`, end: fmt(now), label: `YTD ${y}` };
     case 'last_quarter': { const s = new Date(y, m - 3, 1); const e = new Date(y, m, 0); return { start: fmt(s), end: fmt(e), label: 'Últ. Trimestre' }; }
     case 'full_year': return { start: `${y}-01-01`, end: `${y}-12-31`, label: `Año ${y}` };
+    case 'custom': {
+      const s = customFrom ? fmt(customFrom) : '2000-01-01';
+      const e = customTo ? fmt(customTo) : fmt(now);
+      return { start: s, end: e, label: 'Personalizado' };
+    }
     default: { const s = new Date(y, m, 1); return { start: fmt(s), end: fmt(now), label: s.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' }) }; }
   }
 }
