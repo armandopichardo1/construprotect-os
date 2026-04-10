@@ -93,6 +93,7 @@ export default function FinanzasPage() {
   const [tab, setTab] = useState('Crear Transacción');
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
+  const [costPrefill, setCostPrefill] = useState<any>(null);
   const { rate, rateForMonth } = useExchangeRate();
   const fmt = (usd: number) => formatDOP(usd * rate);
   const fmtDop = (dop: number) => formatDOP(dop);
@@ -223,7 +224,8 @@ export default function FinanzasPage() {
         {tab === 'Crear Transacción' && (
           <CrearTransaccionTab rate={latestRate}
             onEditSale={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
-            onEditExpense={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
+            onEditExpense={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }}
+            onEditCost={(data: any) => { setCostPrefill(data); setTab('Costos'); }} />
         )}
 
         {tab === 'Resumen' && (
@@ -314,13 +316,13 @@ export default function FinanzasPage() {
             <TerritoryCoverageSection data={territoryData} />
           </div>
         )}
-        {tab === 'Gastos' && <GastosTab expenses={expenses} queryClient={queryClient} rate={latestRate} onExport={() => {
+        {tab === 'Gastos' && <GastosTab expenses={expenses} queryClient={queryClient} rate={latestRate} prefill={expensePrefill} clearPrefill={() => setExpensePrefill(null)} onExport={() => {
           exportToExcel(expenses.map((e: any) => ({
             Fecha: e.date, Descripción: e.description, Categoría: e.category,
             Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
           })), 'gastos', 'Gastos');
         }} />}
-        {tab === 'Costos' && <CostosTab costs={costs} queryClient={queryClient} rate={latestRate} onExport={() => {
+        {tab === 'Costos' && <CostosTab costs={costs} queryClient={queryClient} rate={latestRate} prefill={costPrefill} clearPrefill={() => setCostPrefill(null)} onExport={() => {
           exportToExcel(costs.map((c: any) => ({
             Fecha: c.date, Descripción: c.description, Categoría: c.category,
             Proveedor: c.vendor, 'Monto USD': c.amount_usd, 'Monto DOP': c.amount_dop,
