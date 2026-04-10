@@ -56,17 +56,15 @@ export function CashFlowTab({ sales, expenses }: Props) {
       .reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   }, [sales]);
 
-  // --- PROJECTION ---
+  // --- PROJECTION with scenarios ---
   const projection = useMemo(() => {
     const nProj = Number(projMonths);
     const currentCumulative = data[data.length - 1]?.cumulative || 0;
 
-    // Pending receivables broken down: assume collected evenly over projection months
     const pendingSales = sales.filter((s: any) => s.payment_status !== 'paid' && s.payment_status !== 'cancelled');
     const totalPending = pendingSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
     const monthlyReceivable = nProj > 0 ? totalPending / nProj : 0;
 
-    // Recurring expenses: sum monthly amounts
     const recurringExpenses = expenses.filter((e: any) => e.is_recurring);
     const monthlyRecurring = recurringExpenses.reduce((s: number, e: any) => {
       const amt = Number(e.amount_usd || 0);
@@ -75,32 +73,54 @@ export function CashFlowTab({ sales, expenses }: Props) {
       if (freq === 'biweekly' || freq === 'quincenal') return s + amt * 2;
       if (freq === 'quarterly' || freq === 'trimestral') return s + amt / 3;
       if (freq === 'yearly' || freq === 'anual') return s + amt / 12;
-      return s + amt; // monthly
+      return s + amt;
     }, 0);
 
-    // Average non-recurring monthly expenses (last 3 months)
     const last3 = data.slice(-3);
     const avgNonRecurringOut = last3.length > 0
       ? last3.reduce((s, r) => s + r.outflows, 0) / last3.length - monthlyRecurring
       : 0;
     const estimatedOtherExpenses = Math.max(0, avgNonRecurringOut);
 
-    // Average monthly sales (last 3 months) as baseline new revenue
     const avgNewSales = last3.length > 0
       ? last3.reduce((s, r) => s + r.inflows, 0) / last3.length
       : 0;
 
-    const rows: { month: string; receivables: number; newSales: number; recurring: number; otherExpenses: number; netProjected: number; cumulative: number }[] = [];
-    let cum = currentCumulative;
+    const SCENARIOS = [
+      { key: 'optimista', salesMult: 1.20, expMult: 0.80 },
+      { key: 'base', salesMult: 1.0, expMult: 1.0 },
+      { key: 'pesimista', salesMult: 0.80, expMult: 1.20 },
+    ] as const;
+
+    const rows: {
+      month: string; receivables: number; newSales: number; recurring: number; otherExpenses: number;
+      netProjected: number; cumulative: number;
+      netOptimista: number; cumOptimista: number;
+      netPesimista: number; cumPesimista: number;
+    }[] = [];
+
+    let cumBase = currentCumulative;
+    let cumOpt = currentCumulative;
+    let cumPes = currentCumulative;
 
     for (let i = 1; i <= nProj; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const label = d.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' });
 
-      const totalIn = monthlyReceivable + avgNewSales;
-      const totalOut = monthlyRecurring + estimatedOtherExpenses;
-      const net = totalIn - totalOut;
-      cum += net;
+      const baseIn = monthlyReceivable + avgNewSales;
+      const baseOut = monthlyRecurring + estimatedOtherExpenses;
+      const netBase = baseIn - baseOut;
+      cumBase += netBase;
+
+      const optIn = monthlyReceivable + avgNewSales * 1.20;
+      const optOut = monthlyRecurring + estimatedOtherExpenses * 0.80;
+      const netOpt = optIn - optOut;
+      cumOpt += netOpt;
+
+      const pesIn = monthlyReceivable + avgNewSales * 0.80;
+      const pesOut = monthlyRecurring + estimatedOtherExpenses * 1.20;
+      const netPes = pesIn - pesOut;
+      cumPes += netPes;
 
       rows.push({
         month: label,
@@ -108,8 +128,12 @@ export function CashFlowTab({ sales, expenses }: Props) {
         newSales: avgNewSales,
         recurring: monthlyRecurring,
         otherExpenses: estimatedOtherExpenses,
-        netProjected: net,
-        cumulative: cum,
+        netProjected: netBase,
+        cumulative: cumBase,
+        netOptimista: netOpt,
+        cumOptimista: cumOpt,
+        netPesimista: netPes,
+        cumPesimista: cumPes,
       });
     }
 
@@ -249,25 +273,35 @@ export function CashFlowTab({ sales, expenses }: Props) {
           ))}
         </div>
 
-        {/* Projection chart */}
-        <ResponsiveContainer width="100%" height={260}>
+        {/* Projection chart with scenarios */}
+        <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={projection.rows}>
             <defs>
               <linearGradient id="projGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.2} />
                 <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="optGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="pesGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" strokeDasharray="3 3" />
-            <Area type="monotone" dataKey="cumulative" name="Acumulado Proyectado" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2} />
-            <Line type="monotone" dataKey="netProjected" name="Flujo Neto Proyectado" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 4, fill: 'hsl(160, 84%, 39%)' }} />
+            <Area type="monotone" dataKey="cumOptimista" name="Optimista (+20%)" stroke="hsl(160, 84%, 39%)" fill="url(#optGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
+            <Area type="monotone" dataKey="cumulative" name="Base" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(217, 91%, 60%)' }} />
+            <Area type="monotone" dataKey="cumPesimista" name="Pesimista (-20%)" stroke="hsl(0, 84%, 60%)" fill="url(#pesGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
 
-        {/* Projection table */}
+        {/* Projection table with scenarios */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader>
@@ -277,8 +311,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
                 <TableHead className="text-xs text-right">Ventas Est.</TableHead>
                 <TableHead className="text-xs text-right">G. Recurrentes</TableHead>
                 <TableHead className="text-xs text-right">Otros Gastos</TableHead>
-                <TableHead className="text-xs text-right">Neto Proy.</TableHead>
-                <TableHead className="text-xs text-right">Acumulado</TableHead>
+                <TableHead className="text-xs text-right text-success">Optimista</TableHead>
+                <TableHead className="text-xs text-right">Base</TableHead>
+                <TableHead className="text-xs text-right text-destructive">Pesimista</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -289,8 +324,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
                   <TableCell className="text-xs text-right font-mono text-success">{formatUSD(r.newSales)}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(r.recurring)}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(r.otherExpenses)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono font-semibold', r.netProjected >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(r.netProjected)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono', r.cumulative >= 0 ? 'text-foreground' : 'text-destructive')}>{formatUSD(r.cumulative)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-success font-semibold">{formatUSD(r.cumOptimista)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono font-bold', r.cumulative >= 0 ? 'text-primary' : 'text-destructive')}>{formatUSD(r.cumulative)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-destructive font-semibold">{formatUSD(r.cumPesimista)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -298,7 +334,7 @@ export function CashFlowTab({ sales, expenses }: Props) {
         </div>
 
         <p className="text-[10px] text-muted-foreground/60 italic">
-          * Proyección basada en ventas pendientes de cobro distribuidas uniformemente, ventas promedio de los últimos 3 meses, y gastos recurrentes configurados. No constituye garantía financiera.
+          * Escenarios Optimista/Pesimista aplican ±20% sobre ventas estimadas y otros gastos. Cobros pendientes y gastos recurrentes se mantienen fijos. No constituye garantía financiera.
         </p>
       </div>
     </div>
