@@ -355,12 +355,14 @@ export function ReorderTab() {
               <TableRow>
                 <TableHead className="text-xs">SKU</TableHead>
                 <TableHead className="text-xs">Producto</TableHead>
-                <TableHead className="text-xs">Categoría</TableHead>
                 <TableHead className="text-xs text-right">Stock</TableHead>
                 <TableHead className="text-xs text-right">Vel/mes</TableHead>
                 <TableHead className="text-xs text-center">Tendencia</TableHead>
                 <TableHead className="text-xs text-right">Días Stock</TableHead>
-                <TableHead className="text-xs text-right">Lead Time</TableHead>
+                <TableHead className="text-xs text-right">Agotam.</TableHead>
+                <TableHead className="text-xs text-right">Lead</TableHead>
+                <TableHead className="text-xs text-right">Safety</TableHead>
+                <TableHead className="text-xs text-right">Min Batch</TableHead>
                 <TableHead className="text-xs text-right">Pto. Reorden</TableHead>
                 <TableHead className="text-xs text-right">Qty Reorden</TableHead>
                 <TableHead className="text-xs"></TableHead>
@@ -370,11 +372,11 @@ export function ReorderTab() {
               {items.sort((a, b) => a.daysOfSupply - b.daysOfSupply).map(p => {
                 const editing = editingRows[p.id];
                 const isWarning = p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point;
+                const isCritical = p.arrivalDay < 0 && p.avgMonthly > 0;
                 return (
-                  <TableRow key={p.id} className={cn(isWarning && 'bg-destructive/5')}>
+                  <TableRow key={p.id} className={cn(isCritical ? 'bg-destructive/10' : isWarning && 'bg-destructive/5')}>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
-                    <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{p.category}</span></TableCell>
                     <TableCell className="text-xs text-right font-mono font-bold">{p.qty}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{p.avgMonthly.toFixed(1)}</TableCell>
                     <TableCell className="text-center">
@@ -388,7 +390,13 @@ export function ReorderTab() {
                     <TableCell className={cn('text-xs text-right font-mono', p.daysOfSupply < p.lead_time_days ? 'text-destructive font-bold' : '')}>
                       {p.daysOfSupply >= 999 ? '∞' : `${p.daysOfSupply}d`}
                     </TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono', isCritical ? 'text-destructive font-bold' : 'text-muted-foreground')}>
+                      {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
+                      {isCritical && <span className="text-[8px] block text-destructive">⚠️ -{Math.abs(p.arrivalDay)}d</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.lead_time_days}d</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.safetyStock}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.min_order_qty}</TableCell>
                     <TableCell className="text-xs text-right">
                       {editing ? (
                         <Input type="number" className="w-16 h-6 text-xs p-1 text-right" value={editing.reorderPoint}
