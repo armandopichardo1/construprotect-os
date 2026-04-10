@@ -4,8 +4,9 @@ import { KpiCard } from '@/components/KpiCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, formatDOP } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   LineChart, Line, ComposedChart, Legend, LabelList,
@@ -42,6 +43,8 @@ const FUNNEL_COLORS = ['hsl(217, 91%, 65%)', 'hsl(217, 91%, 58%)', 'hsl(217, 91%
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { rate } = useExchangeRate();
+  const fmt = (usd: number) => formatDOP(usd * rate);
   const [showReview, setShowReview] = useState(false);
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -264,10 +267,10 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <KpiCard title="Ingresos Total" value={formatUSD(revenueData?.totalRevenue || 0)} icon="💰" variant="primary" />
+          <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon="💰" variant="primary" />
           <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon="📈" variant="success" />
-          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon="📊" variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${formatUSD(revenueData?.totalExpenses || 0)}`} />
-          <KpiCard title="Valor Inventario" value={formatUSD(inventoryStats?.totalValue || 0)} icon="📦" />
+          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon="📊" variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
+          <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon="📦" />
           <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon="🔔"
             variant={inventoryStats?.alerts ? 'warning' : 'default'}
             subtitle={`${(inventoryStats?.totalUnits || 0).toLocaleString()} unidades total`} />
@@ -281,15 +284,15 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={revenueData.monthly} barGap={2}>
                   <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" tick={axisTick} axisLine={false} tickLine={false} width={50} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis yAxisId="left" tick={axisTick} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `RD$${(v * rate / 1000).toFixed(0)}k`} />
                   <YAxis yAxisId="right" orientation="right" tick={axisTick} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}%`} />
                   <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
                     if (name === 'Margen Bruto' || name === 'Margen Neto') return `${v}%`;
-                    return formatUSD(v);
+                    return fmt(v);
                   }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar yAxisId="left" dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos">
-                    <LabelList dataKey="revenue" position="top" formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ''} style={{ fill: 'hsl(220, 12%, 60%)', fontSize: 9 }} />
+                    <LabelList dataKey="revenue" position="top" formatter={(v: number) => v > 0 ? `RD$${(v * rate / 1000).toFixed(1)}k` : ''} style={{ fill: 'hsl(220, 12%, 60%)', fontSize: 9 }} />
                   </Bar>
                   <Bar yAxisId="left" dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos" />
                   <Line yAxisId="right" type="monotone" dataKey="grossMargin" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 3, fill: 'hsl(160, 84%, 39%)' }} name="Margen Bruto">
@@ -348,7 +351,7 @@ export default function DashboardPage() {
                     <div key={stage.name} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-foreground font-medium">{stage.name}</span>
-                        <span className="text-muted-foreground">{stage.value} deals · {formatUSD(stage.amount)}</span>
+                        <span className="text-muted-foreground">{stage.value} deals · {fmt(stage.amount)}</span>
                       </div>
                       <div className="h-6 rounded-lg overflow-hidden" style={{ width: `${widthPct}%`, background: FUNNEL_COLORS[i] || FUNNEL_COLORS[5], opacity: 0.8 + (i * 0.04) }} />
                     </div>
@@ -416,7 +419,7 @@ export default function DashboardPage() {
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${p.pct}%` }} />
                   </div>
-                  <p className="text-xs text-muted-foreground">{formatUSD(p.revenue)}</p>
+                  <p className="text-xs text-muted-foreground">{fmt(p.revenue)}</p>
                 </div>
               ))}
             </div>

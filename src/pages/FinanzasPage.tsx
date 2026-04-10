@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, formatDOP } from '@/lib/format';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, Legend } from 'recharts';
@@ -79,6 +80,9 @@ export default function FinanzasPage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
+  const { rate } = useExchangeRate();
+  const fmt = (usd: number) => formatDOP(usd * rate);
+  const fmtDop = (dop: number) => formatDOP(dop);
   const queryClient = useQueryClient();
 
   const { data: sales = [] } = useQuery({
@@ -122,11 +126,11 @@ export default function FinanzasPage() {
   const mtdSales = sales.filter((s: any) => s.date?.startsWith(thisMonth));
   const mtdExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth));
   const revenueMTD = mtdSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
-  const expensesMTD = mtdExpenses.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
   const cogsMTD = saleItems.filter((si: any) => si.sales?.date?.startsWith(thisMonth))
     .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
   const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD) / revenueMTD * 100) : 0;
-  const netIncome = revenueMTD - cogsMTD - expensesMTD;
+  const netIncome = (revenueMTD - cogsMTD) * rate - expensesMTD_dop;
 
   const monthlyData = useMemo(() => {
     const months: { month: string; revenue: number; cogs: number; expenses: number; profit: number }[] = [];
@@ -134,22 +138,22 @@ export default function FinanzasPage() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString('es-DO', { month: 'short' });
-      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * rate;
       const cogs = saleItems.filter((si: any) => si.sales?.date?.startsWith(key))
-        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * rate;
+      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
       months.push({ month: label, revenue: rev, cogs, expenses: exp, profit: rev - cogs - exp });
     }
     return months;
-  }, [sales, expenses, saleItems]);
+  }, [sales, expenses, saleItems, rate]);
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
-    expenses.forEach((e: any) => { cats[e.category] = (cats[e.category] || 0) + Number(e.amount_usd || 0); });
+    expenses.forEach((e: any) => { cats[e.category] = (cats[e.category] || 0) + (Number(e.amount_dop) || Number(e.amount_usd || 0) * rate); });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([key, value], i) => ({
       name: EXPENSE_CATEGORIES[key]?.label || key, value, color: PIE_COLORS[i % PIE_COLORS.length],
     }));
-  }, [expenses]);
+  }, [expenses, rate]);
 
   return (
     <AppLayout>
@@ -173,10 +177,10 @@ export default function FinanzasPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
-                { label: 'Ingresos MTD', value: formatUSD(revenueMTD), color: 'text-primary' },
+                { label: 'Ingresos MTD', value: fmt(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
-                { label: 'Gastos MTD', value: formatUSD(expensesMTD), color: 'text-destructive' },
-                { label: 'Ingreso Neto', value: formatUSD(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
+                { label: 'Gastos MTD', value: fmtDop(expensesMTD_dop), color: 'text-destructive' },
+                { label: 'Ingreso Neto', value: fmtDop(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
               ].map(kpi => (
                 <div key={kpi.label} className="rounded-2xl bg-card border border-border p-5 text-center">
                   <p className={cn('text-2xl font-bold', kpi.color)}>{kpi.value}</p>
@@ -192,8 +196,8 @@ export default function FinanzasPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlyData}>
                     <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                    <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v/1000).toFixed(0)}K`} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                     <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
                     <Bar dataKey="cogs" name="COGS" fill="hsl(38, 92%, 50%)" radius={[6,6,0,0]} />
                     <Bar dataKey="expenses" name="Gastos" fill="hsl(0, 84%, 60%)" radius={[6,6,0,0]} />
@@ -207,14 +211,14 @@ export default function FinanzasPage() {
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart><Pie data={expenseByCategory} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {expenseByCategory.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
-                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
+                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} /></PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-1.5">
                     {expenseByCategory.slice(0,6).map((c: any) => (
                       <div key={c.name} className="flex items-center gap-2">
                         <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.color }} />
                         <span className="text-xs text-foreground truncate">{c.name}</span>
-                        <span className="text-xs text-muted-foreground ml-auto shrink-0">{formatUSD(c.value)}</span>
+                        <span className="text-xs text-muted-foreground ml-auto shrink-0">{fmtDop(c.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -227,8 +231,8 @@ export default function FinanzasPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={monthlyData}>
                   <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                   <Line type="monotone" dataKey="profit" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -313,7 +317,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
               <TableHead className="text-xs">Ref.</TableHead>
               <TableHead className="text-xs text-right">Subtotal</TableHead>
               <TableHead className="text-xs text-right">ITBIS</TableHead>
-              <TableHead className="text-xs text-right">Total USD</TableHead>
+              <TableHead className="text-xs text-right">Total RD$</TableHead>
               <TableHead className="text-xs">Estado</TableHead>
               <TableHead className="text-xs">Productos</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
@@ -325,9 +329,9 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
                 <TableCell className="text-xs">{s.date}</TableCell>
                 <TableCell className="text-xs font-medium">{s.crm_clients?.name || '—'}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.invoice_ref || '—'}</TableCell>
-                <TableCell className="text-xs text-right font-mono">{formatUSD(Number(s.subtotal_usd))}</TableCell>
-                <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(Number(s.itbis_usd))}</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(Number(s.total_usd))}</TableCell>
+                <TableCell className="text-xs text-right font-mono">{formatDOP(Number(s.subtotal_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
+                <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(Number(s.itbis_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatDOP(Number(s.total_dop) || Number(s.total_usd) * rate)}</TableCell>
                 <TableCell>
                   <SaleStatusSelect sale={s} queryClient={queryClient} />
                 </TableCell>
@@ -357,7 +361,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
         open={!!deleteSale}
         onOpenChange={(v) => { if (!v) setDeleteSale(null); }}
         title="Eliminar venta"
-        description={`¿Eliminar la venta <strong>${deleteSale?.invoice_ref || deleteSale?.date || ''}</strong> por <strong>${formatUSD(Number(deleteSale?.total_usd || 0))}</strong>? Se eliminarán todos los ítems asociados. Esta acción no se puede deshacer.`}
+        description={`¿Eliminar la venta <strong>${deleteSale?.invoice_ref || deleteSale?.date || ''}</strong> por <strong>${formatDOP(Number(deleteSale?.total_dop || Number(deleteSale?.total_usd || 0) * rate))}</strong>? Se eliminarán todos los ítems asociados. Esta acción no se puede deshacer.`}
         onConfirm={handleDeleteSale}
       />
     </div>
@@ -608,8 +612,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Categoría</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Proveedor</TableHead>
-              <TableHead className="text-xs text-right">USD</TableHead>
-              <TableHead className="text-xs text-right">DOP</TableHead>
+              <TableHead className="text-xs text-right">Monto RD$</TableHead>
               <TableHead className="text-xs">Recibo</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
@@ -617,14 +620,14 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
           <TableBody>
             {expenses.map((e: any) => {
               const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.other;
+              const amountDop = Number(e.amount_dop) || Number(e.amount_usd || 0) * rate;
               return (
                 <TableRow key={e.id}>
                   <TableCell className="text-xs">{e.date}</TableCell>
                   <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
                   <TableCell className="text-xs font-medium">{e.description}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
-                  <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(Number(e.amount_usd))}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">RD${Number(e.amount_dop).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
                     <ReceiptUpload expenseId={e.id} currentUrl={e.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })} />
                   </TableCell>
@@ -652,7 +655,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
         open={!!deleteExpense}
         onOpenChange={(v) => { if (!v) setDeleteExpense(null); }}
         title="Eliminar gasto"
-        description={`¿Eliminar el gasto <strong>${deleteExpense?.description || ''}</strong> por <strong>${formatUSD(Number(deleteExpense?.amount_usd || 0))}</strong>? Esta acción no se puede deshacer.`}
+        description={`¿Eliminar el gasto <strong>${deleteExpense?.description || ''}</strong> por <strong>${formatDOP(Number(deleteExpense?.amount_dop) || Number(deleteExpense?.amount_usd || 0) * rate)}</strong>? Esta acción no se puede deshacer.`}
         onConfirm={handleDeleteExpense}
       />
     </div>
