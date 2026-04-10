@@ -224,7 +224,7 @@ export default function FinanzasPage() {
 }
 
 // ============ VENTAS TAB ============
-function VentasTab({ sales, queryClient, rate }: any) {
+function VentasTab({ sales, queryClient, rate, onExport }: any) {
   const [showForm, setShowForm] = useState(false);
   const [editSale, setEditSale] = useState<any>(null);
   const [deleteSale, setDeleteSale] = useState<any>(null);
@@ -243,7 +243,10 @@ function VentasTab({ sales, queryClient, rate }: any) {
 
   return (
     <div className="space-y-4">
-      <Button size="sm" onClick={() => { setEditSale(null); setShowForm(true); }}>+ Nueva Venta</Button>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => { setEditSale(null); setShowForm(true); }}>+ Nueva Venta</Button>
+        <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+      </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
