@@ -9,16 +9,17 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Pencil, Trash2, Star, Search, Upload, Plus } from 'lucide-react';
+import { Pencil, Trash2, Star, Search, Upload, Plus, Eye } from 'lucide-react';
 
 interface ContactsTabProps {
   contacts: Contact[];
   onEdit: (c: Contact) => void;
   onDelete: (c: Contact) => void;
   onNew: () => void;
+  onView?: (c: Contact) => void;
 }
 
-export function ContactsTab({ contacts, onEdit, onDelete, onNew }: ContactsTabProps) {
+export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: ContactsTabProps) {
   const [search, setSearch] = useState('');
   const [segFilter, setSegFilter] = useState('all');
 
@@ -63,6 +64,7 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew }: ContactsTabPr
               {c.segment && (
                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-primary/15 text-primary">{c.segment}</span>
               )}
+              {onView && <button onClick={() => onView(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Eye className="w-3 h-3" /></button>}
               <button onClick={() => onEdit(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
               <button onClick={() => onDelete(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
             </div>
