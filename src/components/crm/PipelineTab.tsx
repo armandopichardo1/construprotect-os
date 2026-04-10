@@ -133,13 +133,13 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
           return matchesStage && matchesSearch;
         });
         return (<>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-[260px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[140px] max-w-[260px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar deal, contacto, empresa..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
+            <Input placeholder="Buscar deal, contacto..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
           </div>
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-8 text-[11px] w-auto min-w-[130px] rounded-lg">
+            <SelectTrigger className="h-8 text-[11px] w-auto min-w-[120px] rounded-lg">
               <Filter className="w-3 h-3 mr-1.5" /><SelectValue placeholder="Etapa" />
             </SelectTrigger>
             <SelectContent>
@@ -147,11 +147,11 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
               {PIPELINE_STAGES.map(s => (<SelectItem key={s} value={s} className="text-[11px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>))}
             </SelectContent>
           </Select>
-          <span className="text-[10px] text-muted-foreground">{filteredDeals.length} de {deals.length}</span>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{filteredDeals.length} de {deals.length}</span>
         </div>
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden -mx-4 sm:mx-0">
           <div className="overflow-x-auto">
-            <Table>
+            <table className="w-full caption-bottom text-sm" style={{ minWidth: '700px' }}>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-[10px] font-semibold">Deal</TableHead>
