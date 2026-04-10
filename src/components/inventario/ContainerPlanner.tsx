@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
+import { exportToExcel } from '@/lib/export-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download } from 'lucide-react';
 
 const CONTAINER_TYPES = {
   '20ft': { label: '20\' Standard', maxCbm: 33.2, maxKg: 21770, costEstimate: 3500 },
