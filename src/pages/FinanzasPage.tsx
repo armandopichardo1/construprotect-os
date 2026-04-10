@@ -133,7 +133,7 @@ export default function FinanzasPage() {
     },
   });
 
-
+  const { data: latestRate } = useQuery({
     queryKey: ['latest-rate'],
     queryFn: async () => {
       const { data } = await supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1);
