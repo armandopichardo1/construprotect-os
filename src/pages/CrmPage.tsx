@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Download } from 'lucide-react';
+import { Plus, Download, Calculator } from 'lucide-react';
 import { type Contact, type Deal, type Activity, type Quote } from '@/lib/crm-utils';
 import { PipelineTab } from '@/components/crm/PipelineTab';
 import { ContactsTab, ContactDialog } from '@/components/crm/ContactsTab';
@@ -15,6 +15,8 @@ import { ActivityDialog } from '@/components/crm/ActivityDialog';
 import { CrmDeleteDialog } from '@/components/crm/CrmDeleteDialog';
 import { ContactDetailDialog } from '@/components/crm/ContactDetailDialog';
 import { ClientProjectsTab } from '@/components/crm/ClientProjectsTab';
+import { QuoteCreateDialog } from '@/components/crm/QuoteCreateDialog';
+import { ProjectPlannerDialog } from '@/components/crm/ProjectPlannerDialog';
 import { exportToExcel } from '@/lib/export-utils';
 
 type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes' | 'projects';
@@ -31,6 +33,8 @@ export default function CrmPage() {
   const [showActivityDialog, setShowActivityDialog] = useState(false);
   const [editActivity, setEditActivity] = useState<Activity | null>(null);
   const [deleteItem, setDeleteItem] = useState<{ type: 'contact' | 'deal' | 'activity' | 'quote'; item: any } | null>(null);
+  const [showQuoteCreate, setShowQuoteCreate] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['crm-contacts'],
@@ -72,6 +76,7 @@ export default function CrmPage() {
     if (tab === 'contacts') { setEditContact(null); setShowContactDialog(true); }
     else if (tab === 'pipeline') { setEditDeal(null); setShowDealDialog(true); }
     else if (tab === 'agenda') { setEditActivity(null); setShowActivityDialog(true); }
+    else if (tab === 'quotes') { setShowQuoteCreate(true); }
   };
 
   const handleExport = () => {
@@ -95,7 +100,7 @@ export default function CrmPage() {
   return (
     <AppLayout>
       <div className="space-y-5">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex gap-1 rounded-xl bg-muted p-1">
             {([
               { key: 'pipeline' as Tab, label: 'Pipeline' },
@@ -122,6 +127,9 @@ export default function CrmPage() {
               <Download className="w-3.5 h-3.5 mr-1" /> Excel
             </Button>
           )}
+          <Button size="sm" variant="outline" onClick={() => setShowPlanner(true)}>
+            <Calculator className="w-3.5 h-3.5 mr-1" /> Planificador m²
+          </Button>
         </div>
 
         {tab === 'pipeline' && (
@@ -147,7 +155,7 @@ export default function CrmPage() {
         {tab === 'quotes' && (
           <QuotesTab
             quotes={quotes}
-            onNew={() => {}}
+            onNew={() => setShowQuoteCreate(true)}
             onEdit={() => {}}
             onDelete={(q) => setDeleteItem({ type: 'quote', item: q })}
           />
@@ -161,6 +169,8 @@ export default function CrmPage() {
       <ActivityDialog open={showActivityDialog} onOpenChange={(v) => { setShowActivityDialog(v); if (!v) setEditActivity(null); }} contacts={contacts} deals={deals} queryClient={queryClient} editActivity={editActivity} />
       <CrmDeleteDialog open={!!deleteItem} onOpenChange={(v) => { if (!v) setDeleteItem(null); }} type={deleteItem?.type || 'contact'} item={deleteItem?.item} queryClient={queryClient} />
       <ContactDetailDialog open={!!viewContact} onOpenChange={(v) => { if (!v) setViewContact(null); }} contact={viewContact} />
+      <QuoteCreateDialog open={showQuoteCreate} onOpenChange={setShowQuoteCreate} contacts={contacts} queryClient={queryClient} />
+      <ProjectPlannerDialog open={showPlanner} onOpenChange={setShowPlanner} />
     </AppLayout>
   );
 }
