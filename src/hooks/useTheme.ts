@@ -7,7 +7,7 @@ export function useTheme() {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('cp-theme') as Theme) || 'light';
     }
-    return 'dark';
+    return 'light';
   });
 
   useEffect(() => {
