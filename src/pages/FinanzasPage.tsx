@@ -1107,6 +1107,7 @@ function deltaStr(cur: number, prev: number): string {
 function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[] }) {
   const [period, setPeriod] = useState('current_month');
   const [expandCogs, setExpandCogs] = useState(false);
+  const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
   const now = useMemo(() => new Date(), []);
   const range = useMemo(() => getDateRange(period, now), [period, now]);
