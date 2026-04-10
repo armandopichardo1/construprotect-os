@@ -306,7 +306,7 @@ export function useAlerts() {
             severity: 'critical',
             count: 1,
             message: `Flujo neto este mes: -$${Math.abs(monthInflows - monthOutflows).toLocaleString('en-US', { minimumFractionDigits: 0 })}`,
-            navigateTo: '/finanzas',
+            navigateTo: '/finanzas?tab=Flujo+Caja',
           });
         }
       }
@@ -396,7 +396,7 @@ export function useAlerts() {
             severity: breachMonths.length >= 2 ? 'critical' : 'warning',
             count: breachMonths.length,
             message: `El flujo acumulado proyectado baja de $${threshold.toLocaleString()} en ${breachMonths.join(', ')}`,
-            navigateTo: '/finanzas',
+            navigateTo: '/finanzas?tab=Flujo+Caja',
           });
         }
       }
