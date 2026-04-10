@@ -211,6 +211,91 @@ export function ReorderTab() {
   const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
 
+  const generateCart = () => {
+    const reorderItems = items.filter(p => p.qty <= p.reorder_point || (p.arrivalDay < 0 && p.avgMonthly > 0));
+    if (reorderItems.length === 0) { toast.info('No hay productos que requieran reorden'); return; }
+    const cart: CartItem[] = reorderItems.map(p => {
+      const optimalQty = Math.max(
+        p.reorder_qty || 0,
+        Math.ceil(p.dailyVelocity * p.lead_time_days * 2) - p.qty,
+        p.min_order_qty || 1
+      );
+      const sup = supplierMap?.[p.id];
+      return {
+        product_id: p.id, name: p.name, sku: p.sku,
+        qty_to_order: Math.max(optimalQty, 1),
+        unit_cost: Number(p.unit_cost_usd) || 0,
+        supplier_name: sup?.supplier_name || 'Sin proveedor',
+        supplier_id: sup?.supplier_id || '',
+      };
+    });
+    setCartItems(cart);
+    setShowCart(true);
+  };
+
+  const removeFromCart = (productId: string) => setCartItems(prev => prev.filter(i => i.product_id !== productId));
+  const updateCartQty = (productId: string, qty: number) => setCartItems(prev => prev.map(i => i.product_id === productId ? { ...i, qty_to_order: Math.max(1, qty) } : i));
+
+  const cartBySupplier = useMemo(() => {
+    const grouped: Record<string, CartItem[]> = {};
+    cartItems.forEach(i => {
+      const key = i.supplier_name || 'Sin proveedor';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(i);
+    });
+    return grouped;
+  }, [cartItems]);
+
+  const cartTotal = cartItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
+
+  const createShipments = async () => {
+    setCartSaving(true);
+    try {
+      for (const [supplierName, supplierItems] of Object.entries(cartBySupplier)) {
+        const supplierId = supplierItems[0]?.supplier_id || null;
+        const totalCost = supplierItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
+        const maxLead = Math.max(...supplierItems.map(i => {
+          const p = items.find(x => x.id === i.product_id);
+          return p?.lead_time_days || 21;
+        }));
+        const eta = new Date();
+        eta.setDate(eta.getDate() + maxLead);
+
+        const { data: shipment, error } = await supabase.from('shipments').insert({
+          supplier_id: supplierId,
+          supplier_name: supplierName === 'Sin proveedor' ? 'Por asignar' : supplierName,
+          po_number: `PO-AUTO-${Date.now().toString(36).toUpperCase()}`,
+          status: 'ordered' as any,
+          order_date: new Date().toISOString().split('T')[0],
+          estimated_arrival: eta.toISOString().split('T')[0],
+          total_cost_usd: totalCost,
+          notes: 'Orden generada automáticamente desde análisis de reorden',
+        }).select().single();
+
+        if (error) throw error;
+
+        await supabase.from('shipment_items').insert(
+          supplierItems.map(i => ({
+            shipment_id: shipment.id,
+            product_id: i.product_id,
+            quantity_ordered: i.qty_to_order,
+            unit_cost_usd: i.unit_cost,
+          }))
+        );
+      }
+
+      const supplierCount = Object.keys(cartBySupplier).length;
+      toast.success(`${supplierCount} orden(es) de compra creada(s) con ${cartItems.length} productos`);
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      setShowCart(false);
+      setCartItems([]);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al crear órdenes');
+    } finally {
+      setCartSaving(false);
+    }
+  };
+
   const urgencyStyle = (urgency: string) => {
     if (urgency === 'high') return 'bg-destructive/15 text-destructive';
     if (urgency === 'medium') return 'bg-warning/15 text-warning';
