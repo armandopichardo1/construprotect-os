@@ -93,7 +93,7 @@ export default function FinanzasPage() {
   const [tab, setTab] = useState('Crear Transacción');
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
-  const { rate } = useExchangeRate();
+  const { rate, rateForMonth } = useExchangeRate();
   const fmt = (usd: number) => formatDOP(usd * rate);
   const fmtDop = (dop: number) => formatDOP(dop);
   const queryClient = useQueryClient();
@@ -167,12 +167,13 @@ export default function FinanzasPage() {
 
   const mtdSales = sales.filter((s: any) => s.date?.startsWith(thisMonth));
   const mtdExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth));
+  const thisMonthRate = rateForMonth(thisMonth);
   const revenueMTD = mtdSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
-  const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
+  const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * thisMonthRate), 0);
   const cogsMTD = saleItems.filter((si: any) => si.sales?.date?.startsWith(thisMonth))
     .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
   const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD) / revenueMTD * 100) : 0;
-  const netIncome = (revenueMTD - cogsMTD) * rate - expensesMTD_dop;
+  const netIncome = (revenueMTD - cogsMTD) * thisMonthRate - expensesMTD_dop;
 
   const monthlyData = useMemo(() => {
     const months: { month: string; revenue: number; cogs: number; expenses: number; profit: number }[] = [];
@@ -180,22 +181,26 @@ export default function FinanzasPage() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString('es-DO', { month: 'short' });
-      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * rate;
+      const mRate = rateForMonth(key);
+      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * mRate;
       const cogs = saleItems.filter((si: any) => si.sales?.date?.startsWith(key))
-        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * rate;
-      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
+        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * mRate;
+      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * mRate), 0);
       months.push({ month: label, revenue: rev, cogs, expenses: exp, profit: rev - cogs - exp });
     }
     return months;
-  }, [sales, expenses, saleItems, rate]);
+  }, [sales, expenses, saleItems, rateForMonth]);
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
-    expenses.forEach((e: any) => { cats[e.category] = (cats[e.category] || 0) + (Number(e.amount_dop) || Number(e.amount_usd || 0) * rate); });
+    expenses.forEach((e: any) => {
+      const mRate = rateForMonth(e.date?.substring(0, 7) || thisMonth);
+      cats[e.category] = (cats[e.category] || 0) + (Number(e.amount_dop) || Number(e.amount_usd || 0) * mRate);
+    });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([key, value], i) => ({
       name: EXPENSE_CATEGORIES[key]?.label || key, value, color: PIE_COLORS[i % PIE_COLORS.length],
     }));
-  }, [expenses, rate]);
+  }, [expenses, rateForMonth]);
 
   return (
     <AppLayout>
