@@ -149,9 +149,8 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
           </Select>
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">{filteredDeals.length} de {deals.length}</span>
         </div>
-        <div className="rounded-xl border border-border overflow-hidden -mx-4 sm:mx-0">
-          <div className="overflow-x-auto">
-            <table className="w-full caption-bottom text-sm" style={{ minWidth: '700px' }}>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 sm:rounded-xl sm:border sm:border-border">
+          <table className="w-full caption-bottom text-sm" style={{ minWidth: '720px' }}>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-[10px] font-semibold">Deal</TableHead>
