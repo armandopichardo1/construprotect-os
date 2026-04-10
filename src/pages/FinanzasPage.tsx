@@ -1309,6 +1309,50 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
         </ResponsiveContainer>
       </div>
 
+      {/* Pareto 80/20 Analysis */}
+      {paretoData.length > 0 && (
+        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Análisis Pareto 80/20: Costos por Categoría</h2>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Las barras rojas representan el 80% de tus costos totales — enfoca tu optimización ahí
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-destructive inline-block" /> 80% de costos</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'hsl(220, 12%, 45%)' }} /> Resto 20%</span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <ComposedChart data={paretoData} barSize={36}>
+              <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={80} />
+              <YAxis yAxisId="left" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fill: 'hsl(38, 92%, 50%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
+                if (name === 'value') return [formatUSD(v), 'Monto'];
+                if (name === 'cumPct') return [`${v}%`, '% Acumulado'];
+                return [v, name];
+              }} />
+              <Bar yAxisId="left" dataKey="value" radius={[4,4,0,0]}>
+                {paretoData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+              <Line yAxisId="right" type="monotone" dataKey="cumPct" stroke="hsl(38, 92%, 50%)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(38, 92%, 50%)' }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+          {/* Summary badges */}
+          <div className="flex gap-2 flex-wrap">
+            {paretoData.filter(d => d.in80).map(d => (
+              <span key={d.name} className="inline-flex items-center gap-1.5 rounded-lg bg-destructive/10 border border-destructive/20 px-2.5 py-1 text-[10px] font-medium text-destructive">
+                {d.name} — {formatUSD(d.value)} ({d.pct}%)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
         <h2 className="text-sm font-semibold text-foreground">Tendencia 12 Meses (vs Año Anterior)</h2>
         <ResponsiveContainer width="100%" height={300}>
