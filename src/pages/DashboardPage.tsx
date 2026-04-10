@@ -26,12 +26,11 @@ const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid
 const axisTick = { fill: 'hsl(220, 12%, 55%)', fontSize: 11 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  floor_protection: 'hsl(217, 91%, 60%)',
-  tape: 'hsl(160, 84%, 39%)',
-  stairs: 'hsl(38, 92%, 50%)',
-  accessories: 'hsl(280, 60%, 55%)',
-  dust_containment: 'hsl(0, 84%, 60%)',
-  countertop: 'hsl(190, 70%, 50%)',
+  'Protección de Pisos': 'hsl(217, 91%, 60%)',
+  'Cintas': 'hsl(160, 84%, 39%)',
+  'Accesorios': 'hsl(38, 92%, 50%)',
+  'Contención de Polvo': 'hsl(0, 84%, 60%)',
+  'Protección de Superficies': 'hsl(190, 70%, 50%)',
 };
 const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 55%)', 'hsl(0, 84%, 60%)', 'hsl(190, 70%, 50%)', 'hsl(330, 70%, 55%)'];
 
