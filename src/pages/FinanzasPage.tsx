@@ -17,8 +17,12 @@ import { streamFinancialAI } from '@/lib/financial-ai';
 import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
+import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from '@/components/finanzas/ResumenAnalytics';
+import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
+import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
+import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
@@ -199,6 +203,13 @@ export default function FinanzasPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+
+            {/* New analytics widgets */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <ClientSparklines sales={sales} />
+              <ConcentrationAnalysis sales={sales} />
+              <ProductMarginBreakdown saleItems={saleItems} />
+            </div>
           </div>
         )}
 
@@ -217,6 +228,8 @@ export default function FinanzasPage() {
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
+        {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
+        {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
@@ -499,6 +512,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Proveedor</TableHead>
               <TableHead className="text-xs text-right">USD</TableHead>
               <TableHead className="text-xs text-right">DOP</TableHead>
+              <TableHead className="text-xs">Recibo</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -513,6 +527,9 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(Number(e.amount_usd))}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">RD${Number(e.amount_dop).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <ReceiptUpload expenseId={e.id} currentUrl={e.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <button onClick={() => { setEditExpense(e); setShowForm(true); }}
