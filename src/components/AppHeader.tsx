@@ -2,6 +2,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTheme } from '@/hooks/useTheme';
+import { Sun, Moon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
@@ -15,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
 export function AppHeader() {
   const location = useLocation();
   const title = PAGE_TITLES[location.pathname] || 'ConstruProtect OS';
+  const { theme, toggle } = useTheme();
 
   const { data: rate } = useQuery({
     queryKey: ['latest-rate'],
@@ -36,6 +40,9 @@ export function AppHeader() {
           <span className="text-foreground font-medium">V: {Number(rate.usd_sell).toFixed(2)}</span>
         </div>
       )}
+      <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8 shrink-0">
+        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </Button>
     </header>
   );
 }
