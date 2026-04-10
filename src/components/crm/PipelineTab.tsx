@@ -169,7 +169,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                   const dayColor = stageColor(days);
                   const stageCfg = DEAL_STAGES[deal.stage];
                   return (
-                    <TableRow key={deal.id} className="group hover:bg-muted/30">
+                    <TableRow key={deal.id} className="group hover:bg-muted/30 cursor-pointer sm:cursor-default" onClick={() => onEdit(deal)}>
                       <TableCell className="py-1.5">
                         <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{deal.title}</p>
                         <p className="text-[9px] text-muted-foreground truncate sm:hidden">{deal.contacts?.contact_name || ''}</p>
