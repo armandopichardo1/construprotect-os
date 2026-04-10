@@ -167,16 +167,18 @@ export default function FinanzasPage() {
 
   const mtdSales = sales.filter((s: any) => s.date?.startsWith(thisMonth));
   const mtdExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth));
+  const mtdCosts = costs.filter((c: any) => c.date?.startsWith(thisMonth));
   const thisMonthRate = rateForMonth(thisMonth);
   const revenueMTD = mtdSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   const expensesMTD_dop = mtdExpenses.reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * thisMonthRate), 0);
   const cogsMTD = saleItems.filter((si: any) => si.sales?.date?.startsWith(thisMonth))
     .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-  const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD) / revenueMTD * 100) : 0;
-  const netIncome = (revenueMTD - cogsMTD) * thisMonthRate - expensesMTD_dop;
+  const directCostsMTD = mtdCosts.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const grossMargin = revenueMTD > 0 ? ((revenueMTD - cogsMTD - directCostsMTD) / revenueMTD * 100) : 0;
+  const netIncome = (revenueMTD - cogsMTD - directCostsMTD) * thisMonthRate - expensesMTD_dop;
 
   const monthlyData = useMemo(() => {
-    const months: { month: string; revenue: number; cogs: number; expenses: number; profit: number }[] = [];
+    const months: { month: string; revenue: number; cogs: number; directCosts: number; expenses: number; profit: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -185,11 +187,12 @@ export default function FinanzasPage() {
       const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * mRate;
       const cogs = saleItems.filter((si: any) => si.sales?.date?.startsWith(key))
         .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * mRate;
+      const dc = costs.filter((c: any) => c.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0) * mRate;
       const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * mRate), 0);
-      months.push({ month: label, revenue: rev, cogs, expenses: exp, profit: rev - cogs - exp });
+      months.push({ month: label, revenue: rev, cogs, directCosts: dc, expenses: exp, profit: rev - cogs - dc - exp });
     }
     return months;
-  }, [sales, expenses, saleItems, rateForMonth]);
+  }, [sales, expenses, costs, saleItems, rateForMonth]);
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
@@ -225,10 +228,11 @@ export default function FinanzasPage() {
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {[
                 { label: 'Ingresos MTD', value: fmt(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
+                { label: 'Costos Directos', value: fmt(directCostsMTD), color: 'text-warning' },
                 { label: 'Gastos MTD', value: fmtDop(expensesMTD_dop), color: 'text-destructive' },
                 { label: 'Ingreso Neto', value: fmtDop(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
               ].map(kpi => (
@@ -250,6 +254,7 @@ export default function FinanzasPage() {
                     <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                     <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
                     <Bar dataKey="cogs" name="COGS" fill="hsl(38, 92%, 50%)" radius={[6,6,0,0]} />
+                    <Bar dataKey="directCosts" name="Costos Directos" fill="hsl(280, 60%, 55%)" radius={[6,6,0,0]} />
                     <Bar dataKey="expenses" name="Gastos" fill="hsl(0, 84%, 60%)" radius={[6,6,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -321,7 +326,7 @@ export default function FinanzasPage() {
             Proveedor: c.vendor, 'Monto USD': c.amount_usd, 'Monto DOP': c.amount_dop,
           })), 'costos', 'Costos');
         }} />}
-        {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
+        {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
@@ -1041,28 +1046,35 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
 }
 
 // ============ P&L TAB ============
-type PeriodTotals = { revenue: number; cogs: number; grossProfit: number; cogsByProduct: Record<string, number>; expensesByCategory: Record<string, number>; totalExpenses: number; netIncome: number };
+type PeriodTotals = { revenue: number; cogs: number; grossProfit: number; cogsByProduct: Record<string, number>; directCosts: number; costsByCategory: Record<string, number>; expensesByCategory: Record<string, number>; totalExpenses: number; netIncome: number };
 
-function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], startDate: string, endDate: string): PeriodTotals {
+function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], startDate: string, endDate: string, costs: any[] = []): PeriodTotals {
   const filteredSales = sales.filter((s: any) => s.date >= startDate && s.date <= endDate);
   const saleIds = new Set(filteredSales.map((s: any) => s.id));
   const filteredItems = saleItems.filter((si: any) => saleIds.has(si.sale_id));
   const filteredExpenses = expenses.filter((e: any) => e.date >= startDate && e.date <= endDate);
+  const filteredCosts = costs.filter((c: any) => c.date >= startDate && c.date <= endDate);
   const revenue = filteredSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   const cogs = filteredItems.reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-  const grossProfit = revenue - cogs;
   const cogsByProduct: Record<string, number> = {};
   filteredItems.forEach((si: any) => {
     const name = si.products?.name || 'Otro';
     cogsByProduct[name] = (cogsByProduct[name] || 0) + Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
   });
+  const costsByCategory: Record<string, number> = {};
+  filteredCosts.forEach((c: any) => {
+    const label = COST_CATEGORIES[c.category]?.label || c.category;
+    costsByCategory[label] = (costsByCategory[label] || 0) + Number(c.amount_usd || 0);
+  });
+  const directCosts = filteredCosts.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const grossProfit = revenue - cogs - directCosts;
   const expensesByCategory: Record<string, number> = {};
   filteredExpenses.forEach((e: any) => {
     const label = EXPENSE_CATEGORIES[e.category]?.label || e.category;
     expensesByCategory[label] = (expensesByCategory[label] || 0) + Number(e.amount_usd || 0);
   });
   const totalExpenses = filteredExpenses.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
-  return { revenue, cogs, grossProfit, cogsByProduct, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
+  return { revenue, cogs, grossProfit, cogsByProduct, directCosts, costsByCategory, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
 }
 
 function getDateRange(period: string, now: Date): { start: string; end: string; label: string } {
@@ -1097,18 +1109,19 @@ function deltaStr(cur: number, prev: number): string {
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
-function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[]; expenses: any[] }) {
+function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[] }) {
   const [period, setPeriod] = useState('current_month');
   const [expandCogs, setExpandCogs] = useState(false);
+  const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
   const now = useMemo(() => new Date(), []);
   const range = useMemo(() => getDateRange(period, now), [period, now]);
   const prevRange = useMemo(() => getPrevRange(range), [range]);
   const yoyRange = useMemo(() => getYoYRange(range), [range]);
 
-  const current = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, range.start, range.end), [sales, saleItems, expenses, range]);
-  const prev = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, prevRange.start, prevRange.end), [sales, saleItems, expenses, prevRange]);
-  const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end), [sales, saleItems, expenses, yoyRange]);
+  const current = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, range.start, range.end, costs), [sales, saleItems, expenses, costs, range]);
+  const prev = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, prevRange.start, prevRange.end, costs), [sales, saleItems, expenses, costs, prevRange]);
+  const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end, costs), [sales, saleItems, expenses, costs, yoyRange]);
 
   const trendData = useMemo(() => {
     const months: { month: string; revenue: number; profit: number; revenuePY: number; profitPY: number }[] = [];
@@ -1116,18 +1129,24 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const dEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
       const f = (dt: Date) => dt.toISOString().split('T')[0];
-      const t = calcPeriodTotals(sales, saleItems, expenses, f(d), f(dEnd));
+      const t = calcPeriodTotals(sales, saleItems, expenses, f(d), f(dEnd), costs);
       const pyS = new Date(d); pyS.setFullYear(pyS.getFullYear() - 1);
       const pyE = new Date(dEnd); pyE.setFullYear(pyE.getFullYear() - 1);
-      const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE));
+      const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE), costs);
       months.push({ month: d.toLocaleDateString('es-DO', { month: 'short' }), revenue: t.revenue, profit: t.netIncome, revenuePY: py.revenue, profitPY: py.netIncome });
     }
     return months;
-  }, [sales, saleItems, expenses, now]);
+  }, [sales, saleItems, expenses, costs, now]);
 
   const allExpCats = useMemo(() => {
     const cats = new Set<string>();
     [current, prev, yoy].forEach(p => Object.keys(p.expensesByCategory).forEach(k => cats.add(k)));
+    return Array.from(cats).sort();
+  }, [current, prev, yoy]);
+
+  const allCostCats = useMemo(() => {
+    const cats = new Set<string>();
+    [current, prev, yoy].forEach(p => Object.keys(p.costsByCategory).forEach(k => cats.add(k)));
     return Array.from(cats).sort();
   }, [current, prev, yoy]);
 
@@ -1139,12 +1158,13 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
 
   // Waterfall chart data
   const waterfallData = useMemo(() => {
-    const categories = ['Ingresos', 'COGS', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
+    const categories = ['Ingresos', 'COGS', 'Costos Directos', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
 
     return categories.map(name => {
       let curVal = 0, prvVal = 0;
       if (name === 'Ingresos') { curVal = current.revenue; prvVal = prev.revenue; }
       else if (name === 'COGS') { curVal = current.cogs; prvVal = prev.cogs; }
+      else if (name === 'Costos Directos') { curVal = current.directCosts; prvVal = prev.directCosts; }
       else if (name === 'Utilidad Neta') { curVal = current.netIncome; prvVal = prev.netIncome; }
       else { curVal = current.expensesByCategory[name] || 0; prvVal = prev.expensesByCategory[name] || 0; }
 
@@ -1193,6 +1213,8 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
       { Concepto: 'Ingresos', [range.label]: current.revenue, 'Período Ant.': prev.revenue, 'Año Ant.': yoy.revenue },
       { Concepto: 'COGS', [range.label]: current.cogs, 'Período Ant.': prev.cogs, 'Año Ant.': yoy.cogs },
       ...allCogProducts.map(p => ({ Concepto: `  ${p}`, [range.label]: current.cogsByProduct[p] || 0, 'Período Ant.': prev.cogsByProduct[p] || 0, 'Año Ant.': yoy.cogsByProduct[p] || 0 })),
+      { Concepto: 'Costos Directos', [range.label]: current.directCosts, 'Período Ant.': prev.directCosts, 'Año Ant.': yoy.directCosts },
+      ...allCostCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.costsByCategory[cat] || 0, 'Período Ant.': prev.costsByCategory[cat] || 0, 'Año Ant.': yoy.costsByCategory[cat] || 0 })),
       { Concepto: 'Utilidad Bruta', [range.label]: current.grossProfit, 'Período Ant.': prev.grossProfit, 'Año Ant.': yoy.grossProfit },
       ...allExpCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.expensesByCategory[cat] || 0, 'Período Ant.': prev.expensesByCategory[cat] || 0, 'Año Ant.': yoy.expensesByCategory[cat] || 0 })),
       { Concepto: 'Total Gastos', [range.label]: current.totalExpenses, 'Período Ant.': prev.totalExpenses, 'Año Ant.': yoy.totalExpenses },
@@ -1250,6 +1272,28 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
             {expandCogs && allCogProducts.map(prod => (
               <PLCompRow key={prod} label={`    ${prod}`} cur={current.cogsByProduct[prod] || 0} prv={prev.cogsByProduct[prod] || 0} yoy={yoy.cogsByProduct[prod] || 0} negative sub />
             ))}
+
+            {/* Direct Costs (from costs module) */}
+            {(current.directCosts > 0 || prev.directCosts > 0 || yoy.directCosts > 0) && (
+              <>
+                <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandCosts(!expandCosts)}>
+                  <TableCell className="text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-muted-foreground text-[10px]">{expandCosts ? '▼' : '▶'}</span>
+                      (-) Costos Directos
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs text-right font-mono">-{formatUSD(current.directCosts)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < prev.directCosts ? 'text-success' : current.directCosts > prev.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, prev.directCosts)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.directCosts)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < yoy.directCosts ? 'text-success' : current.directCosts > yoy.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, yoy.directCosts)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.directCosts)}</TableCell>
+                </TableRow>
+                {expandCosts && allCostCats.map(cat => (
+                  <PLCompRow key={cat} label={`    ${cat}`} cur={current.costsByCategory[cat] || 0} prv={prev.costsByCategory[cat] || 0} yoy={yoy.costsByCategory[cat] || 0} negative sub />
+                ))}
+              </>
+            )}
 
             <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
             <PLCompRow label="Utilidad Bruta" cur={current.grossProfit} prv={prev.grossProfit} yoy={yoy.grossProfit} bold />
