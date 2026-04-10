@@ -1159,6 +1159,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
       let curVal = 0, prvVal = 0;
       if (name === 'Ingresos') { curVal = current.revenue; prvVal = prev.revenue; }
       else if (name === 'COGS') { curVal = current.cogs; prvVal = prev.cogs; }
+      else if (name === 'Costos Directos') { curVal = current.directCosts; prvVal = prev.directCosts; }
       else if (name === 'Utilidad Neta') { curVal = current.netIncome; prvVal = prev.netIncome; }
       else { curVal = current.expensesByCategory[name] || 0; prvVal = prev.expensesByCategory[name] || 0; }
 
