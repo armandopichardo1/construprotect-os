@@ -12,15 +12,10 @@ import { Bot, RefreshCw } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
+import { ShipmentsTab } from '@/components/inventario/ShipmentsTab';
 
 const tabs = ['Stock', 'Analytics', 'Envíos', 'ABC'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
-
-const shipments = [
-  { id: 'ENV-2847', supplier: 'Porcelanosa España', items: 12, eta: '2026-04-18', step: 2, steps: ['Ordenado', 'Tránsito', 'Aduanas', 'Almacén', 'Recibido'] },
-  { id: 'ENV-2851', supplier: 'Marazzi Italia', items: 8, eta: '2026-04-25', step: 1, steps: ['Ordenado', 'Tránsito', 'Aduanas', 'Almacén', 'Recibido'] },
-  { id: 'ENV-2839', supplier: 'Interceramic MX', items: 5, eta: '2026-04-12', step: 4, steps: ['Ordenado', 'Tránsito', 'Aduanas', 'Almacén', 'Recibido'] },
-];
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = { ok: 'bg-success/15 text-success', low: 'bg-warning/15 text-warning', out: 'bg-destructive/15 text-destructive', excess: 'bg-primary/15 text-primary' };
@@ -308,32 +303,7 @@ export default function InventarioPage() {
           </div>
         )}
 
-        {tab === 'Envíos' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shipments.map(s => (
-              <div key={s.id} className="rounded-2xl bg-card border border-border p-5 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{s.id}</p>
-                    <p className="text-xs text-muted-foreground">{s.supplier}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">{s.items} ítems</p>
-                    <p className="text-xs text-primary font-medium">ETA: {s.eta}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  {s.steps.map((step, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div className={cn('h-1.5 w-full rounded-full', i <= s.step ? 'bg-primary' : 'bg-muted')} />
-                      <span className={cn('text-[8px]', i <= s.step ? 'text-primary font-medium' : 'text-muted-foreground')}>{step}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {tab === 'Envíos' && <ShipmentsTab />}
 
         {tab === 'ABC' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
