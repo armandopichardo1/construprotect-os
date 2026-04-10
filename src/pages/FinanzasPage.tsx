@@ -236,7 +236,9 @@ export default function FinanzasPage() {
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
-      <AIAssistantDialog open={aiOpen} onOpenChange={setAiOpen} queryClient={queryClient} rate={latestRate} />
+      <AIAssistantDialog open={aiOpen} onOpenChange={setAiOpen} queryClient={queryClient} rate={latestRate}
+        onEditPrefill={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
+        onEditExpensePrefill={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
     </AppLayout>
   );
 }
@@ -1128,7 +1130,7 @@ function AIAsesorTab({ sales, expenses, revenueMTD, grossMargin }: any) {
 }
 
 // ============ AI ASSISTANT DIALOG ============
-function AIAssistantDialog({ open, onOpenChange, queryClient, rate }: any) {
+function AIAssistantDialog({ open, onOpenChange, queryClient, rate, onEditPrefill, onEditExpensePrefill }: any) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
