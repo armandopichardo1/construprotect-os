@@ -512,6 +512,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Proveedor</TableHead>
               <TableHead className="text-xs text-right">USD</TableHead>
               <TableHead className="text-xs text-right">DOP</TableHead>
+              <TableHead className="text-xs">Recibo</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -526,6 +527,9 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(Number(e.amount_usd))}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">RD${Number(e.amount_dop).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <ReceiptUpload expenseId={e.id} currentUrl={e.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <button onClick={() => { setEditExpense(e); setShowForm(true); }}
