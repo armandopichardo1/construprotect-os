@@ -568,7 +568,6 @@ export function ReorderTab() {
           </Table>
         </div>
       </div>
-    </div>
 
       {/* Cart Dialog */}
       <Dialog open={showCart} onOpenChange={setShowCart}>
@@ -644,6 +643,6 @@ export function ReorderTab() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
