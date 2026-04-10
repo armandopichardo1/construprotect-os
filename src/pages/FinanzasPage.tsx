@@ -25,7 +25,7 @@ import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
