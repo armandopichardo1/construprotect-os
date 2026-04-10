@@ -322,10 +322,6 @@ export default function FinanzasPage() {
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
-
-      <AIAssistantDialog open={aiOpen} onOpenChange={setAiOpen} queryClient={queryClient} rate={latestRate}
-        onEditPrefill={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
-        onEditExpensePrefill={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
     </AppLayout>
   );
 }
