@@ -26,12 +26,11 @@ const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid
 const axisTick = { fill: 'hsl(220, 12%, 55%)', fontSize: 11 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  floor_protection: 'hsl(217, 91%, 60%)',
-  tape: 'hsl(160, 84%, 39%)',
-  stairs: 'hsl(38, 92%, 50%)',
-  accessories: 'hsl(280, 60%, 55%)',
-  dust_containment: 'hsl(0, 84%, 60%)',
-  countertop: 'hsl(190, 70%, 50%)',
+  'Protección de Pisos': 'hsl(217, 91%, 60%)',
+  'Cintas': 'hsl(160, 84%, 39%)',
+  'Accesorios': 'hsl(38, 92%, 50%)',
+  'Contención de Polvo': 'hsl(0, 84%, 60%)',
+  'Protección de Superficies': 'hsl(190, 70%, 50%)',
 };
 const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 55%)', 'hsl(0, 84%, 60%)', 'hsl(190, 70%, 50%)', 'hsl(330, 70%, 55%)'];
 
@@ -159,7 +158,7 @@ export default function DashboardPage() {
       const topNormalized = topProducts.map(p => ({ ...p, pct: Math.round((p.revenue / maxRev) * 100) }));
 
       const revByCategory = Object.entries(catRevenue).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({
-        name, value, color: CATEGORY_COLORS[name.toLowerCase().replace(/\s+/g, '_')] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
+        name, value, color: CATEGORY_COLORS[name] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
       return { monthly, totalRevenue, totalCogs, totalExpenses, topProducts: topNormalized, revByCategory };
