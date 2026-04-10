@@ -1,0 +1,1 @@
+ALTER TABLE public.chart_of_accounts ADD COLUMN parent_id uuid REFERENCES public.chart_of_accounts(id) ON DELETE SET NULL DEFAULT NULL;

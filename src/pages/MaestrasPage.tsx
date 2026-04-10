@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
@@ -533,11 +533,57 @@ function CuentasMaestra() {
   const filtered = useMemo(() => typeFilter === 'all' ? searched : searched.filter((a: any) => a.account_type === typeFilter), [searched, typeFilter]);
   const [editing, setEditing] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
+  // Build hierarchy: parent accounts (no parent_id) and their children
+  const { parentAccounts, childrenMap, parentMap } = useMemo(() => {
+    const parents: any[] = [];
+    const children: Record<string, any[]> = {};
+    const pMap: Record<string, any> = {};
+    
+    filtered.forEach((a: any) => {
+      if (!a.parent_id) {
+        parents.push(a);
+        pMap[a.id] = a;
+      }
+    });
+    
+    filtered.forEach((a: any) => {
+      if (a.parent_id) {
+        if (!children[a.parent_id]) children[a.parent_id] = [];
+        children[a.parent_id].push(a);
+      }
+    });
+
+    // Accounts whose parent is filtered out → show as standalone
+    const orphans = filtered.filter((a: any) => a.parent_id && !pMap[a.parent_id] && !parents.find(p => p.id === a.parent_id));
+    
+    return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
+  }, [filtered]);
+
+  const toggleCollapse = (id: string) => {
+    setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const collapseAll = () => {
+    const all: Record<string, boolean> = {};
+    parentAccounts.forEach(p => { if (childrenMap[p.id]?.length) all[p.id] = true; });
+    setCollapsed(all);
+  };
+
+  const expandAll = () => setCollapsed({});
+
   const handleSave = async (formData: any) => {
-    const payload = { code: formData.code || null, description: formData.description, classification: formData.classification || null, account_type: formData.account_type, currency: formData.currency || null };
+    const payload = { 
+      code: formData.code || null, 
+      description: formData.description, 
+      classification: formData.classification || null, 
+      account_type: formData.account_type, 
+      currency: formData.currency || null,
+      parent_id: formData.parent_id || null,
+    };
     if (formData.id) {
       const { error } = await supabase.from('chart_of_accounts').update(payload).eq('id', formData.id);
       if (error) { toast.error('Error'); return; }
@@ -567,6 +613,39 @@ function CuentasMaestra() {
     'Gasto': 'bg-destructive/10 text-destructive',
   };
 
+  // Possible parents for the dropdown (only accounts that have no parent themselves)
+  const possibleParents = useMemo(() => accounts.filter((a: any) => !a.parent_id), [accounts]);
+
+  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => (
+    <TableRow key={a.id} className={cn(!isChild && hasChildren && 'bg-muted/40 font-semibold')}>
+      <TableCell className="text-xs font-mono font-medium">
+        <div className="flex items-center gap-1">
+          {!isChild && hasChildren ? (
+            <button onClick={() => toggleCollapse(a.id)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-muted transition-colors">
+              {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+          ) : (
+            <span className="w-5" />
+          )}
+          {isChild && <span className="w-4 border-l-2 border-b-2 border-border h-3 ml-2 mr-1 rounded-bl-sm" />}
+          {a.code || '—'}
+        </div>
+      </TableCell>
+      <TableCell className={cn('text-xs', !isChild && hasChildren ? 'font-semibold' : '')}>
+        {a.description}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
+      <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
+      <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
+      <TableCell>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing({ ...a, parent_id: a.parent_id || '' })}><Pencil className="w-3 h-3" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(a)}><Trash2 className="w-3 h-3" /></Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -581,17 +660,19 @@ function CuentasMaestra() {
             {accountTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Button size="sm" variant="ghost" onClick={expandAll} className="text-xs">Expandir</Button>
+        <Button size="sm" variant="ghost" onClick={collapseAll} className="text-xs">Colapsar</Button>
         <span className="text-xs text-muted-foreground">{filtered.length} cuentas</span>
         <div className="ml-auto flex gap-2">
           <Button size="sm" variant="outline" onClick={() => exportToExcel(accounts.map(a => ({ Código: a.code, Descripción: a.description, Clasificación: a.classification, Tipo: a.account_type, Moneda: a.currency })), 'catalogo_cuentas', 'Cuentas')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
-          <Button size="sm" onClick={() => setEditing({ code: '', description: '', classification: '', account_type: 'Gasto', currency: '' })}><Plus className="w-3.5 h-3.5 mr-1" />Nueva</Button>
+          <Button size="sm" onClick={() => setEditing({ code: '', description: '', classification: '', account_type: 'Gasto', currency: '', parent_id: '' })}><Plus className="w-3.5 h-3.5 mr-1" />Nueva</Button>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader><TableRow>
-            <TableHead className="text-xs w-20">Código</TableHead>
+            <TableHead className="text-xs w-28">Código</TableHead>
             <TableHead className="text-xs">Descripción</TableHead>
             <TableHead className="text-xs">Clasificación</TableHead>
             <TableHead className="text-xs">Tipo</TableHead>
@@ -599,22 +680,18 @@ function CuentasMaestra() {
             <TableHead className="text-xs w-20"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {filtered.map((a: any) => (
-              <TableRow key={a.id}>
-                <TableCell className="text-xs font-mono font-medium">{a.code || '—'}</TableCell>
-                <TableCell className="text-xs">{a.description}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
-                <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
-                <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(a)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(a)}><Trash2 className="w-3 h-3" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+            {parentAccounts.map((a: any) => {
+              const children = childrenMap[a.id] || [];
+              const hasChildren = children.length > 0;
+              const isCollapsed = !!collapsed[a.id];
+              return (
+                <Fragment key={a.id}>
+                  {renderRow(a, false, hasChildren, isCollapsed)}
+                  {!isCollapsed && children.map((child: any) => renderRow(child, true, false, false))}
+                </Fragment>
+              );
+            })}
+            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
@@ -636,6 +713,17 @@ function CuentasMaestra() {
                 </div>
               </div>
               <div><Label className="text-xs">Descripción *</Label><Input value={editing.description} onChange={e => setEditing((p: any) => ({ ...p, description: e.target.value }))} className="mt-1" /></div>
+              <div><Label className="text-xs">Cuenta Madre</Label>
+                <Select value={editing.parent_id || 'none'} onValueChange={v => setEditing((p: any) => ({ ...p, parent_id: v === 'none' ? '' : v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin cuenta madre</SelectItem>
+                    {possibleParents.filter((p: any) => p.id !== editing.id).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.code} · {p.description}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-xs">Clasificación</Label><Input value={editing.classification || ''} onChange={e => setEditing((p: any) => ({ ...p, classification: e.target.value }))} className="mt-1" /></div>
                 <div><Label className="text-xs">Moneda</Label>
