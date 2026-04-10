@@ -1814,14 +1814,22 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
 
   const handleExport = () => {
     if (view === 'pl_detail') {
+      const pctOf = (val: number, rev: number) => rev > 0 ? `${((val / rev) * 100).toFixed(1)}%` : '0.0%';
+      const rev = plData.revenue;
       const rows = [
-        { Concepto: 'Ingresos Netos', USD: plData.revenue },
-        { Concepto: 'ITBIS Cobrado', USD: plData.itbis },
-        { Concepto: 'COGS', USD: -plData.cogs },
-        ...Object.entries(plData.costByCat).map(([k, v]) => ({ Concepto: `  Costo: ${COST_CATEGORIES[k]?.label || k}`, USD: -v })),
-        { Concepto: 'Utilidad Bruta', USD: plData.grossProfit },
-        ...Object.entries(plData.expByCat).map(([k, v]) => ({ Concepto: `  Gasto: ${EXPENSE_CATEGORIES[k]?.label || k}`, USD: -v })),
-        { Concepto: 'Utilidad Neta', USD: plData.netIncome },
+        { Concepto: 'Ingresos Netos', USD: plData.revenue, '% Ingreso': '100.0%' },
+        { Concepto: 'ITBIS Cobrado', USD: plData.itbis, '% Ingreso': pctOf(plData.itbis, rev) },
+        { Concepto: '', USD: '', '% Ingreso': '' },
+        { Concepto: 'COGS', USD: -plData.cogs, '% Ingreso': pctOf(plData.cogs, rev) },
+        ...Object.entries(plData.costByCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ Concepto: `  Costo: ${COST_CATEGORIES[k]?.label || k}`, USD: -(v as number), '% Ingreso': pctOf(v as number, rev) })),
+        { Concepto: '', USD: '', '% Ingreso': '' },
+        { Concepto: 'UTILIDAD BRUTA', USD: plData.grossProfit, '% Ingreso': pctOf(plData.grossProfit, rev) },
+        { Concepto: '', USD: '', '% Ingreso': '' },
+        { Concepto: 'GASTOS OPERATIVOS', USD: '', '% Ingreso': '' },
+        ...Object.entries(plData.expByCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ Concepto: `  ${EXPENSE_CATEGORIES[k]?.label || k}`, USD: -(v as number), '% Ingreso': pctOf(v as number, rev) })),
+        { Concepto: 'Total Gastos', USD: -plData.totalExpenses, '% Ingreso': pctOf(plData.totalExpenses, rev) },
+        { Concepto: '', USD: '', '% Ingreso': '' },
+        { Concepto: 'UTILIDAD NETA', USD: plData.netIncome, '% Ingreso': pctOf(plData.netIncome, rev) },
       ];
       exportToExcel(rows, 'pl_detallado', 'P&L Detallado');
     } else if (view === 'margin') {
