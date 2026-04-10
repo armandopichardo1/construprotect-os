@@ -97,6 +97,14 @@ export function ContainerPlanner() {
     },
   });
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
   const items = products || [];
 
   // Compute suggested quantities based on rotation + safety stock
