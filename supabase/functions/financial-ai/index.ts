@@ -19,15 +19,17 @@ Deno.serve(async (req) => {
     );
 
     // Fetch context data for the AI
-    const [{ data: products }, { data: clients }, { data: rates }] = await Promise.all([
+    const [{ data: products }, { data: clients }, { data: rates }, { data: accounts }] = await Promise.all([
       supabase.from("products").select("id, sku, name, unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd, category").eq("is_active", true),
       supabase.from("crm_clients").select("id, name, company"),
       supabase.from("exchange_rates").select("*").order("date", { ascending: false }).limit(1),
+      supabase.from("chart_of_accounts").select("id, code, description, account_type, classification").eq("is_active", true),
     ]);
 
     const rate = rates?.[0];
     const productList = (products || []).map(p => `${p.name} (SKU:${p.sku}, costo:$${p.unit_cost_usd}, lista:$${p.price_list_usd}, arq:$${p.price_architect_usd})`).join("\n");
     const clientList = (clients || []).map(c => `${c.name} - ${c.company || 'Sin empresa'} (ID:${c.id})`).join("\n");
+    const accountList = (accounts || []).map(a => `${a.code} - ${a.description} [${a.account_type}/${a.classification || ''}] (ID:${a.id})`).join("\n");
 
     const systemPrompt = action === "classify" ? `Eres un asistente financiero para ConstruProtect OS, una empresa de distribución de materiales de construcción en República Dominicana.
 
@@ -39,21 +41,39 @@ ${productList}
 CLIENTES:
 ${clientList}
 
-CATEGORÍAS DE GASTOS: warehouse, software, accounting, marketing, shipping, customs, travel, samples, office, bank_fees, other
+CATÁLOGO DE CUENTAS CONTABLES:
+${accountList}
+
+CATEGORÍAS DE GASTOS (expense): warehouse, software, accounting, marketing, shipping, customs, travel, samples, office, bank_fees, purchases, payroll, insurance, rent, utilities, maintenance, other
+
+CATEGORÍAS DE COSTOS (cost): freight, customs, raw_materials, packaging, labor, logistics, warehousing, insurance, other
 
 Cuando el usuario describe una transacción en lenguaje natural, debes clasificarla y responder SIEMPRE con un JSON válido con esta estructura:
 {
-  "type": "expense" | "sale",
+  "type": "expense" | "sale" | "cost",
   "confidence": 0.0-1.0,
   "data": {
-    // Para gastos:
+    // Para gastos (expense):
     "category": "expense_category_enum",
     "description": "descripción",
     "vendor": "proveedor si aplica",
     "amount_usd": number,
     "amount_dop": number,
     "exchange_rate": number,
-    // Para ventas:
+    "account_id": "uuid de la cuenta contable más apropiada o null",
+    "account_code": "código de la cuenta contable o null",
+    "account_name": "nombre de la cuenta contable o null",
+    // Para costos (cost):
+    "category": "cost_category_enum",
+    "description": "descripción",
+    "vendor": "proveedor si aplica",
+    "amount_usd": number,
+    "amount_dop": number,
+    "exchange_rate": number,
+    "account_id": "uuid de la cuenta contable más apropiada o null",
+    "account_code": "código de la cuenta contable o null",
+    "account_name": "nombre de la cuenta contable o null",
+    // Para ventas (sale):
     "contact_id": "uuid del cliente o null",
     "contact_name": "nombre",
     "items": [{"product_id": "uuid", "product_name": "nombre", "quantity": number, "unit_price_usd": number, "unit_cost_usd": number, "line_total_usd": number, "margin_pct": number}],
@@ -66,9 +86,15 @@ Cuando el usuario describe una transacción en lenguaje natural, debes clasifica
   "explanation": "Explicación breve en español de la clasificación"
 }
 
+REGLAS DE CLASIFICACIÓN:
+- "Gasto" (expense) = gastos operativos del día a día: nómina, alquiler, software, marketing, oficina, etc.
+- "Costo" (cost) = costos directos asociados a mercancía: flete, aduanas, materiales, empaque, almacenaje, etc.
+- "Venta" (sale) = cuando se vende producto a un cliente.
+
 Si el monto está en DOP, convierte a USD usando la tasa. Si está en USD, convierte a DOP.
 Calcula el ITBIS (18%) sobre el subtotal para ventas.
 Para ventas, usa el precio de lista por defecto salvo que se mencione un tier específico.
+Siempre sugiere la cuenta contable más apropiada del catálogo. Si no hay coincidencia clara, deja account_id como null.
 Responde SOLO con el JSON, sin markdown ni explicaciones adicionales.` 
     : `Eres un asesor financiero experto para ConstruProtect OS, una empresa de distribución de materiales de construcción en República Dominicana.
 
