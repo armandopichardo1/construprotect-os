@@ -829,6 +829,7 @@ export type Database = {
           additional_costs_usd: number | null
           brand: string | null
           category: string | null
+          cbm_per_unit: number | null
           coverage_m2: number | null
           created_at: string
           dimensions: string | null
@@ -840,6 +841,7 @@ export type Database = {
           margin_list_pct: number | null
           margin_project_pct: number | null
           margin_wholesale_pct: number | null
+          min_order_qty: number | null
           name: string
           notes: string | null
           price_architect_usd: number | null
@@ -854,11 +856,13 @@ export type Database = {
           unit_cost_usd: number | null
           units_per_pack: number | null
           updated_at: string
+          weight_kg_per_unit: number | null
         }
         Insert: {
           additional_costs_usd?: number | null
           brand?: string | null
           category?: string | null
+          cbm_per_unit?: number | null
           coverage_m2?: number | null
           created_at?: string
           dimensions?: string | null
@@ -870,6 +874,7 @@ export type Database = {
           margin_list_pct?: number | null
           margin_project_pct?: number | null
           margin_wholesale_pct?: number | null
+          min_order_qty?: number | null
           name: string
           notes?: string | null
           price_architect_usd?: number | null
@@ -884,11 +889,13 @@ export type Database = {
           unit_cost_usd?: number | null
           units_per_pack?: number | null
           updated_at?: string
+          weight_kg_per_unit?: number | null
         }
         Update: {
           additional_costs_usd?: number | null
           brand?: string | null
           category?: string | null
+          cbm_per_unit?: number | null
           coverage_m2?: number | null
           created_at?: string
           dimensions?: string | null
@@ -900,6 +907,7 @@ export type Database = {
           margin_list_pct?: number | null
           margin_project_pct?: number | null
           margin_wholesale_pct?: number | null
+          min_order_qty?: number | null
           name?: string
           notes?: string | null
           price_architect_usd?: number | null
@@ -914,6 +922,7 @@ export type Database = {
           unit_cost_usd?: number | null
           units_per_pack?: number | null
           updated_at?: string
+          weight_kg_per_unit?: number | null
         }
         Relationships: []
       }
