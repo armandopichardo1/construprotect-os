@@ -702,12 +702,12 @@ function AlertHistorySection() {
   const [filterCat, setFilterCat] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
 
-  const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
-    margin: { label: 'Márgenes', icon: '📊' },
-    concentration: { label: 'Concentración', icon: '⚖️' },
-    inventory: { label: 'Inventario', icon: '📦' },
-    crm: { label: 'CRM', icon: '🤝' },
-    finance: { label: 'Finanzas', icon: '💰' },
+  const CATEGORY_LABELS: Record<string, { label: string; icon: string; route: string }> = {
+    margin: { label: 'Márgenes', icon: '📊', route: '/productos' },
+    concentration: { label: 'Concentración', icon: '⚖️', route: '/crm?tab=pipeline' },
+    inventory: { label: 'Inventario', icon: '📦', route: '/inventario?tab=reorden' },
+    crm: { label: 'CRM', icon: '🤝', route: '/crm?tab=pipeline' },
+    finance: { label: 'Finanzas', icon: '💰', route: '/finanzas' },
   };
 
   const categories = useMemo(() => [...new Set(history.map(h => h.category))], [history]);
