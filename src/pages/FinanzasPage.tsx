@@ -1208,6 +1208,8 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
       { Concepto: 'Ingresos', [range.label]: current.revenue, 'Período Ant.': prev.revenue, 'Año Ant.': yoy.revenue },
       { Concepto: 'COGS', [range.label]: current.cogs, 'Período Ant.': prev.cogs, 'Año Ant.': yoy.cogs },
       ...allCogProducts.map(p => ({ Concepto: `  ${p}`, [range.label]: current.cogsByProduct[p] || 0, 'Período Ant.': prev.cogsByProduct[p] || 0, 'Año Ant.': yoy.cogsByProduct[p] || 0 })),
+      { Concepto: 'Costos Directos', [range.label]: current.directCosts, 'Período Ant.': prev.directCosts, 'Año Ant.': yoy.directCosts },
+      ...allCostCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.costsByCategory[cat] || 0, 'Período Ant.': prev.costsByCategory[cat] || 0, 'Año Ant.': yoy.costsByCategory[cat] || 0 })),
       { Concepto: 'Utilidad Bruta', [range.label]: current.grossProfit, 'Período Ant.': prev.grossProfit, 'Año Ant.': yoy.grossProfit },
       ...allExpCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.expensesByCategory[cat] || 0, 'Período Ant.': prev.expensesByCategory[cat] || 0, 'Año Ant.': yoy.expensesByCategory[cat] || 0 })),
       { Concepto: 'Total Gastos', [range.label]: current.totalExpenses, 'Período Ant.': prev.totalExpenses, 'Año Ant.': yoy.totalExpenses },
