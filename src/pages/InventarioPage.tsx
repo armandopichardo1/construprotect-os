@@ -8,14 +8,16 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatte
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Bot, RefreshCw, ArrowUpDown } from 'lucide-react';
+import { Bot, RefreshCw, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { ShipmentsTab } from '@/components/inventario/ShipmentsTab';
 import { MovimientosTab } from '@/components/inventario/MovimientosTab';
+import { SuppliersTab } from '@/components/inventario/SuppliersTab';
+import { DaysOfSupplyChart, OverstockWarnings } from '@/components/inventario/InventoryAnalytics';
 
-const tabs = ['Stock', 'Movimientos', 'Analytics', 'Envíos', 'ABC'];
+const tabs = ['Stock', 'Movimientos', 'Analytics', 'Envíos', 'Proveedores', 'ABC'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -101,6 +103,24 @@ export default function InventarioPage() {
   const [poContent, setPOContent] = useState('');
   const [poLoading, setPOLoading] = useState(false);
   const queryClient = useQueryClient();
+
+  // Cash flow data for PO recommender
+  const { data: cashData } = useQuery({
+    queryKey: ['cash-flow-summary'],
+    queryFn: async () => {
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const [{ data: paidSales }, { data: monthExpenses }, { data: pendingPOs }] = await Promise.all([
+        supabase.from('sales').select('total_usd').eq('payment_status', 'paid'),
+        supabase.from('expenses').select('amount_usd').gte('date', `${monthKey}-01`),
+        supabase.from('shipments').select('total_cost_usd').neq('status', 'received'),
+      ]);
+      const totalReceived = (paidSales || []).reduce((s, r) => s + Number(r.total_usd || 0), 0);
+      const totalExpenses = (monthExpenses || []).reduce((s, r) => s + Number(r.amount_usd || 0), 0);
+      const pendingPOCost = (pendingPOs || []).reduce((s, r) => s + Number(r.total_cost_usd || 0), 0);
+      return { totalReceived, totalExpenses, pendingPOCost, estimatedCash: totalReceived - totalExpenses - pendingPOCost };
+    },
+  });
 
   useEffect(() => {
     const channel = supabase
@@ -402,10 +422,17 @@ export default function InventarioPage() {
                 <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin datos</div>
               )}
             </div>
+
+            {/* Days of Supply */}
+            <DaysOfSupplyChart items={items} />
+
+            {/* Overstock Warnings */}
+            <OverstockWarnings items={items} />
           </div>
         )}
 
         {tab === 'Envíos' && <ShipmentsTab />}
+        {tab === 'Proveedores' && <SuppliersTab />}
 
         {tab === 'ABC' && (
           <div className="space-y-4">
@@ -479,6 +506,20 @@ export default function InventarioPage() {
               </Button>
             </DialogTitle>
           </DialogHeader>
+
+          {/* Cash Flow Check */}
+          {cashData && (
+            <div className={cn('rounded-xl p-3 flex items-center gap-3 text-xs',
+              cashData.estimatedCash > 0 ? 'bg-success/10' : 'bg-destructive/10')}>
+              <AlertTriangle className={cn('w-4 h-4 shrink-0', cashData.estimatedCash > 0 ? 'text-success' : 'text-destructive')} />
+              <div className="flex-1 grid grid-cols-4 gap-2">
+                <div><span className="text-muted-foreground">Cobrado:</span> <span className="font-mono font-semibold text-success">{formatUSD(cashData.totalReceived)}</span></div>
+                <div><span className="text-muted-foreground">Gastos mes:</span> <span className="font-mono text-destructive">{formatUSD(cashData.totalExpenses)}</span></div>
+                <div><span className="text-muted-foreground">POs pend.:</span> <span className="font-mono text-warning">{formatUSD(cashData.pendingPOCost)}</span></div>
+                <div><span className="text-muted-foreground">Disponible:</span> <span className={cn('font-mono font-bold', cashData.estimatedCash >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(cashData.estimatedCash)}</span></div>
+              </div>
+            </div>
+          )}
           
           {poContent ? (
             poTableData ? (

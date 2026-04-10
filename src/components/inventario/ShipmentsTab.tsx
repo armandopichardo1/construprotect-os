@@ -85,7 +85,12 @@ export function ShipmentsTab() {
                   <p className="text-xs text-muted-foreground">{s.supplier_name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{itemCount} ítems · {formatUSD(Number(s.total_cost_usd))}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {itemCount} ítems · {formatUSD(Number(s.total_cost_usd))}
+                    {(Number(s.shipping_cost_usd) > 0 || Number(s.customs_cost_usd) > 0) && (
+                      <span className="ml-1 text-[10px]">(envío: {formatUSD(Number(s.shipping_cost_usd || 0))}, aduana: {formatUSD(Number(s.customs_cost_usd || 0))})</span>
+                    )}
+                  </span>
                   {s.estimated_arrival && <span className="text-xs text-primary font-medium">ETA: {s.estimated_arrival}</span>}
                   <div className="flex gap-1">
                     {s.status !== 'received' && (
