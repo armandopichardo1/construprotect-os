@@ -149,17 +149,18 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
           </Select>
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">{filteredDeals.length} de {deals.length}</span>
         </div>
-        <div className="overflow-x-auto -mx-4 sm:mx-0 sm:rounded-xl sm:border sm:border-border">
-          <table className="w-full caption-bottom text-sm" style={{ minWidth: '720px' }}>
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full caption-bottom text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-[10px] font-semibold">Deal</TableHead>
                   <TableHead className="text-[10px] font-semibold">Contacto</TableHead>
-                  <TableHead className="text-[10px] font-semibold">Etapa</TableHead>
+                  <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Etapa</TableHead>
                   <TableHead className="text-[10px] font-semibold text-right">Valor</TableHead>
-                  <TableHead className="text-[10px] font-semibold text-center">Prob.</TableHead>
-                  <TableHead className="text-[10px] font-semibold text-center">Días</TableHead>
-                  <TableHead className="text-[10px] font-semibold">Proyecto</TableHead>
+                  <TableHead className="text-[10px] font-semibold text-center hidden md:table-cell">Prob.</TableHead>
+                  <TableHead className="text-[10px] font-semibold text-center hidden md:table-cell">Días</TableHead>
+                  <TableHead className="text-[10px] font-semibold hidden lg:table-cell">Proyecto</TableHead>
                   <TableHead className="text-[10px] font-semibold text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
