@@ -180,7 +180,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                           <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.company_name || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden sm:table-cell">
                         <Select value={deal.stage} onValueChange={(v) => updateStage(deal.id, v as DealStage)}>
                           <SelectTrigger className="h-6 text-[10px] w-auto min-w-[110px] rounded-lg border-0 bg-muted px-2">
                             <SelectValue />
@@ -195,13 +195,13 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                       <TableCell className="py-1.5 text-right">
                         <span className="text-xs font-bold text-foreground">${Number(deal.value_usd || 0).toLocaleString()}</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-center">
+                      <TableCell className="py-1.5 text-center hidden md:table-cell">
                         <span className="text-[11px] text-muted-foreground">{deal.probability}%</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-center">
+                      <TableCell className="py-1.5 text-center hidden md:table-cell">
                         <span className={cn('text-[11px] font-medium', dayColor)}>{days}d</span>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden lg:table-cell">
                         <span className="text-[11px] text-muted-foreground truncate">{deal.project_name || '—'}</span>
                       </TableCell>
                       <TableCell className="py-1.5">
