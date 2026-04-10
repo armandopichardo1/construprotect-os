@@ -1687,3 +1687,97 @@ function AIAssistantDialog({ open, onOpenChange, queryClient, rate, onEditPrefil
     </Dialog>
   );
 }
+
+// ========== Territory Coverage ==========
+const TERRITORY_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 55%)', 'hsl(0, 84%, 60%)', 'hsl(190, 70%, 50%)', 'hsl(330, 70%, 55%)'];
+
+function TerritoryCoverageSection({ data }: { data: { name: string; count: number; revenue: number; orders: number; active: number }[] }) {
+  const totalRevenue = data.reduce((s, d) => s + d.revenue, 0);
+  const totalContacts = data.reduce((s, d) => s + d.count, 0);
+
+  const chartData = data.slice(0, 8).map((d, i) => ({
+    name: d.name.length > 12 ? d.name.substring(0, 12) + '...' : d.name,
+    revenue: Math.round(d.revenue),
+    contacts: d.count,
+    fill: TERRITORY_COLORS[i % TERRITORY_COLORS.length],
+  }));
+
+  if (data.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><MapPin className="w-4 h-4 text-primary" /> Cobertura por Territorio</h2>
+        <span className="text-xs text-muted-foreground">{data.length} territorios · {totalContacts} contactos</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-foreground">Ingresos por Territorio</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
+              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} width={90} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+              <Bar dataKey="revenue" radius={[0, 6, 6, 0]}>
+                {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-foreground">Distribución de Contactos</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie data={chartData} innerRadius={40} outerRadius={65} dataKey="contacts" stroke="none">
+                {chartData.map((_, i) => <Cell key={i} fill={TERRITORY_COLORS[i % TERRITORY_COLORS.length]} />)}
+              </Pie>
+              <Tooltip contentStyle={chartTooltipStyle} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-1">
+            {chartData.map((c, i) => (
+              <div key={c.name} className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: TERRITORY_COLORS[i % TERRITORY_COLORS.length] }} />
+                <span className="text-xs text-foreground truncate">{c.name}</span>
+                <span className="text-xs text-muted-foreground ml-auto">{c.contacts}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-card border border-border p-5">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left py-2 font-medium">Territorio</th>
+              <th className="text-right py-2 font-medium">Contactos</th>
+              <th className="text-right py-2 font-medium">Activos</th>
+              <th className="text-right py-2 font-medium">Pedidos</th>
+              <th className="text-right py-2 font-medium">Revenue</th>
+              <th className="text-right py-2 font-medium">% Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(d => (
+              <tr key={d.name} className="border-t border-border/50">
+                <td className="py-2.5 font-medium text-foreground">{d.name}</td>
+                <td className="py-2.5 text-right text-muted-foreground">{d.count}</td>
+                <td className="py-2.5 text-right text-muted-foreground">{d.active}</td>
+                <td className="py-2.5 text-right text-muted-foreground">{d.orders}</td>
+                <td className="py-2.5 text-right text-foreground font-medium">{formatUSD(d.revenue)}</td>
+                <td className="py-2.5 text-right">
+                  <span className={cn('text-[10px] font-semibold', d.revenue / totalRevenue > 0.3 ? 'text-primary' : 'text-muted-foreground')}>
+                    {totalRevenue > 0 ? ((d.revenue / totalRevenue) * 100).toFixed(1) : 0}%
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
