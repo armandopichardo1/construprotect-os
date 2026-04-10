@@ -152,6 +152,7 @@ export function CashFlowTab({ sales, expenses }: Props) {
     return projection.rows.filter(r => r.cumulative < thresholdValue || r.cumPesimista < thresholdValue);
   }, [projection.rows, thresholdEnabled, thresholdValue]);
 
+  const handleExport = () => {
     exportToExcel(data.map(r => ({
       Mes: r.month, 'Entradas USD': r.inflows, 'Salidas USD': r.outflows,
       'Flujo Neto USD': r.net, 'Acumulado USD': r.cumulative,
