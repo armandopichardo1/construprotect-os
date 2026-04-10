@@ -5,13 +5,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUSD } from '@/lib/format';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, FunnelChart, Funnel, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw } from 'lucide-react';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { daysInStage } from '@/lib/crm-utils';
 
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 const axisTick = { fill: 'hsl(220, 12%, 55%)', fontSize: 11 };
@@ -34,6 +36,7 @@ const FUNNEL_COLORS = ['hsl(217, 91%, 65%)', 'hsl(217, 91%, 58%)', 'hsl(217, 91%
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showReview, setShowReview] = useState(false);
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -163,6 +166,25 @@ export default function DashboardPage() {
 
   const lowStockItems = inventoryStats?.stockItems.filter(i => i.status === 'low' || i.status === 'out') || [];
 
+  // Alerts data
+  const { data: alertsData } = useQuery({
+    queryKey: ['dashboard-alerts'],
+    queryFn: async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [{ data: staleDeals }, { data: overdueActivities }, { data: overduePayments }] = await Promise.all([
+        supabase.from('deals').select('id, title, value_usd, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
+        supabase.from('activities').select('id, title, due_date, contacts(contact_name)').eq('is_completed', false).lt('due_date', todayStr),
+        supabase.from('sales').select('id, invoice_ref, total_usd, date, crm_clients(name)').eq('payment_status', 'overdue'),
+      ]);
+      const stale = (staleDeals || []).filter(d => daysInStage(d.updated_at) > 7);
+      return {
+        staleDeals: stale,
+        overdueActivities: overdueActivities || [],
+        overduePayments: overduePayments || [],
+      };
+    },
+  });
+
   const generateReview = async () => {
     setShowReview(true);
     setReviewContent('');
@@ -182,12 +204,57 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        {/* Quick Actions */}
+        <div className="flex items-center gap-3 flex-wrap">
           <p className="text-sm text-muted-foreground">Hola, {user?.user_metadata?.full_name || 'usuario'} 👋</p>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={generateReview}>
-            <Bot className="w-3.5 h-3.5" /> AI Business Review
-          </Button>
+          <div className="flex gap-2 ml-auto">
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/finanzas')}>
+              <Plus className="w-3 h-3" /> Venta
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/finanzas')}>
+              <DollarSign className="w-3 h-3" /> Gasto
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/crm')}>
+              <Clock className="w-3 h-3" /> Actividad
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={generateReview}>
+              <Bot className="w-3.5 h-3.5" /> AI Business Review
+            </Button>
+          </div>
         </div>
+
+        {/* Alerts Banner */}
+        {alertsData && (alertsData.staleDeals.length > 0 || alertsData.overdueActivities.length > 0 || alertsData.overduePayments.length > 0 || lowStockItems.length > 0) && (
+          <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
+            <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Alertas que requieren atención</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {lowStockItems.length > 0 && (
+                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/inventario')}>
+                  <p className="text-lg font-bold text-warning">{lowStockItems.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Productos bajo stock</p>
+                </div>
+              )}
+              {alertsData.staleDeals.length > 0 && (
+                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/crm')}>
+                  <p className="text-lg font-bold text-warning">{alertsData.staleDeals.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Deals estancados (7+ días)</p>
+                </div>
+              )}
+              {alertsData.overdueActivities.length > 0 && (
+                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/crm')}>
+                  <p className="text-lg font-bold text-destructive">{alertsData.overdueActivities.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Actividades vencidas</p>
+                </div>
+              )}
+              {alertsData.overduePayments.length > 0 && (
+                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/finanzas')}>
+                  <p className="text-lg font-bold text-destructive">{alertsData.overduePayments.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Pagos vencidos</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
