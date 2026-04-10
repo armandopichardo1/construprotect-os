@@ -27,7 +27,7 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const queryClient = useQueryClient();
   const isEdit = !!editShipment;
 
-  const [supplierName, setSupplierName] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [status, setStatus] = useState('ordered');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
@@ -38,6 +38,14 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const [items, setItems] = useState<{ product_id: string; quantity_ordered: number; unit_cost_usd: number }[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
   const { data: products = [] } = useQuery({
     queryKey: ['products-active'],
     queryFn: async () => {
@@ -45,7 +53,6 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
       return data || [];
     },
   });
-
   useEffect(() => {
     if (editShipment) {
       setSupplierName(editShipment.supplier_name || '');
