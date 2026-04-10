@@ -47,6 +47,25 @@ export function ReorderTab() {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingRows, setEditingRows] = useState<Record<string, EditingRow>>({});
   const [showConfigAll, setShowConfigAll] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+  type CartItem = { product_id: string; name: string; sku: string; qty_to_order: number; unit_cost: number; supplier_name: string; supplier_id: string };
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartSaving, setCartSaving] = useState(false);
+
+  // Fetch supplier history for product → supplier mapping
+  const { data: supplierMap } = useQuery({
+    queryKey: ['product-supplier-map'],
+    queryFn: async () => {
+      const { data } = await supabase.from('shipment_items').select('product_id, shipments(supplier_id, supplier_name, order_date)').order('created_at', { ascending: false });
+      const map: Record<string, { supplier_id: string; supplier_name: string }> = {};
+      (data || []).forEach((si: any) => {
+        if (si.product_id && si.shipments && !map[si.product_id]) {
+          map[si.product_id] = { supplier_id: si.shipments.supplier_id || '', supplier_name: si.shipments.supplier_name || '' };
+        }
+      });
+      return map;
+    },
+  });
 
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
