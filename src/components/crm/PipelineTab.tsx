@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List } from 'lucide-react';
+import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List, Phone, MessageCircle, Mail } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
@@ -264,6 +264,15 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
             <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.contact_name} · {deal.contacts?.company_name || ''}</p>
           </div>
           <div className="flex gap-0.5 shrink-0">
+            {deal.contacts?.phone && (
+              <a href={`tel:${deal.contacts.phone.replace(/\D/g, '')}`} className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" onClick={(e) => e.stopPropagation()} title="Llamar"><Phone className="w-3 h-3" /></a>
+            )}
+            {deal.contacts?.phone && (
+              <a href={`https://wa.me/${deal.contacts.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-muted-foreground hover:text-success hover:bg-success/10 transition-colors" onClick={(e) => e.stopPropagation()} title="WhatsApp"><MessageCircle className="w-3 h-3" /></a>
+            )}
+            {deal.contacts?.email && (
+              <a href={`mailto:${deal.contacts.email}`} className="p-1 rounded text-muted-foreground hover:text-warning hover:bg-warning/10 transition-colors" onClick={(e) => e.stopPropagation()} title="Email"><Mail className="w-3 h-3" /></a>
+            )}
             <button onClick={generatePlan} className="p-1 rounded text-primary hover:text-primary/80" title="AI Game Plan"><Bot className="w-3 h-3" /></button>
             <button onClick={generatePitch} className="p-1 rounded text-accent-foreground hover:text-primary" title="AI Pitch"><Megaphone className="w-3 h-3" /></button>
             <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>

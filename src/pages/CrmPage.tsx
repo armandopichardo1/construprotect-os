@@ -68,7 +68,7 @@ export default function CrmPage() {
   const { data: deals = [] } = useQuery({
     queryKey: ['crm-deals'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('deals').select('*, contacts(contact_name, company_name)').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('deals').select('*, contacts(contact_name, company_name, phone, email, whatsapp)').order('created_at', { ascending: false });
       if (error) throw error;
       return data as Deal[];
     },

@@ -43,7 +43,7 @@ export interface Deal {
   notes: string | null;
   created_at: string;
   updated_at: string;
-  contacts?: { contact_name: string; company_name: string | null } | null;
+  contacts?: { contact_name: string; company_name: string | null; phone?: string | null; email?: string | null; whatsapp?: string | null } | null;
 }
 
 export interface Activity {
