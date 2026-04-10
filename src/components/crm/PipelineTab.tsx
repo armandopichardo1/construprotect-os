@@ -180,7 +180,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                           <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.company_name || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="py-1.5 hidden sm:table-cell">
+                      <TableCell className="py-1.5 hidden sm:table-cell" onClick={e => e.stopPropagation()}>
                         <Select value={deal.stage} onValueChange={(v) => updateStage(deal.id, v as DealStage)}>
                           <SelectTrigger className="h-6 text-[10px] w-auto min-w-[110px] rounded-lg border-0 bg-muted px-2">
                             <SelectValue />
