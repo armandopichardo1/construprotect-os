@@ -212,6 +212,20 @@ export default function DashboardPage() {
   // Dynamic alerts from configurable rules
   const { data: computedAlerts = [] } = useAlerts();
 
+  // Toast notifications for critical inventory/shipment alerts
+  useEffect(() => {
+    if (!computedAlerts.length || alertsNotifiedRef.current) return;
+    alertsNotifiedRef.current = true;
+    const inventoryAlerts = computedAlerts.filter(a => ['reorder_needed', 'low_stock', 'out_of_stock', 'shipment_delayed'].includes(a.ruleId));
+    inventoryAlerts.forEach(alert => {
+      if (alert.severity === 'critical') {
+        toast.error(alert.message, { duration: 8000 });
+      } else {
+        toast.warning(alert.message, { duration: 6000 });
+      }
+    });
+  }, [computedAlerts]);
+
   const generateReview = async () => {
     setShowReview(true);
     setReviewContent('');
