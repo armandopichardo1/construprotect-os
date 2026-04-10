@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -94,7 +95,9 @@ function ExchangeRateKpi({ rate }: { rate: any }) {
 }
 
 export default function FinanzasPage() {
-  const [tab, setTab] = useState('Crear Transacción');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'Crear Transacción';
+  const [tab, setTab] = useState(initialTab);
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
   const [costPrefill, setCostPrefill] = useState<any>(null);
