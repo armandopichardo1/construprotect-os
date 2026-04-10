@@ -27,7 +27,7 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const queryClient = useQueryClient();
   const isEdit = !!editShipment;
 
-  const [supplierName, setSupplierName] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [status, setStatus] = useState('ordered');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
@@ -38,6 +38,14 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const [items, setItems] = useState<{ product_id: string; quantity_ordered: number; unit_cost_usd: number }[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
   const { data: products = [] } = useQuery({
     queryKey: ['products-active'],
     queryFn: async () => {
@@ -45,10 +53,9 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
       return data || [];
     },
   });
-
   useEffect(() => {
     if (editShipment) {
-      setSupplierName(editShipment.supplier_name || '');
+      setSupplierId(editShipment.supplier_id || '');
       setPoNumber(editShipment.po_number || '');
       setStatus(editShipment.status || 'ordered');
       setOrderDate(editShipment.order_date || '');
@@ -60,7 +67,7 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
         product_id: si.product_id, quantity_ordered: si.quantity_ordered, unit_cost_usd: Number(si.unit_cost_usd),
       })) || []);
     } else {
-      setSupplierName(''); setPoNumber(''); setStatus('ordered');
+      setSupplierId(''); setPoNumber(''); setStatus('ordered');
       setOrderDate(new Date().toISOString().split('T')[0]);
       setEstimatedArrival(''); setNotes(''); setShippingCost('0'); setCustomsCost('0'); setItems([]);
     }
@@ -82,11 +89,12 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
   const totalCost = productCost + (Number(shippingCost) || 0) + (Number(customsCost) || 0);
 
   const handleSave = async () => {
-    if (!supplierName.trim()) { toast.error('Ingresa el proveedor'); return; }
+    if (!supplierId) { toast.error('Selecciona un proveedor'); return; }
+    const selectedSupplier = suppliers.find(s => s.id === supplierId);
     setSaving(true);
     try {
       const payload = {
-        supplier_name: supplierName, po_number: poNumber, status: status as any,
+        supplier_id: supplierId, supplier_name: selectedSupplier?.name || '', po_number: poNumber, status: status as any,
         order_date: orderDate, estimated_arrival: estimatedArrival || null,
         total_cost_usd: totalCost, notes: notes || null,
         shipping_cost_usd: Number(shippingCost) || 0,
@@ -130,7 +138,12 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label className="text-xs">Proveedor *</Label><Input value={supplierName} onChange={e => setSupplierName(e.target.value)} /></div>
+            <div><Label className="text-xs">Proveedor *</Label>
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                <SelectContent>{suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div><Label className="text-xs">PO Number</Label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} /></div>
             <div><Label className="text-xs">Estado</Label>
               <Select value={status} onValueChange={setStatus}>
