@@ -20,6 +20,11 @@ export function CashFlowTab({ sales, expenses }: Props) {
   const [months, setMonths] = useState('6');
   const [projMonths, setProjMonths] = useState('3');
   const now = useMemo(() => new Date(), []);
+  const { data: alertRules } = useAlertRules();
+
+  const cashflowRule = alertRules?.find(r => r.id === 'cashflow_projection_low');
+  const thresholdEnabled = cashflowRule?.enabled ?? true;
+  const thresholdValue = cashflowRule?.threshold ?? 1000;
 
   const data = useMemo(() => {
     const n = Number(months);
