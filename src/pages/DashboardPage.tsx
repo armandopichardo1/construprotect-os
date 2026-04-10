@@ -221,9 +221,9 @@ export default function DashboardPage() {
   });
 
   const margin = revenueData && revenueData.totalRevenue > 0
-    ? ((revenueData.totalRevenue - revenueData.totalCogs) / revenueData.totalRevenue * 100) : 0;
+    ? ((revenueData.totalRevenue - revenueData.totalCogs - (revenueData.totalDirectCosts || 0)) / revenueData.totalRevenue * 100) : 0;
   const netMargin = revenueData && revenueData.totalRevenue > 0
-    ? ((revenueData.totalRevenue - revenueData.totalCogs - (revenueData.totalExpenses || 0)) / revenueData.totalRevenue * 100) : 0;
+    ? ((revenueData.totalRevenue - revenueData.totalCogs - (revenueData.totalDirectCosts || 0) - (revenueData.totalExpenses || 0)) / revenueData.totalRevenue * 100) : 0;
 
   const lowStockItems = inventoryStats?.stockItems.filter(i => i.status === 'low' || i.status === 'out') || [];
 
