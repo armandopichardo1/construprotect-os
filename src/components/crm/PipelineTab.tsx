@@ -205,7 +205,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                         <span className="text-[11px] text-muted-foreground truncate">{deal.project_name || '—'}</span>
                       </TableCell>
                       <TableCell className="py-1.5">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onEdit(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
                           <button onClick={() => onDelete(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
                         </div>
