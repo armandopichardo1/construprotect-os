@@ -513,6 +513,7 @@ export default function DashboardPage() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+        )}
       </div>
 
       {/* AI Business Review Dialog */}
