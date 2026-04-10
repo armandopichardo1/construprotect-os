@@ -649,10 +649,18 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
 }
 
 // ============ GASTOS TAB ============
-function GastosTab({ expenses, queryClient, rate, onExport }: any) {
+function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExport }: any) {
   const [showForm, setShowForm] = useState(false);
   const [editExpense, setEditExpense] = useState<any>(null);
   const [deleteExpense, setDeleteExpense] = useState<any>(null);
+
+  useEffect(() => {
+    if (prefill) {
+      setEditExpense(prefill);
+      setShowForm(true);
+      clearPrefill?.();
+    }
+  }, [prefill]);
 
   const handleDeleteExpense = async () => {
     if (!deleteExpense) return;
@@ -849,10 +857,18 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
 }
 
 // ============ COSTOS TAB ============
-function CostosTab({ costs, queryClient, rate, onExport }: any) {
+function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }: any) {
   const [showForm, setShowForm] = useState(false);
   const [editCost, setEditCost] = useState<any>(null);
   const [deleteCost, setDeleteCost] = useState<any>(null);
+
+  useEffect(() => {
+    if (prefill) {
+      setEditCost(prefill);
+      setShowForm(true);
+      clearPrefill?.();
+    }
+  }, [prefill]);
 
   const handleDeleteCost = async () => {
     if (!deleteCost) return;
