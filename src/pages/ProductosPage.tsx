@@ -8,13 +8,55 @@ import { formatUSD } from '@/lib/format';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
 
 const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
+
+const MIN_MARGIN_THRESHOLD = 5; // margen mínimo aceptable en %
+
+function calcRealMargin(cost: number, price: number): number | null {
+  if (!price || price === 0) return null;
+  return ((price - cost) / price) * 100;
+}
+
+function MarginCell({ cost, price, targetPct, label }: { cost: number; price: number; targetPct: number; label: string }) {
+  const real = calcRealMargin(cost, price);
+  if (real === null) return <span className="text-muted-foreground">—</span>;
+
+  const belowTarget = real < targetPct;
+  const critical = real < MIN_MARGIN_THRESHOLD;
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={`inline-flex items-center gap-1 font-mono ${
+            critical ? 'text-destructive font-semibold' : belowTarget ? 'text-amber-500' : 'text-emerald-500'
+          }`}>
+            {critical ? (
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+            ) : belowTarget ? (
+              <TrendingDown className="w-3 h-3 shrink-0" />
+            ) : (
+              <TrendingUp className="w-3 h-3 shrink-0 opacity-60" />
+            )}
+            {real.toFixed(1)}%
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p className="font-medium">{label}</p>
+          <p>Real: {real.toFixed(1)}% — Objetivo: {targetPct.toFixed(1)}%</p>
+          {belowTarget && <p className="text-amber-400">⚠ {(targetPct - real).toFixed(1)} pts debajo del objetivo</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
@@ -89,9 +131,10 @@ export default function ProductosPage() {
                   <TableHead className="text-xs">Marca</TableHead>
                   <TableHead className="text-xs">Categoría</TableHead>
                   <TableHead className="text-xs text-right">Costo</TableHead>
-                  <TableHead className="text-xs text-right">Precio Lista</TableHead>
-                  <TableHead className="text-xs text-right">Arq.</TableHead>
-                  <TableHead className="text-xs text-right">Proy.</TableHead>
+                  <TableHead className="text-xs text-right">P. Lista</TableHead>
+                  <TableHead className="text-xs text-center">M. Lista</TableHead>
+                  <TableHead className="text-xs text-center">M. Arq.</TableHead>
+                  <TableHead className="text-xs text-center">M. Proy.</TableHead>
                   <TableHead className="text-xs">Dimensiones</TableHead>
                   <TableHead className="text-xs w-[80px]">Acciones</TableHead>
                 </TableRow>
@@ -107,8 +150,15 @@ export default function ProductosPage() {
                     </TableCell>
                     <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.unit_cost_usd))}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-medium text-primary">{formatUSD(Number(p.price_list_usd))}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_architect_usd))}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_project_usd))}</TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || 30)} label="Margen Lista" />
+                    </TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || 25)} label="Margen Arquitecto" />
+                    </TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || 20)} label="Margen Proyecto" />
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
