@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAlertHistory, type AlertHistoryRow } from '@/hooks/useAlertHistory';
 import { cn } from '@/lib/utils';
-import { Bell, Package, DollarSign, TrendingDown, Users, ShieldAlert, Clock, Filter, Trash2 } from 'lucide-react';
+import { Bell, Package, DollarSign, TrendingDown, Users, ShieldAlert, Clock, Filter, Trash2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,12 +11,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const CATEGORY_CONFIG: Record<string, { icon: typeof Bell; label: string; color: string }> = {
-  inventory: { icon: Package, label: 'Inventario', color: 'text-primary' },
-  finance: { icon: DollarSign, label: 'Finanzas', color: 'text-warning' },
-  margin: { icon: TrendingDown, label: 'Márgenes', color: 'text-destructive' },
-  crm: { icon: Users, label: 'CRM', color: 'text-success' },
-  concentration: { icon: ShieldAlert, label: 'Concentración', color: 'text-destructive' },
+const CATEGORY_CONFIG: Record<string, { icon: typeof Bell; label: string; color: string; route: string }> = {
+  inventory: { icon: Package, label: 'Inventario', color: 'text-primary', route: '/inventario?tab=reorden' },
+  finance: { icon: DollarSign, label: 'Finanzas', color: 'text-warning', route: '/finanzas' },
+  margin: { icon: TrendingDown, label: 'Márgenes', color: 'text-destructive', route: '/productos' },
+  crm: { icon: Users, label: 'CRM', color: 'text-success', route: '/crm?tab=pipeline' },
+  concentration: { icon: ShieldAlert, label: 'Concentración', color: 'text-destructive', route: '/crm?tab=pipeline' },
 };
 
 function timeAgo(dateStr: string): string {
@@ -52,10 +53,19 @@ function groupByDate(items: AlertHistoryRow[]): { label: string; items: AlertHis
 }
 
 export function NotificationCenter() {
+  const navigate = useNavigate();
   const { data: history = [], isLoading } = useAlertHistory(50);
   const [filter, setFilter] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const handleNavigate = (category: string) => {
+    const cfg = CATEGORY_CONFIG[category];
+    if (cfg?.route) {
+      setOpen(false);
+      navigate(cfg.route);
+    }
+  };
 
   const filtered = filter ? history.filter(h => h.category === filter) : history;
   const grouped = groupByDate(filtered);
@@ -153,7 +163,11 @@ export function NotificationCenter() {
                     const cfg = CATEGORY_CONFIG[item.category] || { icon: Bell, label: item.category, color: 'text-muted-foreground' };
                     const Icon = cfg.icon;
                     return (
-                      <div key={item.id} className="px-4 py-2.5 hover:bg-muted/50 transition-colors flex items-start gap-3">
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavigate(item.category)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-muted/50 transition-colors flex items-start gap-3 cursor-pointer"
+                      >
                         <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5', 
                           item.severity === 'critical' ? 'bg-destructive/10' : 'bg-warning/10'
                         )}>
@@ -176,9 +190,10 @@ export function NotificationCenter() {
                             {item.alert_count > 1 && (
                               <span className="text-[9px] text-muted-foreground/60">×{item.alert_count}</span>
                             )}
+                            <ExternalLink className="w-2.5 h-2.5 text-muted-foreground/40 ml-auto" />
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
