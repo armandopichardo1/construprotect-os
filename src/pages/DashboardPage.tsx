@@ -43,6 +43,8 @@ const FUNNEL_COLORS = ['hsl(217, 91%, 65%)', 'hsl(217, 91%, 58%)', 'hsl(217, 91%
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { rate } = useExchangeRate();
+  const fmt = (usd: number) => formatDOP(usd * rate);
   const [showReview, setShowReview] = useState(false);
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
