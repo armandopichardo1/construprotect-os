@@ -1263,8 +1263,36 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
             <SelectItem value="ytd">YTD (Año en Curso)</SelectItem>
             <SelectItem value="last_quarter">Último Trimestre</SelectItem>
             <SelectItem value="full_year">Año Completo</SelectItem>
+            <SelectItem value="custom">Personalizado</SelectItem>
           </SelectContent>
         </Select>
+        {period === 'custom' && (
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !plCustomFrom && 'text-muted-foreground')}>
+                  <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                  {plCustomFrom ? format(plCustomFrom, 'dd/MM/yyyy') : 'Desde'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={plCustomFrom} onSelect={setPlCustomFrom} initialFocus className={cn('p-3 pointer-events-auto')} />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">→</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !plCustomTo && 'text-muted-foreground')}>
+                  <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                  {plCustomTo ? format(plCustomTo, 'dd/MM/yyyy') : 'Hasta'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={plCustomTo} onSelect={setPlCustomTo} initialFocus className={cn('p-3 pointer-events-auto')} />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
         <span className="text-xs text-muted-foreground">{range.start} → {range.end}</span>
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
