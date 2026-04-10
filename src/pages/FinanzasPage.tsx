@@ -329,7 +329,7 @@ export default function FinanzasPage() {
           })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
-        {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
+        {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
