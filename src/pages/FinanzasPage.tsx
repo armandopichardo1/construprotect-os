@@ -695,10 +695,22 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
 }
 
 function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editExpense;
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+
+  // Group accounts by type for the selector
+  const gastoAccounts = useMemo(() => accounts.filter((a: any) => ['Gasto', 'Costo', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
+  const otherAccounts = useMemo(() => accounts.filter((a: any) => !['Gasto', 'Costo', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
 
   useEffect(() => {
     if (editExpense) {
@@ -708,9 +720,10 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
         vendor: editExpense.vendor || '',
         amount_usd: String(editExpense.amount_usd || ''),
         amount_dop: String(editExpense.amount_dop || ''),
+        account_id: editExpense.account_id || '',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
     }
   }, [editExpense, open]);
 
