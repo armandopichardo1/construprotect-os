@@ -25,6 +25,7 @@ const defaultForm = {
   price_project_usd: '', price_wholesale_usd: '', coverage_m2: '',
   reorder_point: '10', dimensions: '', units_per_pack: '1', lead_time_days: '21',
   margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
+  cbm_per_unit: '', weight_kg_per_unit: '', min_order_qty: '1', reorder_qty: '50',
 };
 
 export function ProductDialog({ open, onOpenChange, product, onSuccess }: ProductDialogProps) {
@@ -53,6 +54,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
         margin_architect_pct: String(product.margin_architect_pct ?? ''),
         margin_project_pct: String(product.margin_project_pct ?? ''),
         margin_wholesale_pct: String(product.margin_wholesale_pct ?? ''),
+        cbm_per_unit: String(product.cbm_per_unit ?? ''),
+        weight_kg_per_unit: String(product.weight_kg_per_unit ?? ''),
+        min_order_qty: String(product.min_order_qty ?? '1'),
+        reorder_qty: String(product.reorder_qty ?? '50'),
       });
     } else {
       setForm(defaultForm);
@@ -86,6 +91,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
       margin_architect_pct: Number(form.margin_architect_pct) || 0,
       margin_project_pct: Number(form.margin_project_pct) || 0,
       margin_wholesale_pct: Number(form.margin_wholesale_pct) || 0,
+      cbm_per_unit: Number(form.cbm_per_unit) || 0,
+      weight_kg_per_unit: Number(form.weight_kg_per_unit) || 0,
+      min_order_qty: Number(form.min_order_qty) || 1,
+      reorder_qty: Number(form.reorder_qty) || 50,
     };
 
     const { error } = isEdit
@@ -143,6 +152,14 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
             <div><Label className="text-xs">Dimensiones</Label><Input value={form.dimensions} onChange={e => set('dimensions', e.target.value)} className="h-8 text-xs mt-1" placeholder="38x100'" /></div>
             <div><Label className="text-xs">Uds/Caja</Label><Input type="number" value={form.units_per_pack} onChange={e => set('units_per_pack', e.target.value)} className="h-8 text-xs mt-1" /></div>
             <div><Label className="text-xs">Lead Time (días)</Label><Input type="number" value={form.lead_time_days} onChange={e => set('lead_time_days', e.target.value)} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">Qty Reorden</Label><Input type="number" value={form.reorder_qty} onChange={e => set('reorder_qty', e.target.value)} className="h-8 text-xs mt-1" /></div>
+            <div><Label className="text-xs">Min Order Qty</Label><Input type="number" value={form.min_order_qty} onChange={e => set('min_order_qty', e.target.value)} className="h-8 text-xs mt-1" /></div>
+          </div>
+
+          <p className="text-[10px] font-semibold text-muted-foreground pt-1">🚢 Logística (Contenedor)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label className="text-xs">CBM por unidad</Label><Input type="number" step="0.001" value={form.cbm_per_unit} onChange={e => set('cbm_per_unit', e.target.value)} className="h-8 text-xs mt-1" placeholder="0.035" /></div>
+            <div><Label className="text-xs">Peso por unidad (kg)</Label><Input type="number" step="0.1" value={form.weight_kg_per_unit} onChange={e => set('weight_kg_per_unit', e.target.value)} className="h-8 text-xs mt-1" placeholder="2.5" /></div>
           </div>
 
           <Button onClick={handleSave} disabled={saving} className="w-full rounded-xl text-xs mt-2">
