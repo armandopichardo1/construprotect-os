@@ -4,8 +4,9 @@ import { KpiCard } from '@/components/KpiCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, formatDOP } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   LineChart, Line, ComposedChart, Legend, LabelList,
