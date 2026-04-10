@@ -24,7 +24,19 @@ import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+
+const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
+  freight: { label: 'Flete', icon: '🚢' },
+  customs: { label: 'Aduanas', icon: '🛃' },
+  raw_materials: { label: 'Materiales', icon: '🧱' },
+  packaging: { label: 'Empaque', icon: '📦' },
+  labor: { label: 'Mano de Obra', icon: '👷' },
+  logistics: { label: 'Logística', icon: '🚚' },
+  warehousing: { label: 'Almacenaje', icon: '🏭' },
+  insurance: { label: 'Seguro', icon: '🛡️' },
+  other: { label: 'Otro', icon: '📎' },
+};
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
@@ -99,6 +111,15 @@ export default function FinanzasPage() {
     queryKey: ['expenses'],
     queryFn: async () => {
       const { data, error } = await supabase.from('expenses').select('*, chart_of_accounts(code, description)').order('date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: costs = [] } = useQuery({
+    queryKey: ['costs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('costs').select('*, chart_of_accounts(code, description)').order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -285,6 +306,12 @@ export default function FinanzasPage() {
             Fecha: e.date, Descripción: e.description, Categoría: e.category,
             Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
           })), 'gastos', 'Gastos');
+        }} />}
+        {tab === 'Costos' && <CostosTab costs={costs} queryClient={queryClient} rate={latestRate} onExport={() => {
+          exportToExcel(costs.map((c: any) => ({
+            Fecha: c.date, Descripción: c.description, Categoría: c.category,
+            Proveedor: c.vendor, 'Monto USD': c.amount_usd, 'Monto DOP': c.amount_dop,
+          })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
@@ -804,6 +831,205 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
             <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Gasto'}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============ COSTOS TAB ============
+function CostosTab({ costs, queryClient, rate, onExport }: any) {
+  const [showForm, setShowForm] = useState(false);
+  const [editCost, setEditCost] = useState<any>(null);
+  const [deleteCost, setDeleteCost] = useState<any>(null);
+
+  const handleDeleteCost = async () => {
+    if (!deleteCost) return;
+    const { error } = await supabase.from('costs').delete().eq('id', deleteCost.id);
+    if (error) { toast.error('Error al eliminar costo'); throw error; }
+    toast.success('Costo eliminado');
+    queryClient.invalidateQueries({ queryKey: ['costs'] });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => { setEditCost(null); setShowForm(true); }}>+ Nuevo Costo</Button>
+        <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+      </div>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs">Fecha</TableHead>
+              <TableHead className="text-xs">Categoría</TableHead>
+              <TableHead className="text-xs">Descripción</TableHead>
+              <TableHead className="text-xs">Cuenta Contable</TableHead>
+              <TableHead className="text-xs">Proveedor</TableHead>
+              <TableHead className="text-xs text-right">Monto RD$</TableHead>
+              <TableHead className="text-xs">Recibo</TableHead>
+              <TableHead className="text-xs w-[80px]">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {costs.map((c: any) => {
+              const cat = COST_CATEGORIES[c.category] || COST_CATEGORIES.other;
+              const amountDop = Number(c.amount_dop) || Number(c.amount_usd || 0) * (Number(rate?.usd_sell) || 60.76);
+              return (
+                <TableRow key={c.id}>
+                  <TableCell className="text-xs">{c.date}</TableCell>
+                  <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
+                  <TableCell className="text-xs font-medium">{c.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {c.chart_of_accounts ? (
+                      <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium">{c.chart_of_accounts.code} · {c.chart_of_accounts.description}</span>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{c.vendor || '—'}</TableCell>
+                  <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
+                  <TableCell>
+                    <ReceiptUpload expenseId={c.id} currentUrl={c.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['costs'] })} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <button onClick={() => { setEditCost(c); setShowForm(true); }}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteCost(c)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+        {costs.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay costos registrados</p>}
+      </div>
+      <CostFormDialog open={showForm} onOpenChange={(v: boolean) => { setShowForm(v); if (!v) setEditCost(null); }} queryClient={queryClient} rate={rate} editCost={editCost} />
+      <DeleteConfirmDialog
+        open={!!deleteCost}
+        onOpenChange={(v) => { if (!v) setDeleteCost(null); }}
+        title="Eliminar costo"
+        description={`¿Eliminar el costo <strong>${deleteCost?.description || ''}</strong> por <strong>${formatDOP(Number(deleteCost?.amount_dop) || Number(deleteCost?.amount_usd || 0) * (Number(rate?.usd_sell) || 60.76))}</strong>? Esta acción no se puede deshacer.`}
+        onConfirm={handleDeleteCost}
+      />
+    </div>
+  );
+}
+
+function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any) {
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+  const [saving, setSaving] = useState(false);
+  const xr = Number(rate?.usd_sell) || 60.76;
+  const isEdit = !!editCost;
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+
+  const costoAccounts = useMemo(() => accounts.filter((a: any) => ['Costo', 'Gasto', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
+  const otherAccounts = useMemo(() => accounts.filter((a: any) => !['Costo', 'Gasto', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
+
+  useEffect(() => {
+    if (editCost) {
+      setForm({
+        description: editCost.description || '',
+        category: editCost.category || 'other',
+        vendor: editCost.vendor || '',
+        amount_usd: String(editCost.amount_usd || ''),
+        amount_dop: String(editCost.amount_dop || ''),
+        account_id: editCost.account_id || '',
+      });
+    } else {
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+    }
+  }, [editCost, open]);
+
+  const handleSave = async () => {
+    if (!form.description.trim()) { toast.error('Descripción requerida'); return; }
+    setSaving(true);
+    const amtUsd = Number(form.amount_usd) || (Number(form.amount_dop) / xr);
+    const amtDop = Number(form.amount_dop) || (Number(form.amount_usd) * xr);
+    const payload = {
+      description: form.description.trim(), category: form.category as any,
+      vendor: form.vendor.trim() || null,
+      amount_usd: Math.round(amtUsd * 100) / 100,
+      amount_dop: Math.round(amtDop * 100) / 100,
+      exchange_rate: xr,
+      account_id: form.account_id || null,
+    };
+
+    const { error } = isEdit
+      ? await supabase.from('costs').update(payload).eq('id', editCost.id)
+      : await supabase.from('costs').insert(payload);
+
+    setSaving(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success(isEdit ? 'Costo actualizado' : 'Costo registrado');
+    queryClient.invalidateQueries({ queryKey: ['costs'] });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>{isEdit ? 'Editar Costo' : 'Nuevo Costo'}</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Descripción *</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="mt-1" /></div>
+            <div>
+              <Label className="text-xs">Categoría</Label>
+              <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(COST_CATEGORIES).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Proveedor</Label><Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} className="mt-1" /></div>
+            <div>
+              <Label className="text-xs">Cuenta Contable</Label>
+              <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar cuenta..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin asignar</SelectItem>
+                  {costoAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Costos / Gastos</div>
+                      {costoAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {otherAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Otras cuentas</div>
+                      {otherAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
+            <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Costo'}</Button>
         </div>
       </DialogContent>
     </Dialog>

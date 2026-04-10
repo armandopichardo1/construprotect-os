@@ -317,6 +317,68 @@ export type Database = {
         }
         Relationships: []
       }
+      costs: {
+        Row: {
+          account_id: string | null
+          amount_dop: number
+          amount_usd: number
+          category: Database["public"]["Enums"]["cost_category"]
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string
+          exchange_rate: number | null
+          id: string
+          is_recurring: boolean | null
+          receipt_url: string | null
+          recurring_frequency: string | null
+          subcategory: string | null
+          vendor: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount_dop?: number
+          amount_usd?: number
+          category?: Database["public"]["Enums"]["cost_category"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description: string
+          exchange_rate?: number | null
+          id?: string
+          is_recurring?: boolean | null
+          receipt_url?: string | null
+          recurring_frequency?: string | null
+          subcategory?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount_dop?: number
+          amount_usd?: number
+          category?: Database["public"]["Enums"]["cost_category"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string
+          exchange_rate?: number | null
+          id?: string
+          is_recurring?: boolean | null
+          receipt_url?: string | null
+          recurring_frequency?: string | null
+          subcategory?: string | null
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "costs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_clients: {
         Row: {
           company: string | null
@@ -1294,6 +1356,16 @@ export type Database = {
         | "follow_up"
         | "note"
         | "delivery"
+      cost_category:
+        | "freight"
+        | "customs"
+        | "raw_materials"
+        | "packaging"
+        | "labor"
+        | "logistics"
+        | "warehousing"
+        | "insurance"
+        | "other"
       deal_stage:
         | "prospecting"
         | "initial_contact"
@@ -1485,6 +1557,17 @@ export const Constants = {
         "follow_up",
         "note",
         "delivery",
+      ],
+      cost_category: [
+        "freight",
+        "customs",
+        "raw_materials",
+        "packaging",
+        "labor",
+        "logistics",
+        "warehousing",
+        "insurance",
+        "other",
       ],
       deal_stage: [
         "prospecting",
