@@ -17,8 +17,12 @@ import { streamFinancialAI } from '@/lib/financial-ai';
 import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
+import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from '@/components/finanzas/ResumenAnalytics';
+import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
+import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
+import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
