@@ -98,7 +98,7 @@ export default function FinanzasPage() {
   const { data: expenses = [] } = useQuery({
     queryKey: ['expenses'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+      const { data, error } = await supabase.from('expenses').select('*, chart_of_accounts(code, description)').order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -637,6 +637,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Categoría</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
+              <TableHead className="text-xs">Cuenta Contable</TableHead>
               <TableHead className="text-xs">Proveedor</TableHead>
               <TableHead className="text-xs text-right">Monto RD$</TableHead>
               <TableHead className="text-xs">Recibo</TableHead>
@@ -652,6 +653,11 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
                   <TableCell className="text-xs">{e.date}</TableCell>
                   <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
                   <TableCell className="text-xs font-medium">{e.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {e.chart_of_accounts ? (
+                      <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium">{e.chart_of_accounts.code} · {e.chart_of_accounts.description}</span>
+                    ) : '—'}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
@@ -689,10 +695,22 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
 }
 
 function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editExpense;
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+
+  // Group accounts by type for the selector
+  const gastoAccounts = useMemo(() => accounts.filter((a: any) => ['Gasto', 'Costo', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
+  const otherAccounts = useMemo(() => accounts.filter((a: any) => !['Gasto', 'Costo', 'Gastos No Operacionales'].includes(a.account_type)), [accounts]);
 
   useEffect(() => {
     if (editExpense) {
@@ -702,9 +720,10 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
         vendor: editExpense.vendor || '',
         amount_usd: String(editExpense.amount_usd || ''),
         amount_dop: String(editExpense.amount_dop || ''),
+        account_id: editExpense.account_id || '',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
     }
   }, [editExpense, open]);
 
@@ -719,6 +738,7 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
       amount_usd: Math.round(amtUsd * 100) / 100,
       amount_dop: Math.round(amtDop * 100) / 100,
       exchange_rate: xr,
+      account_id: form.account_id || null,
     };
 
     const { error } = isEdit
@@ -751,7 +771,34 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
               </Select>
             </div>
           </div>
-          <div><Label className="text-xs">Proveedor</Label><Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} className="mt-1" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Proveedor</Label><Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} className="mt-1" /></div>
+            <div>
+              <Label className="text-xs">Cuenta Contable</Label>
+              <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar cuenta..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin asignar</SelectItem>
+                  {gastoAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Gastos / Costos</div>
+                      {gastoAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {otherAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Otras cuentas</div>
+                      {otherAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
             <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>

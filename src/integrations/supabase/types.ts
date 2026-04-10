@@ -506,6 +506,7 @@ export type Database = {
       }
       expenses: {
         Row: {
+          account_id: string | null
           amount_dop: number
           amount_usd: number
           category: Database["public"]["Enums"]["expense_category"]
@@ -522,6 +523,7 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          account_id?: string | null
           amount_dop?: number
           amount_usd?: number
           category?: Database["public"]["Enums"]["expense_category"]
@@ -538,6 +540,7 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          account_id?: string | null
           amount_dop?: number
           amount_usd?: number
           category?: Database["public"]["Enums"]["expense_category"]
@@ -553,7 +556,15 @@ export type Database = {
           subcategory?: string | null
           vendor?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
