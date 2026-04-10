@@ -1460,7 +1460,17 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
       Object.values(revenueMatrix).forEach(m => Object.entries(m).forEach(([cid, v]) => { totals[cid] = (totals[cid] || 0) + v; }));
       const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
       const series = topIds.map(id => ({ id, name: clientNames[id] || id }));
-      const activeMatrix = metric === 'ingresos' ? revenueMatrix : marginMatrix;
+      // GM% matrix: margin / revenue * 100
+      const gmPctMatrix: Record<string, Record<string, number>> = {};
+      Object.keys(revenueMatrixFromItems).forEach(mk => {
+        gmPctMatrix[mk] = {};
+        Object.keys(revenueMatrixFromItems[mk] || {}).forEach(cid => {
+          const rev = revenueMatrixFromItems[mk][cid] || 0;
+          const mar = marginMatrix[mk]?.[cid] || 0;
+          gmPctMatrix[mk][cid] = rev > 0 ? (mar / rev) * 100 : 0;
+        });
+      });
+      const activeMatrix = metric === 'ingresos' ? revenueMatrix : metric === 'margen' ? marginMatrix : gmPctMatrix;
       const rows = months.map(m => {
         const row: any = { month: m.label };
         series.forEach(s => { row[s.name] = activeMatrix[m.key]?.[s.id] || 0; });
