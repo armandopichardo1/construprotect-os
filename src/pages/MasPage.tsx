@@ -4,19 +4,40 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
-import { Pencil, Save, X } from 'lucide-react';
+import { formatUSD } from '@/lib/format';
+import { Pencil, Save, X, Plus, Trash2, Eye, MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts';
+
+const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
+const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 55%)', 'hsl(0, 84%, 60%)', 'hsl(190, 70%, 50%)', 'hsl(330, 70%, 55%)'];
+
+const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending: { label: 'Pendiente', color: 'bg-warning/15 text-warning' },
+  sourcing: { label: 'Buscando', color: 'bg-primary/15 text-primary' },
+  available: { label: 'Disponible', color: 'bg-success/15 text-success' },
+  declined: { label: 'Declinado', color: 'bg-destructive/15 text-destructive' },
+};
+
+type Tab = 'general' | 'requests' | 'competitors' | 'territory';
 
 export default function MasPage() {
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>('general');
   const [fetching, setFetching] = useState(false);
   const [editingCompany, setEditingCompany] = useState(false);
   const [companyForm, setCompanyForm] = useState({ name: '', rnc: '', address: '' });
 
+  // ---- Queries ----
   const { data: exchangeRate } = useQuery({
     queryKey: ['exchange-rate'],
     queryFn: async () => {
@@ -42,6 +63,42 @@ export default function MasPage() {
     },
   });
 
+  const { data: productRequests = [], refetch: refetchRequests } = useQuery({
+    queryKey: ['product-requests'],
+    queryFn: async () => {
+      const { data } = await supabase.from('product_requests').select('*, contacts(contact_name, company_name)').order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const { data: competitors = [], refetch: refetchCompetitors } = useQuery({
+    queryKey: ['competitor-entries'],
+    queryFn: async () => {
+      const { data } = await supabase.from('competitor_entries').select('*').order('spotted_at', { ascending: false });
+      return data || [];
+    },
+  });
+
+  const { data: territoryData } = useQuery({
+    queryKey: ['territory-coverage'],
+    queryFn: async () => {
+      const { data: contacts } = await supabase.from('contacts').select('territory, lifetime_revenue_usd, total_orders, is_active');
+      if (!contacts) return [];
+      const byTerritory: Record<string, { count: number; revenue: number; orders: number; active: number }> = {};
+      contacts.forEach(c => {
+        const t = c.territory || 'Sin asignar';
+        if (!byTerritory[t]) byTerritory[t] = { count: 0, revenue: 0, orders: 0, active: 0 };
+        byTerritory[t].count++;
+        byTerritory[t].revenue += Number(c.lifetime_revenue_usd || 0);
+        byTerritory[t].orders += Number(c.total_orders || 0);
+        if (c.is_active) byTerritory[t].active++;
+      });
+      return Object.entries(byTerritory)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.revenue - a.revenue);
+    },
+  });
+
   useEffect(() => {
     if (companySettings) {
       setCompanyForm({ name: companySettings.name || '', rnc: companySettings.rnc || '', address: companySettings.address || '' });
@@ -50,6 +107,7 @@ export default function MasPage() {
     }
   }, [companySettings]);
 
+  // ---- Handlers ----
   const handleFetchRate = async () => {
     setFetching(true);
     try {
@@ -121,106 +179,470 @@ export default function MasPage() {
 
   return (
     <AppLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
-        {/* Company */}
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Empresa</h2>
-            {!editingCompany ? (
-              <Button variant="ghost" size="sm" onClick={() => setEditingCompany(true)}><Pencil className="w-3.5 h-3.5" /></Button>
-            ) : (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => setEditingCompany(false)}><X className="w-3.5 h-3.5" /></Button>
-                <Button size="sm" onClick={handleSaveCompany}><Save className="w-3.5 h-3.5 mr-1" /> Guardar</Button>
-              </div>
-            )}
-          </div>
-          {editingCompany ? (
-            <div className="space-y-2.5">
-              <div><Label className="text-xs">Nombre</Label><Input value={companyForm.name} onChange={e => setCompanyForm(f => ({ ...f, name: e.target.value }))} className="h-8 text-xs mt-1" /></div>
-              <div><Label className="text-xs">RNC</Label><Input value={companyForm.rnc} onChange={e => setCompanyForm(f => ({ ...f, rnc: e.target.value }))} className="h-8 text-xs mt-1" /></div>
-              <div><Label className="text-xs">Dirección</Label><Input value={companyForm.address} onChange={e => setCompanyForm(f => ({ ...f, address: e.target.value }))} className="h-8 text-xs mt-1" /></div>
-            </div>
-          ) : (
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex justify-between"><span>Nombre</span><span className="text-foreground font-medium">{company.name}</span></div>
-              <div className="flex justify-between"><span>RNC</span><span className="text-foreground font-medium">{company.rnc}</span></div>
-              <div className="flex justify-between"><span>Dirección</span><span className="text-foreground text-right font-medium">{company.address}</span></div>
-            </div>
-          )}
+      <div className="space-y-5 max-w-5xl">
+        {/* Tabs */}
+        <div className="flex gap-1 rounded-xl bg-muted p-1 w-fit">
+          {([
+            { key: 'general' as Tab, label: 'General' },
+            { key: 'requests' as Tab, label: 'Solicitudes Producto' },
+            { key: 'competitors' as Tab, label: 'Competencia' },
+            { key: 'territory' as Tab, label: 'Territorios' },
+          ]).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={cn(
+              'rounded-lg px-4 py-1.5 text-xs font-medium transition-colors',
+              tab === t.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+            )}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Exchange Rate */}
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Tasa de Cambio</h2>
-              <p className="text-xs text-muted-foreground">Fuente: Banco Central RD</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleFetchRate} disabled={fetching}>
-              {fetching ? '⏳ Actualizando...' : '🔄 Actualizar'}
-            </Button>
-          </div>
-          {exchangeRate ? (
-            <>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="rounded-xl bg-muted p-4">
-                  <p className="text-2xl font-bold text-foreground">{Number(exchangeRate.usd_buy).toFixed(4)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Compra USD</p>
-                </div>
-                <div className="rounded-xl bg-muted p-4">
-                  <p className="text-2xl font-bold text-foreground">{Number(exchangeRate.usd_sell).toFixed(4)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Venta USD</p>
-                </div>
+        {tab === 'general' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Company */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">Empresa</h2>
+                {!editingCompany ? (
+                  <Button variant="ghost" size="sm" onClick={() => setEditingCompany(true)}><Pencil className="w-3.5 h-3.5" /></Button>
+                ) : (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCompany(false)}><X className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" onClick={handleSaveCompany}><Save className="w-3.5 h-3.5 mr-1" /> Guardar</Button>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Fecha: {exchangeRate.date} · Fuente: {exchangeRate.source}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin datos. Presiona "Actualizar".</p>
-          )}
-        </div>
+              {editingCompany ? (
+                <div className="space-y-2.5">
+                  <div><Label className="text-xs">Nombre</Label><Input value={companyForm.name} onChange={e => setCompanyForm(f => ({ ...f, name: e.target.value }))} className="h-8 text-xs mt-1" /></div>
+                  <div><Label className="text-xs">RNC</Label><Input value={companyForm.rnc} onChange={e => setCompanyForm(f => ({ ...f, rnc: e.target.value }))} className="h-8 text-xs mt-1" /></div>
+                  <div><Label className="text-xs">Dirección</Label><Input value={companyForm.address} onChange={e => setCompanyForm(f => ({ ...f, address: e.target.value }))} className="h-8 text-xs mt-1" /></div>
+                </div>
+              ) : (
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <div className="flex justify-between"><span>Nombre</span><span className="text-foreground font-medium">{company.name}</span></div>
+                  <div className="flex justify-between"><span>RNC</span><span className="text-foreground font-medium">{company.rnc}</span></div>
+                  <div className="flex justify-between"><span>Dirección</span><span className="text-foreground text-right font-medium">{company.address}</span></div>
+                </div>
+              )}
+            </div>
 
-        {/* Users */}
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Usuarios</h2>
-          <div className="space-y-2">
-            {profiles.map(p => (
-              <div key={p.id} className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
+            {/* Exchange Rate */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-foreground">{p.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{p.role}</p>
+                  <h2 className="text-sm font-semibold text-foreground">Tasa de Cambio</h2>
+                  <p className="text-xs text-muted-foreground">Fuente: Banco Central RD</p>
                 </div>
-                <span className="h-2.5 w-2.5 rounded-full bg-success" />
+                <Button variant="outline" size="sm" onClick={handleFetchRate} disabled={fetching}>
+                  {fetching ? '⏳ Actualizando...' : '🔄 Actualizar'}
+                </Button>
               </div>
-            ))}
-            {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
-          </div>
-        </div>
-
-        {/* Data Export */}
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Exportar Datos</h2>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportProducts}>📦 Productos</Button>
-            <Button variant="outline" size="sm" onClick={handleExportContacts}>👥 Contactos</Button>
-            <Button variant="outline" size="sm" onClick={handleExportSales}>💰 Ventas</Button>
-            <Button variant="outline" size="sm" onClick={handleExportExpenses}>💸 Gastos</Button>
-          </div>
-        </div>
-
-        {/* Session */}
-        <div className="rounded-2xl bg-card border border-border p-6 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">{user?.email}</p>
-              <p className="text-xs text-muted-foreground">Sesión activa</p>
+              {exchangeRate ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="rounded-xl bg-muted p-4">
+                      <p className="text-2xl font-bold text-foreground">{Number(exchangeRate.usd_buy).toFixed(4)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Compra USD</p>
+                    </div>
+                    <div className="rounded-xl bg-muted p-4">
+                      <p className="text-2xl font-bold text-foreground">{Number(exchangeRate.usd_sell).toFixed(4)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Venta USD</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Fecha: {exchangeRate.date} · Fuente: {exchangeRate.source}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin datos. Presiona "Actualizar".</p>
+              )}
             </div>
-            <Button variant="destructive" onClick={signOut}>Cerrar sesión</Button>
+
+            {/* Users */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <h2 className="text-sm font-semibold text-foreground">Usuarios</h2>
+              <div className="space-y-2">
+                {profiles.map(p => (
+                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{p.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{p.role}</p>
+                    </div>
+                    <span className="h-2.5 w-2.5 rounded-full bg-success" />
+                  </div>
+                ))}
+                {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
+              </div>
+            </div>
+
+            {/* Data Export */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <h2 className="text-sm font-semibold text-foreground">Exportar Datos</h2>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportProducts}>📦 Productos</Button>
+                <Button variant="outline" size="sm" onClick={handleExportContacts}>👥 Contactos</Button>
+                <Button variant="outline" size="sm" onClick={handleExportSales}>💰 Ventas</Button>
+                <Button variant="outline" size="sm" onClick={handleExportExpenses}>💸 Gastos</Button>
+              </div>
+            </div>
+
+            {/* Session */}
+            <div className="rounded-2xl bg-card border border-border p-6 lg:col-span-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground">Sesión activa</p>
+                </div>
+                <Button variant="destructive" onClick={signOut}>Cerrar sesión</Button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
+        {tab === 'competitors' && <CompetitorWatchSection entries={competitors} refetch={refetchCompetitors} />}
+        {tab === 'territory' && <TerritoryCoverageSection data={territoryData || []} />}
       </div>
     </AppLayout>
+  );
+}
+
+// ========== Product Requests Tracker ==========
+function ProductRequestsSection({ requests, refetch }: { requests: any[]; refetch: () => void }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ product_description: '', category: '', notes: '', priority: 3 });
+  const [saving, setSaving] = useState(false);
+
+  const statusCounts = requests.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
+
+  const handleAdd = async () => {
+    if (!form.product_description.trim()) { toast.error('Descripción requerida'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('product_requests').insert({
+      product_description: form.product_description.trim(),
+      category: form.category.trim() || null,
+      notes: form.notes.trim() || null,
+      priority: form.priority,
+    });
+    setSaving(false);
+    if (error) { toast.error('Error al crear solicitud'); return; }
+    toast.success('Solicitud creada');
+    setForm({ product_description: '', category: '', notes: '', priority: 3 });
+    setShowAdd(false);
+    refetch();
+  };
+
+  const updateStatus = async (id: string, status: string) => {
+    await supabase.from('product_requests').update({ status: status as any }).eq('id', id);
+    refetch();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-foreground">Solicitudes de Productos</h2>
+        <div className="flex gap-2 ml-auto">
+          {Object.entries(statusCounts).map(([status, count]) => {
+            const cfg = REQUEST_STATUS_LABELS[status];
+            return <Badge key={status} variant="outline" className={cn('text-[10px]', cfg?.color)}>{cfg?.label || status}: {count as number}</Badge>;
+          })}
+        </div>
+        <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="w-3.5 h-3.5 mr-1" /> Solicitud</Button>
+      </div>
+
+      {showAdd && (
+        <div className="rounded-2xl bg-card border-2 border-primary/20 p-4 space-y-3 animate-in fade-in slide-in-from-top-2">
+          <p className="text-xs font-semibold text-foreground">Nueva Solicitud</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label className="text-xs">Descripción del producto *</Label>
+              <Input value={form.product_description} onChange={e => setForm(f => ({ ...f, product_description: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Ej: Membrana impermeabilizante 1.5mm..." />
+            </div>
+            <div>
+              <Label className="text-xs">Categoría</Label>
+              <Input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Pisos, Protección..." />
+            </div>
+            <div>
+              <Label className="text-xs">Prioridad</Label>
+              <Select value={String(form.priority)} onValueChange={v => setForm(f => ({ ...f, priority: Number(v) }))}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5].map(p => <SelectItem key={p} value={String(p)} className="text-xs">{p} {'⭐'.repeat(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs">Notas</Label>
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="text-xs mt-1" rows={2} placeholder="Contexto adicional..." />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleAdd} disabled={saving} className="text-xs">{saving ? 'Guardando...' : 'Crear Solicitud'}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)} className="text-xs">Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {requests.map((r: any) => {
+          const cfg = REQUEST_STATUS_LABELS[r.status] || { label: r.status, color: '' };
+          return (
+            <div key={r.id} className="rounded-xl bg-card border border-border p-4 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-semibold text-foreground">{r.product_description}</p>
+                  <Badge className={cn('text-[9px]', cfg.color)}>{cfg.label}</Badge>
+                  {r.category && <Badge variant="outline" className="text-[9px]">{r.category}</Badge>}
+                </div>
+                {r.contacts && <p className="text-[10px] text-muted-foreground mt-0.5">Solicitado por: {r.contacts.contact_name} · {r.contacts.company_name}</p>}
+                {r.notes && <p className="text-[10px] text-muted-foreground mt-1">{r.notes}</p>}
+                <p className="text-[9px] text-muted-foreground mt-1">{new Date(r.created_at).toLocaleDateString('es-DO')}</p>
+              </div>
+              <Select value={r.status} onValueChange={v => updateStatus(r.id, v)}>
+                <SelectTrigger className="h-7 text-[10px] w-[100px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending" className="text-xs">Pendiente</SelectItem>
+                  <SelectItem value="sourcing" className="text-xs">Buscando</SelectItem>
+                  <SelectItem value="available" className="text-xs">Disponible</SelectItem>
+                  <SelectItem value="declined" className="text-xs">Declinado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        })}
+        {requests.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Sin solicitudes de productos</p>}
+      </div>
+    </div>
+  );
+}
+
+// ========== Competitor Watch Log ==========
+function CompetitorWatchSection({ entries, refetch }: { entries: any[]; refetch: () => void }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ competitor_name: '', product_category: '', price_usd: '', our_price_usd: '', notes: '', source: '' });
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!form.competitor_name.trim()) { toast.error('Nombre del competidor requerido'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('competitor_entries').insert({
+      competitor_name: form.competitor_name.trim(),
+      product_category: form.product_category.trim() || null,
+      price_usd: form.price_usd ? Number(form.price_usd) : null,
+      our_price_usd: form.our_price_usd ? Number(form.our_price_usd) : null,
+      notes: form.notes.trim() || null,
+      source: form.source.trim() || null,
+    });
+    setSaving(false);
+    if (error) { toast.error('Error al registrar'); return; }
+    toast.success('Entrada registrada');
+    setForm({ competitor_name: '', product_category: '', price_usd: '', our_price_usd: '', notes: '', source: '' });
+    setShowAdd(false);
+    refetch();
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('competitor_entries').delete().eq('id', id);
+    refetch();
+  };
+
+  // Summary by competitor
+  const byCompetitor: Record<string, number> = {};
+  entries.forEach(e => { byCompetitor[e.competitor_name] = (byCompetitor[e.competitor_name] || 0) + 1; });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-foreground">Registro de Competencia</h2>
+        <span className="text-xs text-muted-foreground">{entries.length} entradas</span>
+        <Button size="sm" className="ml-auto" onClick={() => setShowAdd(true)}><Plus className="w-3.5 h-3.5 mr-1" /> Entrada</Button>
+      </div>
+
+      {/* Competitor summary chips */}
+      {Object.keys(byCompetitor).length > 0 && (
+        <div className="flex gap-1.5 flex-wrap">
+          {Object.entries(byCompetitor).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
+            <Badge key={name} variant="secondary" className="text-[10px]">{name}: {count}</Badge>
+          ))}
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="rounded-2xl bg-card border-2 border-primary/20 p-4 space-y-3 animate-in fade-in slide-in-from-top-2">
+          <p className="text-xs font-semibold text-foreground">Nueva Entrada</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label className="text-xs">Competidor *</Label>
+              <Input value={form.competitor_name} onChange={e => setForm(f => ({ ...f, competitor_name: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Nombre competidor" />
+            </div>
+            <div>
+              <Label className="text-xs">Categoría Producto</Label>
+              <Input value={form.product_category} onChange={e => setForm(f => ({ ...f, product_category: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Pisos, Protección..." />
+            </div>
+            <div>
+              <Label className="text-xs">Fuente</Label>
+              <Input value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Licitación, web, cliente..." />
+            </div>
+            <div>
+              <Label className="text-xs">Precio Competencia USD</Label>
+              <Input type="number" step="0.01" value={form.price_usd} onChange={e => setForm(f => ({ ...f, price_usd: e.target.value }))} className="h-8 text-xs mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Nuestro Precio USD</Label>
+              <Input type="number" step="0.01" value={form.our_price_usd} onChange={e => setForm(f => ({ ...f, our_price_usd: e.target.value }))} className="h-8 text-xs mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Notas</Label>
+              <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="h-8 text-xs mt-1" placeholder="Observaciones..." />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleAdd} disabled={saving} className="text-xs">{saving ? 'Guardando...' : 'Registrar'}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)} className="text-xs">Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {entries.map((e: any) => {
+          const priceDiff = e.price_usd && e.our_price_usd ? ((Number(e.our_price_usd) - Number(e.price_usd)) / Number(e.price_usd) * 100) : null;
+          return (
+            <div key={e.id} className="rounded-xl bg-card border border-border p-4 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-semibold text-foreground">{e.competitor_name}</p>
+                  {e.product_category && <Badge variant="outline" className="text-[9px]">{e.product_category}</Badge>}
+                  {e.source && <span className="text-[9px] text-muted-foreground">vía {e.source}</span>}
+                </div>
+                <div className="flex items-center gap-4 mt-1.5">
+                  {e.price_usd && <span className="text-xs text-muted-foreground">Ellos: <b className="text-foreground">{formatUSD(Number(e.price_usd))}</b></span>}
+                  {e.our_price_usd && <span className="text-xs text-muted-foreground">Nosotros: <b className="text-foreground">{formatUSD(Number(e.our_price_usd))}</b></span>}
+                  {priceDiff !== null && (
+                    <Badge className={cn('text-[9px]', priceDiff > 0 ? 'bg-destructive/15 text-destructive' : 'bg-success/15 text-success')}>
+                      {priceDiff > 0 ? `+${priceDiff.toFixed(1)}% más caro` : `${Math.abs(priceDiff).toFixed(1)}% más barato`}
+                    </Badge>
+                  )}
+                </div>
+                {e.notes && <p className="text-[10px] text-muted-foreground mt-1">{e.notes}</p>}
+                <p className="text-[9px] text-muted-foreground mt-1">{new Date(e.spotted_at).toLocaleDateString('es-DO')}</p>
+              </div>
+              <button onClick={() => handleDelete(e.id)} className="p-1.5 rounded text-muted-foreground hover:text-destructive">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          );
+        })}
+        {entries.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Sin registros de competencia</p>}
+      </div>
+    </div>
+  );
+}
+
+// ========== Territory Coverage ==========
+function TerritoryCoverageSection({ data }: { data: { name: string; count: number; revenue: number; orders: number; active: number }[] }) {
+  const totalRevenue = data.reduce((s, d) => s + d.revenue, 0);
+  const totalContacts = data.reduce((s, d) => s + d.count, 0);
+
+  const chartData = data.slice(0, 8).map((d, i) => ({
+    name: d.name.length > 12 ? d.name.substring(0, 12) + '...' : d.name,
+    revenue: Math.round(d.revenue),
+    contacts: d.count,
+    fill: PIE_COLORS[i % PIE_COLORS.length],
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5"><MapPin className="w-4 h-4 text-primary" /> Cobertura por Territorio</h2>
+        <span className="text-xs text-muted-foreground">{data.length} territorios · {totalContacts} contactos</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue by territory chart */}
+        <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-foreground">Ingresos por Territorio</h3>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
+                <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} width={90} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                <Bar dataKey="revenue" radius={[0, 6, 6, 0]}>
+                  {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-8">Sin datos de territorio</p>
+          )}
+        </div>
+
+        {/* Distribution donut */}
+        <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-foreground">Distribución de Contactos</h3>
+          {data.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie data={chartData} innerRadius={40} outerRadius={65} dataKey="contacts" stroke="none">
+                    {chartData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-1">
+                {chartData.map((c, i) => (
+                  <div key={c.name} className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                    <span className="text-xs text-foreground truncate">{c.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">{c.contacts}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-8">Sin datos</p>
+          )}
+        </div>
+      </div>
+
+      {/* Territory table */}
+      <div className="rounded-2xl bg-card border border-border p-5">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left py-2 font-medium">Territorio</th>
+                <th className="text-right py-2 font-medium">Contactos</th>
+                <th className="text-right py-2 font-medium">Activos</th>
+                <th className="text-right py-2 font-medium">Pedidos</th>
+                <th className="text-right py-2 font-medium">Revenue</th>
+                <th className="text-right py-2 font-medium">% Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(d => (
+                <tr key={d.name} className="border-t border-border/50">
+                  <td className="py-2.5 font-medium text-foreground">{d.name}</td>
+                  <td className="py-2.5 text-right text-muted-foreground">{d.count}</td>
+                  <td className="py-2.5 text-right text-muted-foreground">{d.active}</td>
+                  <td className="py-2.5 text-right text-muted-foreground">{d.orders}</td>
+                  <td className="py-2.5 text-right text-foreground font-medium">{formatUSD(d.revenue)}</td>
+                  <td className="py-2.5 text-right">
+                    <span className={cn('text-[10px] font-semibold', d.revenue / totalRevenue > 0.3 ? 'text-primary' : 'text-muted-foreground')}>
+                      {totalRevenue > 0 ? ((d.revenue / totalRevenue) * 100).toFixed(1) : 0}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">Asigna territorios a tus contactos para ver la cobertura</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
