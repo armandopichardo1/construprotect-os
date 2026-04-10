@@ -24,7 +24,8 @@ import { exportToExcel } from '@/lib/export-utils';
 type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes' | 'projects';
 
 export default function CrmPage() {
-  const [tab, setTab] = useState<Tab>('pipeline');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'pipeline');
   const queryClient = useQueryClient();
 
   const [showContactDialog, setShowContactDialog] = useState(false);
