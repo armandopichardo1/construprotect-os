@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, Legend } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -917,6 +917,91 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight }: { l
   );
 }
 
+// ============ MONTHLY TREND CHART ============
+const TREND_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems: any[]; view: 'clientes' | 'productos' }) {
+  const trendData = useMemo(() => {
+    const now = new Date();
+    const months: { key: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' }),
+      });
+    }
+
+    if (view === 'clientes') {
+      const clientNames: Record<string, string> = {};
+      const matrix: Record<string, Record<string, number>> = {};
+      sales.forEach((s: any) => {
+        const cid = s.contact_id || 'sin_cliente';
+        clientNames[cid] = s.crm_clients?.name || 'Sin Cliente';
+        const mk = s.date?.substring(0, 7);
+        if (!matrix[mk]) matrix[mk] = {};
+        matrix[mk][cid] = (matrix[mk][cid] || 0) + Number(s.total_usd || 0);
+      });
+      // Get top clients by total revenue
+      const totals: Record<string, number> = {};
+      Object.values(matrix).forEach(m => Object.entries(m).forEach(([cid, v]) => { totals[cid] = (totals[cid] || 0) + v; }));
+      const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
+      const series = topIds.map(id => ({ id, name: clientNames[id] || id }));
+      const rows = months.map(m => {
+        const row: any = { month: m.label };
+        series.forEach(s => { row[s.name] = matrix[m.key]?.[s.id] || 0; });
+        return row;
+      });
+      return { rows, series };
+    } else {
+      const prodNames: Record<string, string> = {};
+      const matrix: Record<string, Record<string, number>> = {};
+      saleItems.forEach((si: any) => {
+        const pid = si.product_id || 'unknown';
+        prodNames[pid] = si.products?.name || '?';
+        // Find the sale to get its date
+        const sale = sales.find((s: any) => s.id === si.sale_id);
+        const mk = sale?.date?.substring(0, 7);
+        if (!mk) return;
+        if (!matrix[mk]) matrix[mk] = {};
+        matrix[mk][pid] = (matrix[mk][pid] || 0) + Number(si.line_total_usd || 0);
+      });
+      const totals: Record<string, number> = {};
+      Object.values(matrix).forEach(m => Object.entries(m).forEach(([pid, v]) => { totals[pid] = (totals[pid] || 0) + v; }));
+      const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
+      const series = topIds.map(id => ({ id, name: prodNames[id] || id }));
+      const rows = months.map(m => {
+        const row: any = { month: m.label };
+        series.forEach(s => { row[s.name] = matrix[m.key]?.[s.id] || 0; });
+        return row;
+      });
+      return { rows, series };
+    }
+  }, [sales, saleItems, view]);
+
+  if (trendData.series.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+      <h2 className="text-sm font-semibold text-foreground">
+        Tendencia Mensual por {view === 'clientes' ? 'Cliente' : 'Producto'} (6 meses)
+      </h2>
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={trendData.rows}>
+          <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+          <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {trendData.series.map((s, i) => (
+            <Line key={s.id} type="monotone" dataKey={s.name} stroke={TREND_COLORS[i % TREND_COLORS.length]}
+              strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // ============ REPORTES TAB ============
 function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
   const [view, setView] = useState<'clientes' | 'productos'>('clientes');
@@ -1087,6 +1172,9 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Monthly Trend Chart */}
+      <MonthlyTrendChart sales={sales} saleItems={saleItems} view={view} />
     </div>
   );
 }
