@@ -404,10 +404,17 @@ export default function InventarioPage() {
                 <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin datos</div>
               )}
             </div>
+
+            {/* Days of Supply */}
+            <DaysOfSupplyChart items={items} />
+
+            {/* Overstock Warnings */}
+            <OverstockWarnings items={items} />
           </div>
         )}
 
         {tab === 'Envíos' && <ShipmentsTab />}
+        {tab === 'Proveedores' && <SuppliersTab />}
 
         {tab === 'ABC' && (
           <div className="space-y-4">
