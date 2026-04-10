@@ -271,10 +271,20 @@ export default function FinanzasPage() {
 }
 
 // ============ VENTAS TAB ============
-function VentasTab({ sales, queryClient, rate, onExport }: any) {
+function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }: any) {
   const [showForm, setShowForm] = useState(false);
   const [editSale, setEditSale] = useState<any>(null);
   const [deleteSale, setDeleteSale] = useState<any>(null);
+  const [activePrefill, setActivePrefill] = useState<any>(null);
+
+  useEffect(() => {
+    if (prefill) {
+      setActivePrefill(prefill);
+      setEditSale(null);
+      setShowForm(true);
+      clearPrefill?.();
+    }
+  }, [prefill]);
 
   const handleDeleteSale = async () => {
     if (!deleteSale) return;
@@ -342,7 +352,7 @@ function VentasTab({ sales, queryClient, rate, onExport }: any) {
         </Table>
         {sales.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay ventas registradas</p>}
       </div>
-      <SaleFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) setEditSale(null); }} queryClient={queryClient} rate={rate} editSale={editSale} />
+      <SaleFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) { setEditSale(null); setActivePrefill(null); } }} queryClient={queryClient} rate={rate} editSale={editSale} prefill={activePrefill} />
       <DeleteConfirmDialog
         open={!!deleteSale}
         onOpenChange={(v) => { if (!v) setDeleteSale(null); }}
