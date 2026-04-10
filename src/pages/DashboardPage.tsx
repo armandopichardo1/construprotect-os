@@ -158,7 +158,7 @@ export default function DashboardPage() {
       const topNormalized = topProducts.map(p => ({ ...p, pct: Math.round((p.revenue / maxRev) * 100) }));
 
       const revByCategory = Object.entries(catRevenue).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({
-        name, value, color: CATEGORY_COLORS[name.toLowerCase().replace(/\s+/g, '_')] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
+        name, value, color: CATEGORY_COLORS[name] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
       return { monthly, totalRevenue, totalCogs, totalExpenses, topProducts: topNormalized, revByCategory };
