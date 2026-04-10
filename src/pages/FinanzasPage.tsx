@@ -478,7 +478,7 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
 }
 
 // ============ GASTOS TAB ============
-function GastosTab({ expenses, queryClient, rate }: any) {
+function GastosTab({ expenses, queryClient, rate, onExport }: any) {
   const [showForm, setShowForm] = useState(false);
   const [editExpense, setEditExpense] = useState<any>(null);
   const [deleteExpense, setDeleteExpense] = useState<any>(null);
@@ -625,7 +625,7 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
 }
 
 // ============ P&L TAB ============
-function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses }: any) {
+function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses, onExport }: any) {
   const grossProfit = revenueMTD - cogsMTD;
   const grossMarginPct = revenueMTD > 0 ? (grossProfit / revenueMTD * 100) : 0;
   const netIncome = grossProfit - expensesMTD;
