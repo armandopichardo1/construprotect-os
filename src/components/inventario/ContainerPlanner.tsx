@@ -324,9 +324,14 @@ export function ContainerPlanner() {
         </Button>
         <Button size="sm" variant="ghost" onClick={clearAll} className="text-xs text-muted-foreground">Limpiar</Button>
         {activeLines.length > 0 && (
-          <Button size="sm" variant="outline" onClick={handleExport} className="gap-1.5 text-xs ml-auto">
-            <Download className="w-3.5 h-3.5" /> Exportar Excel
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={handleExport} className="gap-1.5 text-xs ml-auto">
+              <Download className="w-3.5 h-3.5" /> Exportar Excel
+            </Button>
+            <Button size="sm" onClick={() => setShowShipmentDialog(true)} className="gap-1.5 text-xs">
+              <Ship className="w-3.5 h-3.5" /> Crear Envío
+            </Button>
+          </>
         )}
       </div>
 
