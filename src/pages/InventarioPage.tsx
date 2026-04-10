@@ -97,8 +97,12 @@ const ABC_DEFINITIONS: Record<string, { title: string; desc: string; color: stri
   },
 };
 
-export default function InventarioPage() {
-  const [tab, setTab] = useState('Stock');
+  const [searchParams] = useSearchParams();
+  const TAB_MAP: Record<string, string> = { reorden: 'Reorden', stock: 'Stock', contenedor: 'Contenedor', movimientos: 'Movimientos', analytics: 'Analytics', envios: 'Envíos', abc: 'ABC' };
+  const [tab, setTab] = useState(() => {
+    const urlTab = searchParams.get('tab');
+    return (urlTab && TAB_MAP[urlTab]) || 'Stock';
+  });
   const [filter, setFilter] = useState('all');
   const [sortField, setSortField] = useState<SortField>('status');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
