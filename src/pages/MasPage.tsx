@@ -696,6 +696,7 @@ function AlertsConfigSection() {
 
 // ========== Alert History ==========
 function AlertHistorySection() {
+  const navigate = useNavigate();
   const { data: history = [], isLoading } = useAlertHistory(200);
   const [filterCat, setFilterCat] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
