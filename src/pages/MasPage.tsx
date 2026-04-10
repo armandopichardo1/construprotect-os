@@ -164,6 +164,18 @@ export default function MasPage() {
     toast.success('Exportado');
   };
 
+  const handleSaveMargin = async () => {
+    const val = Number(marginInput);
+    if (isNaN(val) || val < 0 || val > 100) { toast.error('Ingresa un valor entre 0 y 100'); return; }
+    setSavingMargin(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'min_margin_threshold', value: { value: val } as any }, { onConflict: 'key' });
+    setSavingMargin(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success(`Umbral de margen actualizado a ${val}%`);
+    refetchMargin();
+    queryClient.invalidateQueries({ queryKey: ['margin-threshold'] });
+  };
+
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
 
   return (
