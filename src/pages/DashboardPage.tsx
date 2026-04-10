@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings } from 'lucide-react';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useAlertLogger } from '@/hooks/useAlertHistory';
