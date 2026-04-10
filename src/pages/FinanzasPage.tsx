@@ -1999,8 +1999,25 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
       {view === 'monthly' && (
         <div className="space-y-4">
           <div className="rounded-2xl bg-card border border-border p-6">
-            <h3 className="text-sm font-semibold mb-4">Tendencia 12 Meses (USD)</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Tendencia 12 Meses (USD)</h3>
+              <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+                {(['bars', 'margin'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setTrendMode(mode)}
+                    className={cn(
+                      'rounded-md px-3 py-1 text-[11px] font-medium transition-colors',
+                      trendMode === mode ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {mode === 'bars' ? 'Montos' : 'Margen'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
+              {trendMode === 'bars' ? (
               <ComposedChart data={monthlyComparison}>
                 <XAxis dataKey="label" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
@@ -2011,6 +2028,18 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
                 <Bar dataKey="expenses" name="Gastos" fill="hsl(43, 96%, 56%)" radius={[4,4,0,0]} />
                 <Line type="monotone" dataKey="netIncome" name="U. Neta" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 3 }} />
               </ComposedChart>
+              ) : (
+              <ComposedChart data={monthlyComparison}>
+                <XAxis dataKey="label" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="usd" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                <YAxis yAxisId="pct" orientation="right" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => name.includes('%') ? `${v.toFixed(1)}%` : formatUSD(v)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[4,4,0,0]} yAxisId="usd" />
+                <Bar dataKey="grossProfit" name="U. Bruta" fill="hsl(160, 84%, 39%)" radius={[4,4,0,0]} yAxisId="usd" />
+                <Line type="monotone" dataKey="gmPct" name="GM %" stroke="hsl(280, 70%, 55%)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(280, 70%, 55%)' }} yAxisId="pct" />
+              </ComposedChart>
+              )}
             </ResponsiveContainer>
           </div>
           <div className="rounded-xl border border-border bg-card overflow-hidden">
