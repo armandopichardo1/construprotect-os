@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUSD } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   LineChart, Line, ComposedChart, Legend, LabelList,
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
+import { useAlerts } from '@/hooks/useAlerts';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -203,24 +205,8 @@ export default function DashboardPage() {
 
   const lowStockItems = inventoryStats?.stockItems.filter(i => i.status === 'low' || i.status === 'out') || [];
 
-  // Alerts data
-  const { data: alertsData } = useQuery({
-    queryKey: ['dashboard-alerts'],
-    queryFn: async () => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const [{ data: staleDeals }, { data: overdueActivities }, { data: overduePayments }] = await Promise.all([
-        supabase.from('deals').select('id, title, value_usd, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
-        supabase.from('activities').select('id, title, due_date, contacts(contact_name)').eq('is_completed', false).lt('due_date', todayStr),
-        supabase.from('sales').select('id, invoice_ref, total_usd, date, crm_clients(name)').eq('payment_status', 'overdue'),
-      ]);
-      const stale = (staleDeals || []).filter(d => daysInStage(d.updated_at) > 7);
-      return {
-        staleDeals: stale,
-        overdueActivities: overdueActivities || [],
-        overduePayments: overduePayments || [],
-      };
-    },
-  });
+  // Dynamic alerts from configurable rules
+  const { data: computedAlerts = [] } = useAlerts();
 
   const generateReview = async () => {
     setShowReview(true);
@@ -258,34 +244,20 @@ export default function DashboardPage() {
         </div>
 
         {/* Alerts Banner */}
-        {alertsData && (alertsData.staleDeals.length > 0 || alertsData.overdueActivities.length > 0 || alertsData.overduePayments.length > 0 || lowStockItems.length > 0) && (
+        {computedAlerts.length > 0 && (
           <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
-            <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Alertas que requieren atención</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Alertas que requieren atención ({computedAlerts.length})</h3>
+              <Button size="sm" variant="ghost" className="text-[10px] text-muted-foreground h-6" onClick={() => navigate('/mas')}>⚙️ Configurar</Button>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {lowStockItems.length > 0 && (
-                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/inventario')}>
-                  <p className="text-lg font-bold text-warning">{lowStockItems.length}</p>
-                  <p className="text-[10px] text-muted-foreground">Productos bajo stock</p>
+              {computedAlerts.map(alert => (
+                <div key={alert.ruleId} className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => alert.navigateTo && navigate(alert.navigateTo)}>
+                  <p className={cn('text-lg font-bold', alert.severity === 'critical' ? 'text-destructive' : 'text-warning')}>{alert.count}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">{alert.label}</p>
+                  <p className="text-[9px] text-muted-foreground/70 mt-0.5 line-clamp-2">{alert.message}</p>
                 </div>
-              )}
-              {alertsData.staleDeals.length > 0 && (
-                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/crm')}>
-                  <p className="text-lg font-bold text-warning">{alertsData.staleDeals.length}</p>
-                  <p className="text-[10px] text-muted-foreground">Deals estancados (7+ días)</p>
-                </div>
-              )}
-              {alertsData.overdueActivities.length > 0 && (
-                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/crm')}>
-                  <p className="text-lg font-bold text-destructive">{alertsData.overdueActivities.length}</p>
-                  <p className="text-[10px] text-muted-foreground">Actividades vencidas</p>
-                </div>
-              )}
-              {alertsData.overduePayments.length > 0 && (
-                <div className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => navigate('/finanzas')}>
-                  <p className="text-lg font-bold text-destructive">{alertsData.overduePayments.length}</p>
-                  <p className="text-[10px] text-muted-foreground">Pagos vencidos</p>
-                </div>
-              )}
+              ))}
             </div>
           </div>
         )}
