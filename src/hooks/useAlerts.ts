@@ -16,6 +16,8 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
   { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
   { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
   { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+  { id: 'reorder_needed', label: 'Reorden necesario', description: 'Alerta cuando un producto alcanza exactamente su punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+  { id: 'shipment_delayed', label: 'Envío retrasado', description: 'Alerta cuando un envío supera su ETA sin ser recibido', category: 'inventory', enabled: true, threshold: 0, unit: 'days' },
   { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
   { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
   { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
@@ -69,6 +71,7 @@ export function useAlerts() {
         { data: deals },
         { data: activities },
         { data: expenses },
+        { data: shipments },
       ] = await Promise.all([
         supabase.from('products').select('id, name, margin_list_pct, margin_wholesale_pct, margin_project_pct, margin_architect_pct'),
         supabase.from('inventory').select('product_id, quantity_on_hand, products(name, reorder_point)'),
@@ -77,6 +80,7 @@ export function useAlerts() {
         supabase.from('deals').select('id, title, value_usd, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
         supabase.from('activities').select('id, title, due_date, contacts(contact_name)').eq('is_completed', false),
         supabase.from('expenses').select('date, amount_usd'),
+        supabase.from('shipments').select('id, po_number, supplier_name, status, estimated_arrival, actual_arrival').not('status', 'eq', 'received'),
       ]);
 
       const ruleMap = Object.fromEntries(enabledRules.map(r => [r.id, r]));
@@ -170,7 +174,45 @@ export function useAlerts() {
               message: `${low.length} producto(s) bajo punto de reorden: ${low.slice(0, 3).map((i: any) => i.products?.name).join(', ')}`,
               navigateTo: '/inventario',
             });
+        if (ruleMap['reorder_needed']) {
+          const reorder = inventory.filter((i: any) => {
+            const rp = Number(i.products?.reorder_point || 0);
+            return rp > 0 && i.quantity_on_hand > 0 && i.quantity_on_hand <= rp;
+          });
+          if (reorder.length > 0) {
+            alerts.push({
+              ruleId: 'reorder_needed',
+              label: 'Reorden necesario',
+              category: 'inventory',
+              severity: 'warning',
+              count: reorder.length,
+              message: `${reorder.length} producto(s) alcanzaron su punto de reorden: ${reorder.slice(0, 3).map((i: any) => `${i.products?.name} (${i.quantity_on_hand} uds)`).join(', ')}`,
+              navigateTo: '/inventario',
+            });
           }
+        }
+      }
+
+      // 3b. Delayed shipments
+      if (ruleMap['shipment_delayed'] && shipments?.length) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const delayed = shipments.filter((s: any) => s.estimated_arrival && s.estimated_arrival < todayStr && s.status !== 'received');
+        if (delayed.length > 0) {
+          const details = delayed.slice(0, 3).map((s: any) => {
+            const daysLate = Math.floor((Date.now() - new Date(s.estimated_arrival).getTime()) / 86400000);
+            return `${s.po_number || s.supplier_name} (${daysLate}d tarde)`;
+          });
+          alerts.push({
+            ruleId: 'shipment_delayed',
+            label: 'Envíos retrasados',
+            category: 'inventory',
+            severity: 'critical',
+            count: delayed.length,
+            message: `${delayed.length} envío(s) pasaron su ETA: ${details.join(', ')}`,
+            navigateTo: '/inventario',
+          });
+        }
+      }
         }
       }
 
