@@ -56,17 +56,15 @@ export function CashFlowTab({ sales, expenses }: Props) {
       .reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   }, [sales]);
 
-  // --- PROJECTION ---
+  // --- PROJECTION with scenarios ---
   const projection = useMemo(() => {
     const nProj = Number(projMonths);
     const currentCumulative = data[data.length - 1]?.cumulative || 0;
 
-    // Pending receivables broken down: assume collected evenly over projection months
     const pendingSales = sales.filter((s: any) => s.payment_status !== 'paid' && s.payment_status !== 'cancelled');
     const totalPending = pendingSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
     const monthlyReceivable = nProj > 0 ? totalPending / nProj : 0;
 
-    // Recurring expenses: sum monthly amounts
     const recurringExpenses = expenses.filter((e: any) => e.is_recurring);
     const monthlyRecurring = recurringExpenses.reduce((s: number, e: any) => {
       const amt = Number(e.amount_usd || 0);
@@ -75,32 +73,54 @@ export function CashFlowTab({ sales, expenses }: Props) {
       if (freq === 'biweekly' || freq === 'quincenal') return s + amt * 2;
       if (freq === 'quarterly' || freq === 'trimestral') return s + amt / 3;
       if (freq === 'yearly' || freq === 'anual') return s + amt / 12;
-      return s + amt; // monthly
+      return s + amt;
     }, 0);
 
-    // Average non-recurring monthly expenses (last 3 months)
     const last3 = data.slice(-3);
     const avgNonRecurringOut = last3.length > 0
       ? last3.reduce((s, r) => s + r.outflows, 0) / last3.length - monthlyRecurring
       : 0;
     const estimatedOtherExpenses = Math.max(0, avgNonRecurringOut);
 
-    // Average monthly sales (last 3 months) as baseline new revenue
     const avgNewSales = last3.length > 0
       ? last3.reduce((s, r) => s + r.inflows, 0) / last3.length
       : 0;
 
-    const rows: { month: string; receivables: number; newSales: number; recurring: number; otherExpenses: number; netProjected: number; cumulative: number }[] = [];
-    let cum = currentCumulative;
+    const SCENARIOS = [
+      { key: 'optimista', salesMult: 1.20, expMult: 0.80 },
+      { key: 'base', salesMult: 1.0, expMult: 1.0 },
+      { key: 'pesimista', salesMult: 0.80, expMult: 1.20 },
+    ] as const;
+
+    const rows: {
+      month: string; receivables: number; newSales: number; recurring: number; otherExpenses: number;
+      netProjected: number; cumulative: number;
+      netOptimista: number; cumOptimista: number;
+      netPesimista: number; cumPesimista: number;
+    }[] = [];
+
+    let cumBase = currentCumulative;
+    let cumOpt = currentCumulative;
+    let cumPes = currentCumulative;
 
     for (let i = 1; i <= nProj; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const label = d.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' });
 
-      const totalIn = monthlyReceivable + avgNewSales;
-      const totalOut = monthlyRecurring + estimatedOtherExpenses;
-      const net = totalIn - totalOut;
-      cum += net;
+      const baseIn = monthlyReceivable + avgNewSales;
+      const baseOut = monthlyRecurring + estimatedOtherExpenses;
+      const netBase = baseIn - baseOut;
+      cumBase += netBase;
+
+      const optIn = monthlyReceivable + avgNewSales * 1.20;
+      const optOut = monthlyRecurring + estimatedOtherExpenses * 0.80;
+      const netOpt = optIn - optOut;
+      cumOpt += netOpt;
+
+      const pesIn = monthlyReceivable + avgNewSales * 0.80;
+      const pesOut = monthlyRecurring + estimatedOtherExpenses * 1.20;
+      const netPes = pesIn - pesOut;
+      cumPes += netPes;
 
       rows.push({
         month: label,
@@ -108,8 +128,12 @@ export function CashFlowTab({ sales, expenses }: Props) {
         newSales: avgNewSales,
         recurring: monthlyRecurring,
         otherExpenses: estimatedOtherExpenses,
-        netProjected: net,
-        cumulative: cum,
+        netProjected: netBase,
+        cumulative: cumBase,
+        netOptimista: netOpt,
+        cumOptimista: cumOpt,
+        netPesimista: netPes,
+        cumPesimista: cumPes,
       });
     }
 
