@@ -20,11 +20,12 @@ import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download, RefreshCw } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from '@/components/finanzas/ResumenAnalytics';
+import { CrearTransaccionTab } from '@/components/finanzas/CrearTransaccionTab';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
@@ -89,8 +90,7 @@ function ExchangeRateKpi({ rate }: { rate: any }) {
 }
 
 export default function FinanzasPage() {
-  const [tab, setTab] = useState('Resumen');
-  const [aiOpen, setAiOpen] = useState(false);
+  const [tab, setTab] = useState('Crear Transacción');
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
   const { rate } = useExchangeRate();
@@ -210,10 +210,13 @@ export default function FinanzasPage() {
               </button>
             ))}
           </div>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAiOpen(true)}>
-            <Bot className="w-3.5 h-3.5" /> AI Asistente
-          </Button>
         </div>
+
+        {tab === 'Crear Transacción' && (
+          <CrearTransaccionTab rate={latestRate}
+            onEditSale={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
+            onEditExpense={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
+        )}
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
@@ -319,10 +322,6 @@ export default function FinanzasPage() {
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
-
-      <AIAssistantDialog open={aiOpen} onOpenChange={setAiOpen} queryClient={queryClient} rate={latestRate}
-        onEditPrefill={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
-        onEditExpensePrefill={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }} />
     </AppLayout>
   );
 }
