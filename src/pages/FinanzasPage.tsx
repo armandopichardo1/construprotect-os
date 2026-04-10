@@ -1174,6 +1174,32 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
     });
   }, [current, allExpCats]);
 
+  // Pareto (80/20) analysis data
+  const paretoData = useMemo(() => {
+    const costItems: { name: string; value: number }[] = [];
+    if (current.cogs > 0) costItems.push({ name: 'COGS', value: current.cogs });
+    allExpCats.forEach(cat => {
+      const val = current.expensesByCategory[cat] || 0;
+      if (val > 0) costItems.push({ name: cat, value: val });
+    });
+    costItems.sort((a, b) => b.value - a.value);
+    const totalCosts = costItems.reduce((s, c) => s + c.value, 0);
+    let cumulative = 0;
+    return costItems.map((item, i) => {
+      cumulative += item.value;
+      const pct = totalCosts > 0 ? (item.value / totalCosts) * 100 : 0;
+      const cumPct = totalCosts > 0 ? (cumulative / totalCosts) * 100 : 0;
+      return {
+        name: item.name,
+        value: item.value,
+        pct: Math.round(pct * 10) / 10,
+        cumPct: Math.round(cumPct * 10) / 10,
+        fill: cumPct <= 80 ? 'hsl(0, 84%, 60%)' : 'hsl(220, 12%, 45%)',
+        in80: cumPct <= 80,
+      };
+    });
+  }, [current, allExpCats]);
+
   const handleExport = () => {
     const rows = [
       { Concepto: 'Ingresos', [range.label]: current.revenue, 'Período Ant.': prev.revenue, 'Año Ant.': yoy.revenue },
