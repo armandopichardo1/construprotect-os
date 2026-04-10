@@ -769,8 +769,8 @@ function AlertHistorySection() {
         <div key={day} className="space-y-2">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{day}</p>
           {items.map(h => (
-            <div key={h.id} className={cn(
-              'rounded-xl border px-4 py-3 flex items-start gap-3',
+            <button key={h.id} onClick={() => navigate(CATEGORY_LABELS[h.category]?.route || '#')} className={cn(
+              'rounded-xl border px-4 py-3 flex items-start gap-3 w-full text-left cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all',
               h.severity === 'critical' ? 'border-destructive/30 bg-destructive/5' : 'border-warning/30 bg-warning/5'
             )}>
               <span className="text-xs mt-0.5">{h.severity === 'critical' ? '🔴' : '🟡'}</span>
@@ -785,7 +785,7 @@ function AlertHistorySection() {
               <span className="text-[10px] text-muted-foreground shrink-0">
                 {new Date(h.fired_at).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       ))}
