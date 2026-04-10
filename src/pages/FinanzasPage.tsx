@@ -493,7 +493,10 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
 
   return (
     <div className="space-y-4">
-      <Button size="sm" onClick={() => { setEditExpense(null); setShowForm(true); }}>+ Nuevo Gasto</Button>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => { setEditExpense(null); setShowForm(true); }}>+ Nuevo Gasto</Button>
+        <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+      </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -644,7 +647,10 @@ function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses, onExpo
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-2xl bg-card border border-border p-6 space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Estado de Resultados — Mes Actual</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Estado de Resultados — Mes Actual</h2>
+          <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        </div>
         <div className="space-y-2">
           <PLRow label="Ingresos" value={revenueMTD} bold />
           <PLRow label="(-) Costo de Ventas" value={cogsMTD} negative />
