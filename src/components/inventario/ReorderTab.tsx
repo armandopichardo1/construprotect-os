@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert } from 'lucide-react';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { toast } from 'sonner';
+import { exportToExcel } from '@/lib/export-utils';
 
 type Recommendation = {
   sku: string;
@@ -264,7 +265,7 @@ export function ReorderTab() {
         </div>
       </div>
 
-      {/* AI Button */}
+      {/* AI Button + Export */}
       <div className="flex items-center gap-3">
         <Button size="sm" onClick={runAI} disabled={aiLoading} className="gap-1.5">
           <Sparkles className={cn('w-3.5 h-3.5', aiLoading && 'animate-spin')} />
@@ -275,6 +276,31 @@ export function ReorderTab() {
             <Check className="w-3.5 h-3.5" /> Aplicar todas las sugerencias
           </Button>
         )}
+        <Button size="sm" variant="outline" className="gap-1.5 ml-auto" onClick={() => {
+          if (!items.length) return;
+          exportToExcel(items.sort((a, b) => a.daysOfSupply - b.daysOfSupply).map(p => ({
+            SKU: p.sku,
+            Producto: p.name,
+            Categoría: p.category || '',
+            Marca: p.brand || '',
+            Stock: p.qty,
+            'Vel/mes': Number(p.avgMonthly.toFixed(1)),
+            'Tendencia %': Number(p.trendPct.toFixed(0)),
+            'Días Stock': p.daysOfSupply >= 999 ? '∞' : p.daysOfSupply,
+            'Días Agotam.': p.daysToStockout >= 999 ? '∞' : p.daysToStockout,
+            'Lead Time (d)': p.lead_time_days,
+            'Safety Stock': p.safetyStock,
+            'Min Batch': p.min_order_qty,
+            'Pto. Reorden': p.reorder_point,
+            'Qty Reorden': p.reorder_qty,
+            'Costo Unit. USD': Number(p.unit_cost_usd) || 0,
+            'Vel. Diaria': Number(p.dailyVelocity.toFixed(2)),
+            'Reorden Calculado': p.reorderPointCalc,
+          })), 'reorden', 'Reorden');
+          toast.success('Reporte de reorden exportado');
+        }}>
+          <Download className="w-3.5 h-3.5" /> Exportar Excel
+        </Button>
       </div>
 
       {/* AI Results */}
