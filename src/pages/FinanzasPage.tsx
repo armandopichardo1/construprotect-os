@@ -98,6 +98,7 @@ export default function FinanzasPage() {
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'Crear Transacción';
   const [tab, setTab] = useState(initialTab);
+  useEffect(() => { const t = searchParams.get('tab'); if (t && tabs.includes(t)) setTab(t); }, [searchParams]);
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
   const [costPrefill, setCostPrefill] = useState<any>(null);
