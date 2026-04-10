@@ -1,10 +1,11 @@
 import { cn } from '@/lib/utils';
+import { type LucideIcon } from 'lucide-react';
 
 interface KpiCardProps {
   title: string;
   value: string;
   subtitle?: string;
-  icon: string;
+  icon: LucideIcon;
   trend?: { value: number; label: string };
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'destructive';
 }
@@ -17,7 +18,15 @@ const variantStyles = {
   destructive: 'bg-destructive/10',
 };
 
-export function KpiCard({ title, value, subtitle, icon, trend, variant = 'default' }: KpiCardProps) {
+const iconVariantStyles = {
+  default: 'text-muted-foreground',
+  primary: 'text-primary',
+  success: 'text-success',
+  warning: 'text-warning',
+  destructive: 'text-destructive',
+};
+
+export function KpiCard({ title, value, subtitle, icon: Icon, trend, variant = 'default' }: KpiCardProps) {
   return (
     <div className={cn('rounded-2xl p-5 border border-border', variantStyles[variant])}>
       <div className="flex items-start justify-between">
@@ -26,7 +35,9 @@ export function KpiCard({ title, value, subtitle, icon, trend, variant = 'defaul
           <p className="text-2xl font-bold text-foreground">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <span className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl bg-muted/50 shrink-0">{icon}</span>
+        <div className={cn('w-10 h-10 flex items-center justify-center rounded-xl bg-muted/50 shrink-0', iconVariantStyles[variant])}>
+          <Icon className="w-5 h-5" />
+        </div>
       </div>
       {trend && (
         <div className="mt-3 flex items-center gap-1">
