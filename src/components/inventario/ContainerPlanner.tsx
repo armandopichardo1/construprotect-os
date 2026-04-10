@@ -134,6 +134,28 @@ export function ContainerPlanner() {
 
   const clearAll = () => setOrderLines({});
 
+  const handleExport = () => {
+    const data = activeLines.map(p => ({
+      SKU: p.sku,
+      Producto: p.name,
+      Categoría: p.category,
+      'Stock Actual': p.currentStock,
+      'Vel/Mes': Number(p.avgMonthly.toFixed(1)),
+      'Días Stock': p.daysOfSupply >= 999 ? '∞' : p.daysOfSupply,
+      Urgencia: urgencyLabel(p),
+      'Min Batch': p.minOrderQty,
+      'Qty Sugerida': p.suggestedQty || 0,
+      'Qty Ordenar': p.qty,
+      'CBM/Unidad': p.cbmPerUnit,
+      'CBM Total': p.cbmPerUnit > 0 ? Number((p.qty * p.cbmPerUnit).toFixed(3)) : 0,
+      'Peso/Unidad (kg)': p.weightPerUnit,
+      'Peso Total (kg)': p.weightPerUnit > 0 ? Number((p.qty * p.weightPerUnit).toFixed(1)) : 0,
+      'Costo Unit (USD)': p.unitCost,
+      'Costo Total (USD)': Number((p.qty * p.unitCost).toFixed(2)),
+    }));
+    exportToExcel(data, `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
+  };
+
   const urgencyColor = (p: typeof lines[0]) => {
     if (p.currentStock === 0) return 'text-destructive';
     if (p.daysOfSupply < p.leadTime) return 'text-destructive';
