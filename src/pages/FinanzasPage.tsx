@@ -1113,9 +1113,9 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   const prevRange = useMemo(() => getPrevRange(range), [range]);
   const yoyRange = useMemo(() => getYoYRange(range), [range]);
 
-  const current = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, range.start, range.end), [sales, saleItems, expenses, range]);
-  const prev = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, prevRange.start, prevRange.end), [sales, saleItems, expenses, prevRange]);
-  const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end), [sales, saleItems, expenses, yoyRange]);
+  const current = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, range.start, range.end, costs), [sales, saleItems, expenses, costs, range]);
+  const prev = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, prevRange.start, prevRange.end, costs), [sales, saleItems, expenses, costs, prevRange]);
+  const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end, costs), [sales, saleItems, expenses, costs, yoyRange]);
 
   const trendData = useMemo(() => {
     const months: { month: string; revenue: number; profit: number; revenuePY: number; profitPY: number }[] = [];
@@ -1123,14 +1123,14 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const dEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
       const f = (dt: Date) => dt.toISOString().split('T')[0];
-      const t = calcPeriodTotals(sales, saleItems, expenses, f(d), f(dEnd));
+      const t = calcPeriodTotals(sales, saleItems, expenses, f(d), f(dEnd), costs);
       const pyS = new Date(d); pyS.setFullYear(pyS.getFullYear() - 1);
       const pyE = new Date(dEnd); pyE.setFullYear(pyE.getFullYear() - 1);
-      const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE));
+      const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE), costs);
       months.push({ month: d.toLocaleDateString('es-DO', { month: 'short' }), revenue: t.revenue, profit: t.netIncome, revenuePY: py.revenue, profitPY: py.netIncome });
     }
     return months;
-  }, [sales, saleItems, expenses, now]);
+  }, [sales, saleItems, expenses, costs, now]);
 
   const allExpCats = useMemo(() => {
     const cats = new Set<string>();
