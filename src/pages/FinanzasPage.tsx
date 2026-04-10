@@ -1242,16 +1242,23 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   }, [current, allExpCats]);
 
   const handleExport = () => {
+    const pctOf = (val: number, rev: number) => rev > 0 ? `${((val / rev) * 100).toFixed(1)}%` : '0.0%';
     const rows = [
-      { Concepto: 'Ingresos', [range.label]: current.revenue, 'Período Ant.': prev.revenue, 'Año Ant.': yoy.revenue },
-      { Concepto: 'COGS', [range.label]: current.cogs, 'Período Ant.': prev.cogs, 'Año Ant.': yoy.cogs },
-      ...allCogProducts.map(p => ({ Concepto: `  ${p}`, [range.label]: current.cogsByProduct[p] || 0, 'Período Ant.': prev.cogsByProduct[p] || 0, 'Año Ant.': yoy.cogsByProduct[p] || 0 })),
-      { Concepto: 'Costos Directos', [range.label]: current.directCosts, 'Período Ant.': prev.directCosts, 'Año Ant.': yoy.directCosts },
-      ...allCostCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.costsByCategory[cat] || 0, 'Período Ant.': prev.costsByCategory[cat] || 0, 'Año Ant.': yoy.costsByCategory[cat] || 0 })),
-      { Concepto: 'Utilidad Bruta', [range.label]: current.grossProfit, 'Período Ant.': prev.grossProfit, 'Año Ant.': yoy.grossProfit },
-      ...allExpCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.expensesByCategory[cat] || 0, 'Período Ant.': prev.expensesByCategory[cat] || 0, 'Año Ant.': yoy.expensesByCategory[cat] || 0 })),
-      { Concepto: 'Total Gastos', [range.label]: current.totalExpenses, 'Período Ant.': prev.totalExpenses, 'Año Ant.': yoy.totalExpenses },
-      { Concepto: 'Utilidad Neta', [range.label]: current.netIncome, 'Período Ant.': prev.netIncome, 'Año Ant.': yoy.netIncome },
+      { Concepto: 'Ingresos', [range.label]: current.revenue, '% Ingreso': '100.0%', 'Período Ant.': prev.revenue, '% Ant.': '100.0%', 'Año Ant.': yoy.revenue, '% YoY': '100.0%', 'Δ vs Ant.': deltaStr(current.revenue, prev.revenue), 'Δ vs Año': deltaStr(current.revenue, yoy.revenue) },
+      { Concepto: '', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      { Concepto: 'COGS', [range.label]: current.cogs, '% Ingreso': pctOf(current.cogs, current.revenue), 'Período Ant.': prev.cogs, '% Ant.': pctOf(prev.cogs, prev.revenue), 'Año Ant.': yoy.cogs, '% YoY': pctOf(yoy.cogs, yoy.revenue), 'Δ vs Ant.': deltaStr(current.cogs, prev.cogs), 'Δ vs Año': deltaStr(current.cogs, yoy.cogs) },
+      ...allCogProducts.map(p => ({ Concepto: `  ${p}`, [range.label]: current.cogsByProduct[p] || 0, '% Ingreso': pctOf(current.cogsByProduct[p] || 0, current.revenue), 'Período Ant.': prev.cogsByProduct[p] || 0, '% Ant.': pctOf(prev.cogsByProduct[p] || 0, prev.revenue), 'Año Ant.': yoy.cogsByProduct[p] || 0, '% YoY': pctOf(yoy.cogsByProduct[p] || 0, yoy.revenue), 'Δ vs Ant.': '', 'Δ vs Año': '' })),
+      { Concepto: '', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      { Concepto: 'Costos Directos', [range.label]: current.directCosts, '% Ingreso': pctOf(current.directCosts, current.revenue), 'Período Ant.': prev.directCosts, '% Ant.': pctOf(prev.directCosts, prev.revenue), 'Año Ant.': yoy.directCosts, '% YoY': pctOf(yoy.directCosts, yoy.revenue), 'Δ vs Ant.': deltaStr(current.directCosts, prev.directCosts), 'Δ vs Año': deltaStr(current.directCosts, yoy.directCosts) },
+      ...allCostCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.costsByCategory[cat] || 0, '% Ingreso': pctOf(current.costsByCategory[cat] || 0, current.revenue), 'Período Ant.': prev.costsByCategory[cat] || 0, '% Ant.': pctOf(prev.costsByCategory[cat] || 0, prev.revenue), 'Año Ant.': yoy.costsByCategory[cat] || 0, '% YoY': pctOf(yoy.costsByCategory[cat] || 0, yoy.revenue), 'Δ vs Ant.': '', 'Δ vs Año': '' })),
+      { Concepto: '', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      { Concepto: 'UTILIDAD BRUTA', [range.label]: current.grossProfit, '% Ingreso': pctOf(current.grossProfit, current.revenue), 'Período Ant.': prev.grossProfit, '% Ant.': pctOf(prev.grossProfit, prev.revenue), 'Año Ant.': yoy.grossProfit, '% YoY': pctOf(yoy.grossProfit, yoy.revenue), 'Δ vs Ant.': deltaStr(current.grossProfit, prev.grossProfit), 'Δ vs Año': deltaStr(current.grossProfit, yoy.grossProfit) },
+      { Concepto: '', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      { Concepto: 'GASTOS OPERATIVOS', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      ...allExpCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.expensesByCategory[cat] || 0, '% Ingreso': pctOf(current.expensesByCategory[cat] || 0, current.revenue), 'Período Ant.': prev.expensesByCategory[cat] || 0, '% Ant.': pctOf(prev.expensesByCategory[cat] || 0, prev.revenue), 'Año Ant.': yoy.expensesByCategory[cat] || 0, '% YoY': pctOf(yoy.expensesByCategory[cat] || 0, yoy.revenue), 'Δ vs Ant.': deltaStr(current.expensesByCategory[cat] || 0, prev.expensesByCategory[cat] || 0), 'Δ vs Año': deltaStr(current.expensesByCategory[cat] || 0, yoy.expensesByCategory[cat] || 0) })),
+      { Concepto: 'Total Gastos', [range.label]: current.totalExpenses, '% Ingreso': pctOf(current.totalExpenses, current.revenue), 'Período Ant.': prev.totalExpenses, '% Ant.': pctOf(prev.totalExpenses, prev.revenue), 'Año Ant.': yoy.totalExpenses, '% YoY': pctOf(yoy.totalExpenses, yoy.revenue), 'Δ vs Ant.': deltaStr(current.totalExpenses, prev.totalExpenses), 'Δ vs Año': deltaStr(current.totalExpenses, yoy.totalExpenses) },
+      { Concepto: '', [range.label]: '', '% Ingreso': '', 'Período Ant.': '', '% Ant.': '', 'Año Ant.': '', '% YoY': '', 'Δ vs Ant.': '', 'Δ vs Año': '' },
+      { Concepto: 'UTILIDAD NETA', [range.label]: current.netIncome, '% Ingreso': pctOf(current.netIncome, current.revenue), 'Período Ant.': prev.netIncome, '% Ant.': pctOf(prev.netIncome, prev.revenue), 'Año Ant.': yoy.netIncome, '% YoY': pctOf(yoy.netIncome, yoy.revenue), 'Δ vs Ant.': deltaStr(current.netIncome, prev.netIncome), 'Δ vs Año': deltaStr(current.netIncome, yoy.netIncome) },
     ];
     exportToExcel(rows, 'estado_resultados', 'P&L');
   };
