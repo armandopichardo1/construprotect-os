@@ -24,6 +24,8 @@ const PIPELINE_STAGES: DealStage[] = ['prospecting', 'initial_contact', 'demo_sa
 export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<'board' | 'table'>('board');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const activeStages = PIPELINE_STAGES.filter(s => s !== 'won' && s !== 'lost');
 
   const updateStage = async (dealId: string, newStage: DealStage) => {
