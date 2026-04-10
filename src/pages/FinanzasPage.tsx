@@ -361,7 +361,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
         open={!!deleteSale}
         onOpenChange={(v) => { if (!v) setDeleteSale(null); }}
         title="Eliminar venta"
-        description={`¿Eliminar la venta <strong>${deleteSale?.invoice_ref || deleteSale?.date || ''}</strong> por <strong>${formatUSD(Number(deleteSale?.total_usd || 0))}</strong>? Se eliminarán todos los ítems asociados. Esta acción no se puede deshacer.`}
+        description={`¿Eliminar la venta <strong>${deleteSale?.invoice_ref || deleteSale?.date || ''}</strong> por <strong>${formatDOP(Number(deleteSale?.total_dop || Number(deleteSale?.total_usd || 0) * rate))}</strong>? Se eliminarán todos los ítems asociados. Esta acción no se puede deshacer.`}
         onConfirm={handleDeleteSale}
       />
     </div>
@@ -612,8 +612,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Categoría</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
               <TableHead className="text-xs">Proveedor</TableHead>
-              <TableHead className="text-xs text-right">USD</TableHead>
-              <TableHead className="text-xs text-right">DOP</TableHead>
+              <TableHead className="text-xs text-right">Monto RD$</TableHead>
               <TableHead className="text-xs">Recibo</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
             </TableRow>
@@ -621,14 +620,14 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
           <TableBody>
             {expenses.map((e: any) => {
               const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.other;
+              const amountDop = Number(e.amount_dop) || Number(e.amount_usd || 0) * rate;
               return (
                 <TableRow key={e.id}>
                   <TableCell className="text-xs">{e.date}</TableCell>
                   <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
                   <TableCell className="text-xs font-medium">{e.description}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
-                  <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(Number(e.amount_usd))}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">RD${Number(e.amount_dop).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
                     <ReceiptUpload expenseId={e.id} currentUrl={e.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })} />
                   </TableCell>
@@ -656,7 +655,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
         open={!!deleteExpense}
         onOpenChange={(v) => { if (!v) setDeleteExpense(null); }}
         title="Eliminar gasto"
-        description={`¿Eliminar el gasto <strong>${deleteExpense?.description || ''}</strong> por <strong>${formatUSD(Number(deleteExpense?.amount_usd || 0))}</strong>? Esta acción no se puede deshacer.`}
+        description={`¿Eliminar el gasto <strong>${deleteExpense?.description || ''}</strong> por <strong>${formatDOP(Number(deleteExpense?.amount_dop) || Number(deleteExpense?.amount_usd || 0) * rate)}</strong>? Esta acción no se puede deshacer.`}
         onConfirm={handleDeleteExpense}
       />
     </div>
