@@ -5,8 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLin
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, TrendingUp } from 'lucide-react';
+import { Download, TrendingUp, AlertTriangle } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
+import { useAlertRules } from '@/hooks/useAlerts';
 
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
@@ -19,6 +20,11 @@ export function CashFlowTab({ sales, expenses }: Props) {
   const [months, setMonths] = useState('6');
   const [projMonths, setProjMonths] = useState('3');
   const now = useMemo(() => new Date(), []);
+  const { data: alertRules } = useAlertRules();
+
+  const cashflowRule = alertRules?.find(r => r.id === 'cashflow_projection_low');
+  const thresholdEnabled = cashflowRule?.enabled ?? true;
+  const thresholdValue = cashflowRule?.threshold ?? 1000;
 
   const data = useMemo(() => {
     const n = Number(months);
@@ -139,6 +145,12 @@ export function CashFlowTab({ sales, expenses }: Props) {
 
     return { rows, monthlyReceivable, avgNewSales, monthlyRecurring, estimatedOtherExpenses, totalPending };
   }, [sales, expenses, data, projMonths, now]);
+
+  // Detect threshold breaches in projection
+  const breachMonths = useMemo(() => {
+    if (!thresholdEnabled) return [];
+    return projection.rows.filter(r => r.cumulative < thresholdValue || r.cumPesimista < thresholdValue);
+  }, [projection.rows, thresholdEnabled, thresholdValue]);
 
   const handleExport = () => {
     exportToExcel(data.map(r => ({
@@ -273,6 +285,20 @@ export function CashFlowTab({ sales, expenses }: Props) {
           ))}
         </div>
 
+        {/* Threshold warning banner */}
+        {thresholdEnabled && breachMonths.length > 0 && (
+          <div className="flex items-start gap-3 rounded-xl bg-destructive/10 border border-destructive/30 p-4">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Alerta de flujo de caja</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                El flujo acumulado proyectado baja de <span className="font-mono font-medium text-foreground">{formatUSD(thresholdValue)}</span> en {breachMonths.length} mes(es): {breachMonths.map(m => m.month).join(', ')}.
+                <span className="opacity-70"> Configura el umbral en Más &gt; Alertas.</span>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Projection chart with scenarios */}
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={projection.rows}>
@@ -295,6 +321,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" strokeDasharray="3 3" />
+            {thresholdEnabled && (
+              <ReferenceLine y={thresholdValue} stroke="hsl(38, 92%, 50%)" strokeDasharray="6 3" strokeWidth={2} label={{ value: `Umbral $${(thresholdValue/1000).toFixed(0)}K`, position: 'right', fill: 'hsl(38, 92%, 50%)', fontSize: 10 }} />
+            )}
             <Area type="monotone" dataKey="cumOptimista" name="Optimista (+20%)" stroke="hsl(160, 84%, 39%)" fill="url(#optGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
             <Area type="monotone" dataKey="cumulative" name="Base" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(217, 91%, 60%)' }} />
             <Area type="monotone" dataKey="cumPesimista" name="Pesimista (-20%)" stroke="hsl(0, 84%, 60%)" fill="url(#pesGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
