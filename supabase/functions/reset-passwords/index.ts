@@ -16,7 +16,7 @@ Deno.serve(async () => {
   const results = [];
   for (const id of users) {
     const { error } = await supabase.auth.admin.updateUserById(id, {
-      password: "maa1!",
+      password: "mnaa1!!",
     });
     results.push({ id, error: error?.message ?? null });
   }
