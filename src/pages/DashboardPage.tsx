@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package } from 'lucide-react';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useAlertLogger } from '@/hooks/useAlertHistory';
@@ -268,7 +268,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Alertas que requieren atención ({computedAlerts.length})</h3>
-              <Button size="sm" variant="ghost" className="text-[10px] text-muted-foreground h-6" onClick={() => navigate('/mas')}>⚙️ Configurar</Button>
+              <Button size="sm" variant="ghost" className="text-[10px] text-muted-foreground h-6 gap-1" onClick={() => navigate('/mas')}><Settings className="w-3 h-3" /> Configurar</Button>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {computedAlerts.map(alert => (
@@ -284,11 +284,11 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon="💰" variant="primary" />
-          <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon="📈" variant="success" />
-          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon="📊" variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
-          <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon="📦" />
-          <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon="🔔"
+          <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon={DollarSign} variant="primary" />
+          <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon={TrendingUp} variant="success" />
+          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart3} variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
+          <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon={Warehouse} />
+          <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon={Bell}
             variant={inventoryStats?.alerts ? 'warning' : 'default'}
             subtitle={`${(inventoryStats?.totalUnits || 0).toLocaleString()} unidades total`} />
         </div>
