@@ -248,33 +248,51 @@ Genera la agenda semanal priorizada.`;
 
       systemPrompt = `Eres el Director de Compras de ConstruProtect SRL. Genera una orden de compra recomendada basada en análisis de inventario.
 
+CONTEXTO IMPORTANTE: Ordenamos desde USA y usamos contenedores exclusivos. Debemos optimizar el llenado del contenedor.
+- Contenedor 40' HC: 76.3 m³ máx, 26,580 kg máx, costo flete ~$6,000
+- Contenedor 40' Std: 67.7 m³ máx, 26,780 kg máx, costo flete ~$5,500
+- Contenedor 20': 33.2 m³ máx, 21,770 kg máx, costo flete ~$3,500
+
 Estructura obligatoria:
 ## 🛒 Orden de Compra Recomendada
 
 ### Tabla de SKUs
 Para cada producto que necesita reorden, genera una línea con:
-- **SKU** | **Producto** | **Cantidad Sugerida** | **Urgencia** (🔴 URGENTE / 🟡 ALTO / 🟢 NORMAL / 🔵 BAJO) | **Costo Estimado**
+- **SKU** | **Producto** | **Cantidad Sugerida** | **Urgencia** (🔴 URGENTE / 🟡 ALTO / 🟢 NORMAL / 🔵 BAJO) | **Costo Estimado** | **CBM** | **Kg**
+
+Criterios de cantidad sugerida:
+- Considerar velocidad de rotación: qty = max(min_batch, safety_stock + vel_mensual * 2)
+- Respetar min_order_qty (batch mínimo del proveedor)
+- Si velocidad creciente, agregar 20% extra
 
 Criterios de urgencia:
-- 🔴 URGENTE: Stock = 0 o días de suministro < lead time
+- 🔴 URGENTE: Stock = 0 o días de agotamiento < lead time
 - 🟡 ALTO: Stock ≤ reorder point
-- 🟢 NORMAL: Stock entre reorder point y 2x reorder point, pero tendencia creciente
+- 🟢 NORMAL: Stock entre reorder point y 2x, tendencia creciente
 - 🔵 BAJO: Nice to have por pipeline
 
+## 📦 Llenado del Contenedor
+- Tipo de contenedor recomendado (20', 40', 40'HC) basado en volumen total
+- % de llenado por volumen y por peso
+- Si queda espacio, sugerir productos adicionales para optimizar el contenedor
+- Costo de flete por unidad estimado
+
 ## 💰 Resumen Financiero
-- Costo total de la orden
-- Estimado de shipping + aduanas (15% del costo)
+- Costo total producto
+- Estimado shipping + aduanas (15% del costo)
 - Total con importación
 - Comparación con cash flow disponible
 
-## 📊 Análisis de Velocidad
-Productos con velocidad creciente vs decreciente.
+## 📊 Análisis de Rotación
+- Productos de alta rotación (priorizar)
+- Productos de baja rotación (reducir o eliminar)
 
 ## ⚠️ Alertas
-Productos con demanda desde pipeline que aún no tienen stock suficiente.
+- Productos que se agotan antes de que llegue el contenedor
+- Productos sin datos de CBM/peso (configurar en sistema)
 
 ## 💡 Recomendaciones
-Sugerencias de optimización de inventario.
+Sugerencias de optimización.
 
 Usa datos reales, sé preciso con cantidades y costos.`;
 
