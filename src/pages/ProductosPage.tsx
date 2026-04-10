@@ -67,6 +67,14 @@ export default function ProductosPage() {
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const queryClient = useQueryClient();
 
+  const { data: minMargin = DEFAULT_MIN_MARGIN } = useQuery({
+    queryKey: ['margin-threshold'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'min_margin_threshold').maybeSingle();
+      return (data?.value as { value: number })?.value ?? DEFAULT_MIN_MARGIN;
+    },
+  });
+
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
@@ -151,13 +159,13 @@ export default function ProductosPage() {
                     <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.unit_cost_usd))}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-medium text-primary">{formatUSD(Number(p.price_list_usd))}</TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || 30)} label="Margen Lista" />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || 30)} label="Margen Lista" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || 25)} label="Margen Arquitecto" />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || 25)} label="Margen Arquitecto" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || 20)} label="Margen Proyecto" />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || 20)} label="Margen Proyecto" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>
@@ -200,7 +208,7 @@ export default function ProductosPage() {
                 const formatAvg = (val: number | null) => {
                   if (val === null) return <span className="text-muted-foreground">—</span>;
                   return (
-                    <span className={`font-mono font-semibold ${val < MIN_MARGIN_THRESHOLD ? 'text-destructive' : val < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                    <span className={`font-mono font-semibold ${val < minMargin ? 'text-destructive' : val < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>
                       {val.toFixed(1)}%
                     </span>
                   );
