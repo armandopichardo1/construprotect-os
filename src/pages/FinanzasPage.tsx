@@ -637,6 +637,7 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Categoría</TableHead>
               <TableHead className="text-xs">Descripción</TableHead>
+              <TableHead className="text-xs">Cuenta Contable</TableHead>
               <TableHead className="text-xs">Proveedor</TableHead>
               <TableHead className="text-xs text-right">Monto RD$</TableHead>
               <TableHead className="text-xs">Recibo</TableHead>
@@ -652,6 +653,11 @@ function GastosTab({ expenses, queryClient, rate, onExport }: any) {
                   <TableCell className="text-xs">{e.date}</TableCell>
                   <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{cat.icon} {cat.label}</span></TableCell>
                   <TableCell className="text-xs font-medium">{e.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {e.chart_of_accounts ? (
+                      <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium">{e.chart_of_accounts.code} · {e.chart_of_accounts.description}</span>
+                    ) : '—'}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{e.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
