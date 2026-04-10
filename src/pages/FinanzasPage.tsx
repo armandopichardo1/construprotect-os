@@ -232,6 +232,7 @@ export default function FinanzasPage() {
               {[
                 { label: 'Ingresos MTD', value: fmt(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
+                { label: 'Costos Directos', value: fmt(directCostsMTD), color: 'text-warning' },
                 { label: 'Gastos MTD', value: fmtDop(expensesMTD_dop), color: 'text-destructive' },
                 { label: 'Ingreso Neto', value: fmtDop(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
               ].map(kpi => (
