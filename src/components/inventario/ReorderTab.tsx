@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
@@ -49,7 +50,7 @@ export function ReorderTab() {
     queryFn: async () => {
       const [{ data: inv }, { data: prods }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
-        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand').eq('is_active', true),
+        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand, min_order_qty').eq('is_active', true),
         supabase.from('inventory_movements').select('product_id, quantity, movement_type, created_at').order('created_at'),
       ]);
       if (!prods) return [];
@@ -74,6 +75,13 @@ export function ReorderTab() {
         const olderAvg = sales ? sales.months.slice(0, 3).reduce((a, b) => a + b, 0) / 3 : 0;
         const trendPct = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
         const daysOfSupply = avgMonthly > 0 ? Math.round(((inv?.quantity_on_hand || 0) / avgMonthly) * 30) : 999;
+        const dailyVelocity = avgMonthly / 30;
+        const leadTime = Number(p.lead_time_days) || 21;
+        const minBatch = Number((p as any).min_order_qty) || 1;
+        const safetyStock = Math.ceil(dailyVelocity * leadTime * 1.5);
+        const reorderPointCalc = safetyStock + Math.ceil(dailyVelocity * leadTime);
+        const daysToStockout = dailyVelocity > 0 ? Math.round((inv?.quantity_on_hand || 0) / dailyVelocity) : 999;
+        const arrivalDay = daysToStockout - leadTime;
         return {
           ...p,
           qty: inv?.quantity_on_hand || 0,
@@ -83,7 +91,13 @@ export function ReorderTab() {
           daysOfSupply,
           reorder_point: Number(p.reorder_point) || 0,
           reorder_qty: Number(p.reorder_qty) || 0,
-          lead_time_days: Number(p.lead_time_days) || 21,
+          lead_time_days: leadTime,
+          min_order_qty: minBatch,
+          safetyStock,
+          reorderPointCalc,
+          daysToStockout,
+          arrivalDay, // negative = will stockout before order arrives
+          dailyVelocity,
         };
       });
     },
@@ -172,6 +186,7 @@ export function ReorderTab() {
 
   const items = products || [];
   const needsAttention = items.filter(p => p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point);
+  const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
 
   const urgencyStyle = (urgency: string) => {
@@ -188,12 +203,49 @@ export function ReorderTab() {
 
   return (
     <div className="space-y-5">
+      {/* Critical stockout simulation alert */}
+      {criticalItems.length > 0 && (
+        <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
+          <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5" /> Simulación de Agotamiento — {criticalItems.length} producto(s) en riesgo
+          </h3>
+          <p className="text-[10px] text-muted-foreground">
+            Estos productos se agotarán antes de que llegue un nuevo pedido si ordenas hoy (basado en velocidad de rotación + lead time).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+            {criticalItems.slice(0, 6).map(p => (
+              <div key={p.id} className="rounded-lg bg-card border border-destructive/20 p-2.5 space-y-1">
+                <p className="text-[11px] font-semibold text-foreground truncate">{p.name}</p>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-muted-foreground">Stock: <span className="font-mono text-foreground">{p.qty}</span></span>
+                  <span className="text-muted-foreground">Vel: <span className="font-mono text-foreground">{p.avgMonthly.toFixed(1)}/mes</span></span>
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-destructive flex items-center gap-0.5">
+                    <Clock className="w-3 h-3" /> Agotado en {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
+                  </span>
+                  <span className="text-muted-foreground">Lead: {p.lead_time_days}d</span>
+                </div>
+                <p className="text-[9px] text-destructive/80">
+                  ⚠️ Déficit de {Math.abs(p.arrivalDay)}d — el pedido llega {Math.abs(p.arrivalDay)} días después del agotamiento
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPI cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div className="rounded-xl bg-card border border-border p-4 space-y-1">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Requieren Atención</p>
           <p className="text-2xl font-bold text-destructive">{needsAttention.length}</p>
           <p className="text-[10px] text-muted-foreground">Stock ≤ reorden o días &lt; lead time</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-4 space-y-1">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Riesgo Agotamiento</p>
+          <p className="text-2xl font-bold text-destructive">{criticalItems.length}</p>
+          <p className="text-[10px] text-muted-foreground">Se agotan antes de reposición</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-4 space-y-1">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Velocidad Creciente</p>
@@ -303,12 +355,14 @@ export function ReorderTab() {
               <TableRow>
                 <TableHead className="text-xs">SKU</TableHead>
                 <TableHead className="text-xs">Producto</TableHead>
-                <TableHead className="text-xs">Categoría</TableHead>
                 <TableHead className="text-xs text-right">Stock</TableHead>
                 <TableHead className="text-xs text-right">Vel/mes</TableHead>
                 <TableHead className="text-xs text-center">Tendencia</TableHead>
                 <TableHead className="text-xs text-right">Días Stock</TableHead>
-                <TableHead className="text-xs text-right">Lead Time</TableHead>
+                <TableHead className="text-xs text-right">Agotam.</TableHead>
+                <TableHead className="text-xs text-right">Lead</TableHead>
+                <TableHead className="text-xs text-right">Safety</TableHead>
+                <TableHead className="text-xs text-right">Min Batch</TableHead>
                 <TableHead className="text-xs text-right">Pto. Reorden</TableHead>
                 <TableHead className="text-xs text-right">Qty Reorden</TableHead>
                 <TableHead className="text-xs"></TableHead>
@@ -318,11 +372,11 @@ export function ReorderTab() {
               {items.sort((a, b) => a.daysOfSupply - b.daysOfSupply).map(p => {
                 const editing = editingRows[p.id];
                 const isWarning = p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point;
+                const isCritical = p.arrivalDay < 0 && p.avgMonthly > 0;
                 return (
-                  <TableRow key={p.id} className={cn(isWarning && 'bg-destructive/5')}>
+                  <TableRow key={p.id} className={cn(isCritical ? 'bg-destructive/10' : isWarning && 'bg-destructive/5')}>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
-                    <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{p.category}</span></TableCell>
                     <TableCell className="text-xs text-right font-mono font-bold">{p.qty}</TableCell>
                     <TableCell className="text-xs text-right font-mono">{p.avgMonthly.toFixed(1)}</TableCell>
                     <TableCell className="text-center">
@@ -336,7 +390,13 @@ export function ReorderTab() {
                     <TableCell className={cn('text-xs text-right font-mono', p.daysOfSupply < p.lead_time_days ? 'text-destructive font-bold' : '')}>
                       {p.daysOfSupply >= 999 ? '∞' : `${p.daysOfSupply}d`}
                     </TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono', isCritical ? 'text-destructive font-bold' : 'text-muted-foreground')}>
+                      {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
+                      {isCritical && <span className="text-[8px] block text-destructive">⚠️ -{Math.abs(p.arrivalDay)}d</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.lead_time_days}d</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.safetyStock}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.min_order_qty}</TableCell>
                     <TableCell className="text-xs text-right">
                       {editing ? (
                         <Input type="number" className="w-16 h-6 text-xs p-1 text-right" value={editing.reorderPoint}
