@@ -104,6 +104,24 @@ export default function InventarioPage() {
   const [poLoading, setPOLoading] = useState(false);
   const queryClient = useQueryClient();
 
+  // Cash flow data for PO recommender
+  const { data: cashData } = useQuery({
+    queryKey: ['cash-flow-summary'],
+    queryFn: async () => {
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const [{ data: paidSales }, { data: monthExpenses }, { data: pendingPOs }] = await Promise.all([
+        supabase.from('sales').select('total_usd').eq('payment_status', 'paid'),
+        supabase.from('expenses').select('amount_usd').gte('date', `${monthKey}-01`),
+        supabase.from('shipments').select('total_cost_usd').neq('status', 'received'),
+      ]);
+      const totalReceived = (paidSales || []).reduce((s, r) => s + Number(r.total_usd || 0), 0);
+      const totalExpenses = (monthExpenses || []).reduce((s, r) => s + Number(r.amount_usd || 0), 0);
+      const pendingPOCost = (pendingPOs || []).reduce((s, r) => s + Number(r.total_cost_usd || 0), 0);
+      return { totalReceived, totalExpenses, pendingPOCost, estimatedCash: totalReceived - totalExpenses - pendingPOCost };
+    },
+  });
+
   useEffect(() => {
     const channel = supabase
       .channel('inventory-realtime')
