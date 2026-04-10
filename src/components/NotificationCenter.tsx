@@ -53,10 +53,19 @@ function groupByDate(items: AlertHistoryRow[]): { label: string; items: AlertHis
 }
 
 export function NotificationCenter() {
+  const navigate = useNavigate();
   const { data: history = [], isLoading } = useAlertHistory(50);
   const [filter, setFilter] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const handleNavigate = (category: string) => {
+    const cfg = CATEGORY_CONFIG[category];
+    if (cfg?.route) {
+      setOpen(false);
+      navigate(cfg.route);
+    }
+  };
 
   const filtered = filter ? history.filter(h => h.category === filter) : history;
   const grouped = groupByDate(filtered);
