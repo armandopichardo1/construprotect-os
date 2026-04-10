@@ -1812,17 +1812,47 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
           ))}
         </div>
         {view !== 'aging' && (
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo el Tiempo</SelectItem>
-              <SelectItem value="month">Mes Actual</SelectItem>
-              <SelectItem value="prev_month">Mes Anterior</SelectItem>
-              <SelectItem value="quarter">Último Trimestre</SelectItem>
-              <SelectItem value="ytd">YTD</SelectItem>
-              <SelectItem value="year">Año Completo</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo el Tiempo</SelectItem>
+                <SelectItem value="month">Mes Actual</SelectItem>
+                <SelectItem value="prev_month">Mes Anterior</SelectItem>
+                <SelectItem value="quarter">Último Trimestre</SelectItem>
+                <SelectItem value="ytd">YTD</SelectItem>
+                <SelectItem value="year">Año Completo</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+            {periodFilter === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !customFrom && 'text-muted-foreground')}>
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                      {customFrom ? format(customFrom, 'dd/MM/yyyy') : 'Desde'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} initialFocus className={cn('p-3 pointer-events-auto')} />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-xs text-muted-foreground">→</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !customTo && 'text-muted-foreground')}>
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                      {customTo ? format(customTo, 'dd/MM/yyyy') : 'Hasta'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={customTo} onSelect={setCustomTo} initialFocus className={cn('p-3 pointer-events-auto')} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </>
         )}
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
