@@ -102,7 +102,7 @@ export default function FinanzasPage() {
   const { data: saleItems = [] } = useQuery({
     queryKey: ['sale-items'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name)');
+      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name, margin_list_pct, margin_architect_pct, margin_project_pct, margin_wholesale_pct)');
       if (error) throw error;
       return data;
     },
