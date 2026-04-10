@@ -9,7 +9,7 @@ import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
 import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -179,6 +179,49 @@ export default function ProductosPage() {
                   </TableRow>
                 ))}
               </TableBody>
+              {(() => {
+                const margins = filtered.reduce((acc, p) => {
+                  const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
+                  const mList = calcRealMargin(cost, Number(p.price_list_usd));
+                  const mArq = calcRealMargin(cost, Number(p.price_architect_usd));
+                  const mProy = calcRealMargin(cost, Number(p.price_project_usd));
+                  if (mList !== null) { acc.list.sum += mList; acc.list.count++; }
+                  if (mArq !== null) { acc.arq.sum += mArq; acc.arq.count++; }
+                  if (mProy !== null) { acc.proy.sum += mProy; acc.proy.count++; }
+                  acc.costSum += Number(p.unit_cost_usd);
+                  acc.priceSum += Number(p.price_list_usd);
+                  return acc;
+                }, { list: { sum: 0, count: 0 }, arq: { sum: 0, count: 0 }, proy: { sum: 0, count: 0 }, costSum: 0, priceSum: 0 });
+
+                const avgList = margins.list.count ? margins.list.sum / margins.list.count : null;
+                const avgArq = margins.arq.count ? margins.arq.sum / margins.arq.count : null;
+                const avgProy = margins.proy.count ? margins.proy.sum / margins.proy.count : null;
+
+                const formatAvg = (val: number | null) => {
+                  if (val === null) return <span className="text-muted-foreground">—</span>;
+                  return (
+                    <span className={`font-mono font-semibold ${val < MIN_MARGIN_THRESHOLD ? 'text-destructive' : val < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                      {val.toFixed(1)}%
+                    </span>
+                  );
+                };
+
+                return (
+                  <TableFooter>
+                    <TableRow className="bg-muted/30">
+                      <TableCell colSpan={4} className="text-xs font-semibold text-foreground">
+                        Resumen ({filtered.length} productos{catFilter ? ` · ${catFilter}` : ''})
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-mono font-semibold">{formatUSD(margins.costSum / (filtered.length || 1))}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-semibold text-primary">{formatUSD(margins.priceSum / (filtered.length || 1))}</TableCell>
+                      <TableCell className="text-xs text-center">{formatAvg(avgList)}</TableCell>
+                      <TableCell className="text-xs text-center">{formatAvg(avgArq)}</TableCell>
+                      <TableCell className="text-xs text-center">{formatAvg(avgProy)}</TableCell>
+                      <TableCell colSpan={2} className="text-xs text-muted-foreground">Promedios</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                );
+              })()}
             </Table>
           </div>
         )}
