@@ -18,7 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
@@ -216,6 +216,7 @@ export default function FinanzasPage() {
           })), 'gastos', 'Gastos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
+        {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
@@ -801,7 +802,180 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight }: { l
   );
 }
 
-// ============ AI ASESOR TAB ============
+// ============ REPORTES TAB ============
+function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
+  const [view, setView] = useState<'clientes' | 'productos'>('clientes');
+  const [periodFilter, setPeriodFilter] = useState('all');
+  const now = useMemo(() => new Date(), []);
+
+  const dateRange = useMemo(() => {
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const y = now.getFullYear(), m = now.getMonth();
+    switch (periodFilter) {
+      case 'month': return { start: fmt(new Date(y, m, 1)), end: fmt(now) };
+      case 'quarter': return { start: fmt(new Date(y, m - 3, 1)), end: fmt(now) };
+      case 'ytd': return { start: `${y}-01-01`, end: fmt(now) };
+      case 'year': return { start: `${y}-01-01`, end: `${y}-12-31` };
+      default: return { start: '2000-01-01', end: '2099-12-31' };
+    }
+  }, [periodFilter, now]);
+
+  const filteredSales = useMemo(() => sales.filter((s: any) => s.date >= dateRange.start && s.date <= dateRange.end), [sales, dateRange]);
+  const filteredSaleIds = useMemo(() => new Set(filteredSales.map((s: any) => s.id)), [filteredSales]);
+  const filteredItems = useMemo(() => saleItems.filter((si: any) => filteredSaleIds.has(si.sale_id)), [saleItems, filteredSaleIds]);
+
+  const clientData = useMemo(() => {
+    const map: Record<string, { name: string; revenue: number; cogs: number; units: number }> = {};
+    filteredSales.forEach((s: any) => {
+      const key = s.contact_id || 'sin_cliente';
+      const name = s.crm_clients?.name || 'Sin Cliente';
+      if (!map[key]) map[key] = { name, revenue: 0, cogs: 0, units: 0 };
+      map[key].revenue += Number(s.total_usd || 0);
+      const items = s.sale_items || [];
+      items.forEach((si: any) => {
+        map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+        map[key].units += Number(si.quantity || 0);
+      });
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  }, [filteredSales]);
+
+  const productData = useMemo(() => {
+    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number }> = {};
+    filteredItems.forEach((si: any) => {
+      const key = si.product_id || 'unknown';
+      const name = si.products?.name || 'Producto Desconocido';
+      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0 };
+      map[key].revenue += Number(si.line_total_usd || 0);
+      map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+      map[key].units += Number(si.quantity || 0);
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  }, [filteredItems]);
+
+  const data = view === 'clientes' ? clientData : productData;
+  const totalRevenue = data.reduce((s, r) => s + r.revenue, 0);
+  const totalCogs = data.reduce((s, r) => s + r.cogs, 0);
+  const totalGM = totalRevenue - totalCogs;
+  const totalGMPct = totalRevenue > 0 ? (totalGM / totalRevenue * 100) : 0;
+
+  const handleExport = () => {
+    exportToExcel(data.map(r => ({
+      [view === 'clientes' ? 'Cliente' : 'Producto']: r.name,
+      'Unidades': r.units,
+      'Ingresos USD': r.revenue,
+      'COGS USD': r.cogs,
+      'GM USD': r.revenue - r.cogs,
+      'GM %': r.revenue > 0 ? `${((r.revenue - r.cogs) / r.revenue * 100).toFixed(1)}%` : '0%',
+      '% del Total': totalRevenue > 0 ? `${(r.revenue / totalRevenue * 100).toFixed(1)}%` : '0%',
+    })), `reporte_${view}`, view === 'clientes' ? 'Por Cliente' : 'Por Producto');
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+          {(['clientes', 'productos'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={cn('rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              {v === 'clientes' ? 'Por Cliente' : 'Por Producto'}
+            </button>
+          ))}
+        </div>
+        <Select value={periodFilter} onValueChange={setPeriodFilter}>
+          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo el Tiempo</SelectItem>
+            <SelectItem value="month">Mes Actual</SelectItem>
+            <SelectItem value="quarter">Último Trimestre</SelectItem>
+            <SelectItem value="ytd">YTD</SelectItem>
+            <SelectItem value="year">Año Completo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Ingresos', value: formatUSD(totalRevenue), color: 'text-primary' },
+          { label: 'COGS', value: formatUSD(totalCogs), color: 'text-warning' },
+          { label: 'Margen Bruto', value: formatUSD(totalGM), color: totalGM >= 0 ? 'text-success' : 'text-destructive' },
+          { label: 'GM %', value: `${totalGMPct.toFixed(1)}%`, color: totalGMPct >= 40 ? 'text-success' : 'text-warning' },
+        ].map(kpi => (
+          <div key={kpi.label} className="rounded-2xl bg-card border border-border p-4 text-center">
+            <p className={cn('text-xl font-bold', kpi.color)}>{kpi.value}</p>
+            <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs">{view === 'clientes' ? 'Cliente' : 'Producto'}</TableHead>
+              <TableHead className="text-xs text-right">Unidades</TableHead>
+              <TableHead className="text-xs text-right">Ingresos</TableHead>
+              <TableHead className="text-xs text-right">COGS</TableHead>
+              <TableHead className="text-xs text-right">GM</TableHead>
+              <TableHead className="text-xs text-right">GM %</TableHead>
+              <TableHead className="text-xs text-right">% Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((r, i) => {
+              const gm = r.revenue - r.cogs;
+              const gmPct = r.revenue > 0 ? (gm / r.revenue * 100) : 0;
+              const sharePct = totalRevenue > 0 ? (r.revenue / totalRevenue * 100) : 0;
+              return (
+                <TableRow key={i}>
+                  <TableCell className="text-xs font-medium">{r.name}</TableCell>
+                  <TableCell className="text-xs text-right font-mono">{r.units.toLocaleString()}</TableCell>
+                  <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(r.revenue)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(r.cogs)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono font-semibold', gm >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(gm)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', gmPct >= 40 ? 'text-success' : gmPct >= 20 ? 'text-warning' : 'text-destructive')}>{gmPct.toFixed(1)}%</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{sharePct.toFixed(1)}%</TableCell>
+                </TableRow>
+              );
+            })}
+            {data.length > 0 && (
+              <TableRow className="bg-muted/30 font-bold">
+                <TableCell className="text-xs font-bold">TOTAL</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold">{data.reduce((s, r) => s + r.units, 0).toLocaleString()}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(totalRevenue)}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold text-muted-foreground">{formatUSD(totalCogs)}</TableCell>
+                <TableCell className={cn('text-xs text-right font-mono font-bold', totalGM >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(totalGM)}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold">{totalGMPct.toFixed(1)}%</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold">100%</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        {data.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay datos para el período seleccionado</p>}
+      </div>
+
+      {/* Top chart */}
+      {data.length > 0 && (
+        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-foreground">Top {view === 'clientes' ? 'Clientes' : 'Productos'} por Ingresos</h2>
+          <ResponsiveContainer width="100%" height={Math.max(200, Math.min(data.length * 40, 400))}>
+            <BarChart data={data.slice(0, 15)} layout="vertical">
+              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+              <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={120} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+              <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[0,6,6,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AIAsesorTab({ sales, expenses, revenueMTD, grossMargin }: any) {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
