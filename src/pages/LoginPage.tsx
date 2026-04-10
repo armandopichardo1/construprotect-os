@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { Eye, EyeOff } from 'lucide-react';
 
 const USERNAME_MAP: Record<string, string> = {
   apichardo: 'apichardo@construprotect.com',
@@ -17,6 +19,17 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('cp_remember');
+    if (saved) {
+      const { username: u, remember: r } = JSON.parse(saved);
+      setUsername(u);
+      setRemember(r);
+    }
+  }, []);
 
   const resolveEmail = (input: string): string => {
     const lower = input.trim().toLowerCase();
@@ -27,6 +40,11 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      if (remember) {
+        localStorage.setItem('cp_remember', JSON.stringify({ username, remember: true }));
+      } else {
+        localStorage.removeItem('cp_remember');
+      }
       const email = resolveEmail(username);
       if (isSignUp) {
         await signUp(email, password, fullName);
@@ -70,15 +88,31 @@ export default function LoginPage() {
             autoCapitalize="none"
             className="h-11"
           />
-          <Input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="h-11"
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              className="h-11 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {!isSignUp && (
+            <div className="flex items-center gap-2">
+              <Checkbox id="remember" checked={remember} onCheckedChange={(v) => setRemember(!!v)} />
+              <label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">Recordar usuario</label>
+            </div>
+          )}
           <Button type="submit" className="w-full h-11 text-sm" disabled={loading}>
             {loading ? 'Cargando...' : isSignUp ? 'Registrarse' : 'Entrar'}
           </Button>
