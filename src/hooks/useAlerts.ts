@@ -23,6 +23,7 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
   { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
   { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
   { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
+  { id: 'client_declining', label: 'Cliente sin compras recientes', description: 'Alerta cuando un cliente activo no compra en X días', category: 'crm', enabled: true, threshold: 30, unit: 'days' },
 ];
 
 export interface AlertItem {
@@ -174,6 +175,8 @@ export function useAlerts() {
               message: `${low.length} producto(s) bajo punto de reorden: ${low.slice(0, 3).map((i: any) => i.products?.name).join(', ')}`,
               navigateTo: '/inventario',
             });
+          }
+        }
         if (ruleMap['reorder_needed']) {
           const reorder = inventory.filter((i: any) => {
             const rp = Number(i.products?.reorder_point || 0);
@@ -211,8 +214,6 @@ export function useAlerts() {
             message: `${delayed.length} envío(s) pasaron su ETA: ${details.join(', ')}`,
             navigateTo: '/inventario',
           });
-        }
-      }
         }
       }
 
