@@ -685,8 +685,10 @@ function CuentasMaestra() {
               const hasChildren = children.length > 0;
               const isCollapsed = !!collapsed[a.id];
               return (
-                <>{renderRow(a, false, hasChildren, isCollapsed)}
-                {!isCollapsed && children.map((child: any) => renderRow(child, true, false, false))}</>
+                <Fragment key={a.id}>
+                  {renderRow(a, false, hasChildren, isCollapsed)}
+                  {!isCollapsed && children.map((child: any) => renderRow(child, true, false, false))}
+                </Fragment>
               );
             })}
             {parentAccounts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
