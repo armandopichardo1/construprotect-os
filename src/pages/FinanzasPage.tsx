@@ -1022,6 +1022,8 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }
 const TREND_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems: any[]; view: 'clientes' | 'productos' }) {
+  const [metric, setMetric] = useState<'ingresos' | 'margen'>('ingresos');
+
   const trendData = useMemo(() => {
     const now = new Date();
     const months: { key: string; label: string }[] = [];
@@ -1033,60 +1035,107 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
       });
     }
 
+    // Build a sale_id → month key map
+    const saleMonthMap: Record<string, string> = {};
+    sales.forEach((s: any) => { saleMonthMap[s.id] = s.date?.substring(0, 7); });
+
+    // Build margin matrix from saleItems grouped by month+entity
+    const marginMatrix: Record<string, Record<string, number>> = {};
+    const revenueMatrixFromItems: Record<string, Record<string, number>> = {};
+
     if (view === 'clientes') {
+      // For clients: group saleItems by contact_id via their sale
+      const saleContactMap: Record<string, string> = {};
       const clientNames: Record<string, string> = {};
-      const matrix: Record<string, Record<string, number>> = {};
       sales.forEach((s: any) => {
         const cid = s.contact_id || 'sin_cliente';
+        saleContactMap[s.id] = cid;
         clientNames[cid] = s.crm_clients?.name || 'Sin Cliente';
-        const mk = s.date?.substring(0, 7);
-        if (!matrix[mk]) matrix[mk] = {};
-        matrix[mk][cid] = (matrix[mk][cid] || 0) + Number(s.total_usd || 0);
       });
-      // Get top clients by total revenue
+
+      // Revenue matrix from sales (for ingresos view)
+      const revenueMatrix: Record<string, Record<string, number>> = {};
+      sales.forEach((s: any) => {
+        const cid = s.contact_id || 'sin_cliente';
+        const mk = s.date?.substring(0, 7);
+        if (!revenueMatrix[mk]) revenueMatrix[mk] = {};
+        revenueMatrix[mk][cid] = (revenueMatrix[mk][cid] || 0) + Number(s.total_usd || 0);
+      });
+
+      // Margin matrix from saleItems
+      saleItems.forEach((si: any) => {
+        const mk = saleMonthMap[si.sale_id];
+        const cid = saleContactMap[si.sale_id] || 'sin_cliente';
+        if (!mk) return;
+        if (!marginMatrix[mk]) marginMatrix[mk] = {};
+        if (!revenueMatrixFromItems[mk]) revenueMatrixFromItems[mk] = {};
+        const margin = Number(si.line_total_usd || 0) - Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+        marginMatrix[mk][cid] = (marginMatrix[mk][cid] || 0) + margin;
+        revenueMatrixFromItems[mk][cid] = (revenueMatrixFromItems[mk][cid] || 0) + Number(si.line_total_usd || 0);
+      });
+
       const totals: Record<string, number> = {};
-      Object.values(matrix).forEach(m => Object.entries(m).forEach(([cid, v]) => { totals[cid] = (totals[cid] || 0) + v; }));
+      Object.values(revenueMatrix).forEach(m => Object.entries(m).forEach(([cid, v]) => { totals[cid] = (totals[cid] || 0) + v; }));
       const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
       const series = topIds.map(id => ({ id, name: clientNames[id] || id }));
+      const activeMatrix = metric === 'ingresos' ? revenueMatrix : marginMatrix;
       const rows = months.map(m => {
         const row: any = { month: m.label };
-        series.forEach(s => { row[s.name] = matrix[m.key]?.[s.id] || 0; });
+        series.forEach(s => { row[s.name] = activeMatrix[m.key]?.[s.id] || 0; });
         return row;
       });
       return { rows, series };
     } else {
       const prodNames: Record<string, string> = {};
-      const matrix: Record<string, Record<string, number>> = {};
+      const revMatrix: Record<string, Record<string, number>> = {};
+
       saleItems.forEach((si: any) => {
         const pid = si.product_id || 'unknown';
         prodNames[pid] = si.products?.name || '?';
-        // Find the sale to get its date
-        const sale = sales.find((s: any) => s.id === si.sale_id);
-        const mk = sale?.date?.substring(0, 7);
+        const mk = saleMonthMap[si.sale_id];
         if (!mk) return;
-        if (!matrix[mk]) matrix[mk] = {};
-        matrix[mk][pid] = (matrix[mk][pid] || 0) + Number(si.line_total_usd || 0);
+        if (!revMatrix[mk]) revMatrix[mk] = {};
+        if (!marginMatrix[mk]) marginMatrix[mk] = {};
+        revMatrix[mk][pid] = (revMatrix[mk][pid] || 0) + Number(si.line_total_usd || 0);
+        const margin = Number(si.line_total_usd || 0) - Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+        marginMatrix[mk][pid] = (marginMatrix[mk][pid] || 0) + margin;
       });
+
       const totals: Record<string, number> = {};
-      Object.values(matrix).forEach(m => Object.entries(m).forEach(([pid, v]) => { totals[pid] = (totals[pid] || 0) + v; }));
+      Object.values(revMatrix).forEach(m => Object.entries(m).forEach(([pid, v]) => { totals[pid] = (totals[pid] || 0) + v; }));
       const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
       const series = topIds.map(id => ({ id, name: prodNames[id] || id }));
+      const activeMatrix = metric === 'ingresos' ? revMatrix : marginMatrix;
       const rows = months.map(m => {
         const row: any = { month: m.label };
-        series.forEach(s => { row[s.name] = matrix[m.key]?.[s.id] || 0; });
+        series.forEach(s => { row[s.name] = activeMatrix[m.key]?.[s.id] || 0; });
         return row;
       });
       return { rows, series };
     }
-  }, [sales, saleItems, view]);
+  }, [sales, saleItems, view, metric]);
 
   if (trendData.series.length === 0) return null;
 
   return (
     <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-      <h2 className="text-sm font-semibold text-foreground">
-        Tendencia Mensual por {view === 'clientes' ? 'Cliente' : 'Producto'} (6 meses)
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">
+          Tendencia Mensual por {view === 'clientes' ? 'Cliente' : 'Producto'} (6 meses)
+        </h2>
+        <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
+          <button
+            onClick={() => setMetric('ingresos')}
+            className={cn('px-3 py-1 text-xs rounded-md transition-colors',
+              metric === 'ingresos' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+          >Ingresos</button>
+          <button
+            onClick={() => setMetric('margen')}
+            className={cn('px-3 py-1 text-xs rounded-md transition-colors',
+              metric === 'margen' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+          >Margen</button>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={trendData.rows}>
           <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
