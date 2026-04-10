@@ -1117,6 +1117,12 @@ export type Database = {
         | "office"
         | "bank_fees"
         | "other"
+        | "purchases"
+        | "payroll"
+        | "insurance"
+        | "rent"
+        | "utilities"
+        | "maintenance"
       movement_type:
         | "receipt"
         | "sale"
@@ -1304,6 +1310,12 @@ export const Constants = {
         "office",
         "bank_fees",
         "other",
+        "purchases",
+        "payroll",
+        "insurance",
+        "rent",
+        "utilities",
+        "maintenance",
       ],
       movement_type: [
         "receipt",
