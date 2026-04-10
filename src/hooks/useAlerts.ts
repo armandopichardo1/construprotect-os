@@ -40,7 +40,7 @@ export function useAlertRules() {
       const { data } = await supabase.from('settings').select('*').eq('key', 'alert_rules').maybeSingle();
       if (data?.value && Array.isArray(data.value)) {
         // Merge saved with defaults to pick up new rules
-        const saved = data.value as AlertRule[];
+        const saved = data.value as unknown as AlertRule[];
         const savedMap = Object.fromEntries(saved.map(r => [r.id, r]));
         return DEFAULT_ALERT_RULES.map(d => savedMap[d.id] ? { ...d, ...savedMap[d.id] } : d);
       }
