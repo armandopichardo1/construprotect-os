@@ -65,6 +65,20 @@ export default function MasPage() {
     },
   });
 
+  const { data: marginThreshold, refetch: refetchMargin } = useQuery({
+    queryKey: ['margin-threshold'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'min_margin_threshold').maybeSingle();
+      return (data?.value as { value: number })?.value ?? 5;
+    },
+  });
+  const [marginInput, setMarginInput] = useState('');
+  const [savingMargin, setSavingMargin] = useState(false);
+
+  useEffect(() => {
+    if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
+  }, [marginThreshold]);
+
   const { data: productRequests = [], refetch: refetchRequests } = useQuery({
     queryKey: ['product-requests'],
     queryFn: async () => {
@@ -148,6 +162,18 @@ export default function MasPage() {
       Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
     })), 'gastos', 'Gastos');
     toast.success('Exportado');
+  };
+
+  const handleSaveMargin = async () => {
+    const val = Number(marginInput);
+    if (isNaN(val) || val < 0 || val > 100) { toast.error('Ingresa un valor entre 0 y 100'); return; }
+    setSavingMargin(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'min_margin_threshold', value: { value: val } as any }, { onConflict: 'key' });
+    setSavingMargin(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success(`Umbral de margen actualizado a ${val}%`);
+    refetchMargin();
+    queryClient.invalidateQueries({ queryKey: ['margin-threshold'] });
   };
 
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
@@ -248,6 +274,29 @@ export default function MasPage() {
                   </div>
                 ))}
                 {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
+              </div>
+            </div>
+
+            {/* Margin Threshold */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <h2 className="text-sm font-semibold text-foreground">Umbral Mínimo de Margen</h2>
+              <p className="text-xs text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Label className="text-xs">Margen mínimo (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={marginInput}
+                    onChange={e => setMarginInput(e.target.value)}
+                    className="h-8 text-xs mt-1 max-w-[120px]"
+                  />
+                </div>
+                <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+                </Button>
               </div>
             </div>
 
