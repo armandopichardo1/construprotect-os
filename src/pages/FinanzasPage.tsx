@@ -1545,6 +1545,7 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
     const y = now.getFullYear(), m = now.getMonth();
     switch (periodFilter) {
       case 'month': return { start: fmt(new Date(y, m, 1)), end: fmt(now) };
+      case 'prev_month': return { start: fmt(new Date(y, m - 1, 1)), end: fmt(new Date(y, m, 0)) };
       case 'quarter': return { start: fmt(new Date(y, m - 3, 1)), end: fmt(now) };
       case 'ytd': return { start: `${y}-01-01`, end: fmt(now) };
       case 'year': return { start: `${y}-01-01`, end: `${y}-12-31` };
@@ -1649,6 +1650,7 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
           <SelectContent>
             <SelectItem value="all">Todo el Tiempo</SelectItem>
             <SelectItem value="month">Mes Actual</SelectItem>
+            <SelectItem value="prev_month">Mes Anterior</SelectItem>
             <SelectItem value="quarter">Último Trimestre</SelectItem>
             <SelectItem value="ytd">YTD</SelectItem>
             <SelectItem value="year">Año Completo</SelectItem>
