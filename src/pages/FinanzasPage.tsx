@@ -321,7 +321,7 @@ export default function FinanzasPage() {
             Proveedor: c.vendor, 'Monto USD': c.amount_usd, 'Monto DOP': c.amount_dop,
           })), 'costos', 'Costos');
         }} />}
-        {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
+        {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
