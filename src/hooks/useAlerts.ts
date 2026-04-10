@@ -268,7 +268,7 @@ export function useAlerts() {
             severity: 'critical',
             count: overdue.length,
             message: `${overdue.length} factura(s) vencida(s) por $${total.toLocaleString('en-US', { minimumFractionDigits: 0 })}`,
-            navigateTo: '/finanzas',
+            navigateTo: '/finanzas?tab=Ventas',
           });
         }
       }
@@ -287,7 +287,7 @@ export function useAlerts() {
             severity: 'warning',
             count: 1,
             message: `Gastos este mes: $${monthTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })} (umbral: $${threshold.toLocaleString()})`,
-            navigateTo: '/finanzas',
+            navigateTo: '/finanzas?tab=Gastos',
           });
         }
       }
