@@ -1141,8 +1141,10 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   const [expandCogs, setExpandCogs] = useState(false);
   const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
+  const [plCustomFrom, setPlCustomFrom] = useState<Date | undefined>(undefined);
+  const [plCustomTo, setPlCustomTo] = useState<Date | undefined>(undefined);
   const now = useMemo(() => new Date(), []);
-  const range = useMemo(() => getDateRange(period, now), [period, now]);
+  const range = useMemo(() => getDateRange(period, now, plCustomFrom, plCustomTo), [period, now, plCustomFrom, plCustomTo]);
   const prevRange = useMemo(() => getPrevRange(range), [range]);
   const yoyRange = useMemo(() => getYoYRange(range), [range]);
 
