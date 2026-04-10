@@ -619,55 +619,160 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
 }
 
 // ============ P&L TAB ============
-function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses, onExport }: any) {
-  const grossProfit = revenueMTD - cogsMTD;
-  const grossMarginPct = revenueMTD > 0 ? (grossProfit / revenueMTD * 100) : 0;
-  const netIncome = grossProfit - expensesMTD;
-  const netMarginPct = revenueMTD > 0 ? (netIncome / revenueMTD * 100) : 0;
+type PeriodTotals = { revenue: number; cogs: number; grossProfit: number; expensesByCategory: Record<string, number>; totalExpenses: number; netIncome: number };
 
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const expByCat: Record<string, number> = {};
-  expenses.forEach((e: any) => {
-    if (e.date?.startsWith(thisMonth)) {
-      const label = EXPENSE_CATEGORIES[e.category]?.label || e.category;
-      expByCat[label] = (expByCat[label] || 0) + Number(e.amount_usd || 0);
-    }
+function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], startDate: string, endDate: string): PeriodTotals {
+  const filteredSales = sales.filter((s: any) => s.date >= startDate && s.date <= endDate);
+  const saleIds = new Set(filteredSales.map((s: any) => s.id));
+  const filteredItems = saleItems.filter((si: any) => saleIds.has(si.sale_id));
+  const filteredExpenses = expenses.filter((e: any) => e.date >= startDate && e.date <= endDate);
+  const revenue = filteredSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+  const cogs = filteredItems.reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
+  const grossProfit = revenue - cogs;
+  const expensesByCategory: Record<string, number> = {};
+  filteredExpenses.forEach((e: any) => {
+    const label = EXPENSE_CATEGORIES[e.category]?.label || e.category;
+    expensesByCategory[label] = (expensesByCategory[label] || 0) + Number(e.amount_usd || 0);
   });
+  const totalExpenses = filteredExpenses.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  return { revenue, cogs, grossProfit, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
+}
+
+function getDateRange(period: string, now: Date): { start: string; end: string; label: string } {
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const y = now.getFullYear(), m = now.getMonth();
+  switch (period) {
+    case 'prev_month': { const s = new Date(y, m - 1, 1); const e = new Date(y, m, 0); return { start: fmt(s), end: fmt(e), label: s.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' }) }; }
+    case 'ytd': return { start: `${y}-01-01`, end: fmt(now), label: `YTD ${y}` };
+    case 'last_quarter': { const s = new Date(y, m - 3, 1); const e = new Date(y, m, 0); return { start: fmt(s), end: fmt(e), label: 'Últ. Trimestre' }; }
+    case 'full_year': return { start: `${y}-01-01`, end: `${y}-12-31`, label: `Año ${y}` };
+    default: { const s = new Date(y, m, 1); return { start: fmt(s), end: fmt(now), label: s.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' }) }; }
+  }
+}
+
+function getPrevRange(r: { start: string; end: string }) {
+  const s = new Date(r.start), e = new Date(r.end);
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000);
+  const pe = new Date(s.getTime() - 86400000);
+  const ps = new Date(pe.getTime() - days * 86400000);
+  return { start: ps.toISOString().split('T')[0], end: pe.toISOString().split('T')[0] };
+}
+
+function getYoYRange(r: { start: string; end: string }) {
+  const s = new Date(r.start), e = new Date(r.end);
+  s.setFullYear(s.getFullYear() - 1); e.setFullYear(e.getFullYear() - 1);
+  return { start: s.toISOString().split('T')[0], end: e.toISOString().split('T')[0] };
+}
+
+function deltaStr(cur: number, prev: number): string {
+  if (prev === 0) return cur > 0 ? '+∞' : '—';
+  const pct = ((cur - prev) / Math.abs(prev)) * 100;
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+}
+
+function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[]; expenses: any[] }) {
+  const [period, setPeriod] = useState('current_month');
+  const now = useMemo(() => new Date(), []);
+  const range = useMemo(() => getDateRange(period, now), [period, now]);
+  const prevRange = useMemo(() => getPrevRange(range), [range]);
+  const yoyRange = useMemo(() => getYoYRange(range), [range]);
+
+  const current = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, range.start, range.end), [sales, saleItems, expenses, range]);
+  const prev = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, prevRange.start, prevRange.end), [sales, saleItems, expenses, prevRange]);
+  const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end), [sales, saleItems, expenses, yoyRange]);
+
+  const trendData = useMemo(() => {
+    const months: { month: string; revenue: number; profit: number; revenuePY: number; profitPY: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const dEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      const f = (dt: Date) => dt.toISOString().split('T')[0];
+      const t = calcPeriodTotals(sales, saleItems, expenses, f(d), f(dEnd));
+      const pyS = new Date(d); pyS.setFullYear(pyS.getFullYear() - 1);
+      const pyE = new Date(dEnd); pyE.setFullYear(pyE.getFullYear() - 1);
+      const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE));
+      months.push({ month: d.toLocaleDateString('es-DO', { month: 'short' }), revenue: t.revenue, profit: t.netIncome, revenuePY: py.revenue, profitPY: py.netIncome });
+    }
+    return months;
+  }, [sales, saleItems, expenses, now]);
+
+  const allExpCats = useMemo(() => {
+    const cats = new Set<string>();
+    [current, prev, yoy].forEach(p => Object.keys(p.expensesByCategory).forEach(k => cats.add(k)));
+    return Array.from(cats).sort();
+  }, [current, prev, yoy]);
+
+  const handleExport = () => {
+    const rows = [
+      { Concepto: 'Ingresos', [range.label]: current.revenue, 'Período Ant.': prev.revenue, 'Año Ant.': yoy.revenue },
+      { Concepto: 'COGS', [range.label]: current.cogs, 'Período Ant.': prev.cogs, 'Año Ant.': yoy.cogs },
+      { Concepto: 'Utilidad Bruta', [range.label]: current.grossProfit, 'Período Ant.': prev.grossProfit, 'Año Ant.': yoy.grossProfit },
+      ...allExpCats.map(cat => ({ Concepto: `  ${cat}`, [range.label]: current.expensesByCategory[cat] || 0, 'Período Ant.': prev.expensesByCategory[cat] || 0, 'Año Ant.': yoy.expensesByCategory[cat] || 0 })),
+      { Concepto: 'Total Gastos', [range.label]: current.totalExpenses, 'Período Ant.': prev.totalExpenses, 'Año Ant.': yoy.totalExpenses },
+      { Concepto: 'Utilidad Neta', [range.label]: current.netIncome, 'Período Ant.': prev.netIncome, 'Año Ant.': yoy.netIncome },
+    ];
+    exportToExcel(rows, 'estado_resultados', 'P&L');
+  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="rounded-2xl bg-card border border-border p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Estado de Resultados — Mes Actual</h2>
-          <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
-        </div>
-        <div className="space-y-2">
-          <PLRow label="Ingresos" value={revenueMTD} bold />
-          <PLRow label="(-) Costo de Ventas" value={cogsMTD} negative />
-          <div className="border-t border-border my-2" />
-          <PLRow label="Utilidad Bruta" value={grossProfit} bold color={grossProfit >= 0 ? 'text-success' : 'text-destructive'} />
-          <PLRow label="Margen Bruto" value={grossMarginPct} pct />
-          <div className="mt-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Gastos Operativos</div>
-          {Object.entries(expByCat).sort((a, b) => b[1] - a[1]).map(([label, amt]) => (
-            <PLRow key={label} label={`  ${label}`} value={amt} negative />
-          ))}
-          <div className="border-t border-border my-2" />
-          <PLRow label="(-) Total Gastos" value={expensesMTD} negative />
-          <div className="border-t-2 border-border my-2" />
-          <PLRow label="Utilidad Neta" value={netIncome} bold color={netIncome >= 0 ? 'text-success' : 'text-destructive'} />
-          <PLRow label="Margen Neto" value={netMarginPct} pct />
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current_month">Mes Actual</SelectItem>
+            <SelectItem value="prev_month">Mes Anterior</SelectItem>
+            <SelectItem value="ytd">YTD (Año en Curso)</SelectItem>
+            <SelectItem value="last_quarter">Último Trimestre</SelectItem>
+            <SelectItem value="full_year">Año Completo</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">{range.start} → {range.end}</span>
+        <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
+
+      <div className="rounded-2xl bg-card border border-border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs w-[200px]">Concepto</TableHead>
+              <TableHead className="text-xs text-right">{range.label}</TableHead>
+              <TableHead className="text-xs text-right text-muted-foreground">Δ vs Ant.</TableHead>
+              <TableHead className="text-xs text-right">Período Ant.</TableHead>
+              <TableHead className="text-xs text-right text-muted-foreground">Δ vs Año Ant.</TableHead>
+              <TableHead className="text-xs text-right">Mismo Per. Año Ant.</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <PLCompRow label="Ingresos" cur={current.revenue} prv={prev.revenue} yoy={yoy.revenue} bold />
+            <PLCompRow label="(-) Costo de Ventas" cur={current.cogs} prv={prev.cogs} yoy={yoy.cogs} negative />
+            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
+            <PLCompRow label="Utilidad Bruta" cur={current.grossProfit} prv={prev.grossProfit} yoy={yoy.grossProfit} bold />
+            <PLCompRow label="Margen Bruto" cur={current.revenue > 0 ? current.grossProfit / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.grossProfit / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.grossProfit / yoy.revenue * 100 : 0} pct />
+            <TableRow><TableCell colSpan={6} className="py-1"><span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Gastos Operativos</span></TableCell></TableRow>
+            {allExpCats.map(cat => (
+              <PLCompRow key={cat} label={`  ${cat}`} cur={current.expensesByCategory[cat] || 0} prv={prev.expensesByCategory[cat] || 0} yoy={yoy.expensesByCategory[cat] || 0} negative />
+            ))}
+            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
+            <PLCompRow label="(-) Total Gastos" cur={current.totalExpenses} prv={prev.totalExpenses} yoy={yoy.totalExpenses} negative bold />
+            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t-2 border-border" /></TableCell></TableRow>
+            <PLCompRow label="Utilidad Neta" cur={current.netIncome} prv={prev.netIncome} yoy={yoy.netIncome} bold highlight />
+            <PLCompRow label="Margen Neto" cur={current.revenue > 0 ? current.netIncome / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.netIncome / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.netIncome / yoy.revenue * 100 : 0} pct />
+          </TableBody>
+        </Table>
+      </div>
+
       <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Tendencia 6 Meses</h2>
+        <h2 className="text-sm font-semibold text-foreground">Tendencia 12 Meses (vs Año Anterior)</h2>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={monthlyData}>
+          <BarChart data={trendData}>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
+            <Bar dataKey="revenuePY" name="Ing. Año Ant." fill="hsl(217, 91%, 60%)" fillOpacity={0.3} radius={[6,6,0,0]} />
             <Bar dataKey="profit" name="Utilidad" fill="hsl(160, 84%, 39%)" radius={[6,6,0,0]} />
+            <Bar dataKey="profitPY" name="Util. Año Ant." fill="hsl(160, 84%, 39%)" fillOpacity={0.3} radius={[6,6,0,0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -675,14 +780,24 @@ function PLTab({ monthlyData, revenueMTD, cogsMTD, expensesMTD, expenses, onExpo
   );
 }
 
-function PLRow({ label, value, bold, negative, color, pct }: { label: string; value: number; bold?: boolean; negative?: boolean; color?: string; pct?: boolean }) {
+function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight }: { label: string; cur: number; prv: number; yoy: number; bold?: boolean; negative?: boolean; pct?: boolean; highlight?: boolean }) {
+  const fmtVal = (v: number) => pct ? `${v.toFixed(1)}%` : (negative ? (v > 0 ? `-${formatUSD(v)}` : formatUSD(Math.abs(v))) : formatUSD(v));
+  const deltaColor = (c: number, p: number) => {
+    if (p === 0 && c === 0) return 'text-muted-foreground';
+    const better = negative ? c < p : c > p;
+    return better ? 'text-success' : c === p ? 'text-muted-foreground' : 'text-destructive';
+  };
+  const dPrev = pct ? `${(cur - prv).toFixed(1)}pp` : deltaStr(cur, prv);
+  const dYoy = pct ? `${(cur - yoy).toFixed(1)}pp` : deltaStr(cur, yoy);
   return (
-    <div className={cn('flex justify-between text-sm', bold ? 'font-bold' : '')}>
-      <span className="text-foreground">{label}</span>
-      <span className={color || (negative ? 'text-destructive' : 'text-foreground')}>
-        {pct ? `${value.toFixed(1)}%` : (negative ? `-${formatUSD(value)}` : formatUSD(value))}
-      </span>
-    </div>
+    <TableRow className={highlight ? 'bg-muted/30' : ''}>
+      <TableCell className={cn('text-xs', bold && 'font-bold')}>{label}</TableCell>
+      <TableCell className={cn('text-xs text-right font-mono', bold && 'font-bold', highlight && (cur >= 0 ? 'text-success' : 'text-destructive'))}>{fmtVal(cur)}</TableCell>
+      <TableCell className={cn('text-xs text-right font-mono', deltaColor(cur, prv))}>{dPrev}</TableCell>
+      <TableCell className="text-xs text-right font-mono text-muted-foreground">{fmtVal(prv)}</TableCell>
+      <TableCell className={cn('text-xs text-right font-mono', deltaColor(cur, yoy))}>{dYoy}</TableCell>
+      <TableCell className="text-xs text-right font-mono text-muted-foreground">{fmtVal(yoy)}</TableCell>
+    </TableRow>
   );
 }
 
