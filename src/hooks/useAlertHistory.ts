@@ -13,7 +13,8 @@ export function useAlertLogger(alerts: AlertItem[] | undefined) {
   useEffect(() => {
     if (!alerts?.length) return;
 
-    const criticalAlerts = alerts.filter(a => a.severity === 'critical');
+    // Log critical alerts AND inventory warnings (reorder/low stock)
+    const criticalAlerts = alerts.filter(a => a.severity === 'critical' || (a.severity === 'warning' && a.category === 'inventory'));
     if (criticalAlerts.length === 0) return;
 
     const now = Date.now();
