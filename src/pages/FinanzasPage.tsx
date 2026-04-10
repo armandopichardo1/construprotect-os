@@ -254,6 +254,7 @@ export default function FinanzasPage() {
                     <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                     <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
                     <Bar dataKey="cogs" name="COGS" fill="hsl(38, 92%, 50%)" radius={[6,6,0,0]} />
+                    <Bar dataKey="directCosts" name="Costos Directos" fill="hsl(280, 60%, 55%)" radius={[6,6,0,0]} />
                     <Bar dataKey="expenses" name="Gastos" fill="hsl(0, 84%, 60%)" radius={[6,6,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
