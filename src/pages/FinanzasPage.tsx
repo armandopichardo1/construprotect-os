@@ -1139,40 +1139,28 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
 
   // Waterfall chart data
   const waterfallData = useMemo(() => {
-    const items: { name: string; value: number; fill: string; isTotal?: boolean }[] = [];
-    items.push({ name: 'Ingresos', value: current.revenue, fill: 'hsl(217, 91%, 60%)', isTotal: true });
-    items.push({ name: 'COGS', value: -current.cogs, fill: 'hsl(38, 92%, 50%)' });
+    const categories = ['Ingresos', 'COGS', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
 
-    // Sort expense categories by value descending
-    const sortedCats = allExpCats
-      .map(cat => ({ cat, val: current.expensesByCategory[cat] || 0 }))
-      .filter(c => c.val > 0)
-      .sort((a, b) => b.val - a.val);
+    return categories.map(name => {
+      let curVal = 0, prvVal = 0;
+      if (name === 'Ingresos') { curVal = current.revenue; prvVal = prev.revenue; }
+      else if (name === 'COGS') { curVal = current.cogs; prvVal = prev.cogs; }
+      else if (name === 'Utilidad Neta') { curVal = current.netIncome; prvVal = prev.netIncome; }
+      else { curVal = current.expensesByCategory[name] || 0; prvVal = prev.expensesByCategory[name] || 0; }
 
-    sortedCats.forEach((c, i) => {
-      items.push({ name: c.cat, value: -c.val, fill: PIE_COLORS[i % PIE_COLORS.length] });
+      const delta = curVal - prvVal;
+      const deltaPct = prvVal !== 0 ? ((delta / prvVal) * 100) : (curVal > 0 ? 100 : 0);
+
+      return {
+        name,
+        current: curVal,
+        previous: prvVal,
+        delta,
+        deltaPct: Math.round(deltaPct * 10) / 10,
+        isTotal: name === 'Ingresos' || name === 'Utilidad Neta',
+      };
     });
-
-    items.push({ name: 'Utilidad Neta', value: current.netIncome, fill: current.netIncome >= 0 ? 'hsl(160, 84%, 39%)' : 'hsl(0, 84%, 60%)', isTotal: true });
-
-    // Build waterfall bars: each non-total bar floats from running total
-    let running = 0;
-    return items.map(item => {
-      if (item.isTotal) {
-        const result = { name: item.name, base: 0, delta: item.value, fill: item.fill };
-        running = item.value;
-        if (item.name === 'Utilidad Neta') {
-          result.base = 0;
-          result.delta = item.value;
-        }
-        return result;
-      }
-      const base = running + item.value; // value is negative
-      const result = { name: item.name, base: Math.min(running, base), delta: Math.abs(item.value), fill: item.fill };
-      running = base;
-      return result;
-    });
-  }, [current, allExpCats]);
+  }, [current, prev, allExpCats]);
 
   // Pareto (80/20) analysis data
   const paretoData = useMemo(() => {
@@ -1288,25 +1276,46 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
         </Table>
       </div>
 
-      {/* Waterfall Chart */}
+      {/* Waterfall Comparison Chart */}
       <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Waterfall: Impacto por Categoría (USD)</h2>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={waterfallData} barSize={36}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Waterfall: Comparación por Categoría (USD)</h2>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'hsl(217, 91%, 60%)' }} /> Actual</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'hsl(220, 12%, 40%)' }} /> Anterior</span>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={380}>
+          <BarChart data={waterfallData} barGap={2} barCategoryGap="20%">
             <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={80} />
             <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
-              if (name === 'base') return [null, null];
-              return [formatUSD(v), 'Monto'];
+              if (name === 'current') return [formatUSD(v), 'Actual'];
+              if (name === 'previous') return [formatUSD(v), 'Anterior'];
+              return [formatUSD(v), name];
             }} />
-            <Bar dataKey="base" stackId="a" fill="transparent" />
-            <Bar dataKey="delta" stackId="a" radius={[4,4,0,0]}>
-              {waterfallData.map((entry, i) => (
-                <Cell key={i} fill={entry.fill} />
-              ))}
-            </Bar>
+            <Bar dataKey="current" fill="hsl(217, 91%, 60%)" radius={[4,4,0,0]} barSize={28} />
+            <Bar dataKey="previous" fill="hsl(220, 12%, 40%)" radius={[4,4,0,0]} barSize={28} />
           </BarChart>
         </ResponsiveContainer>
+        {/* Delta indicators */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {waterfallData.map(d => {
+            const isGood = d.isTotal ? d.delta > 0 : d.delta < 0;
+            const isBad = d.isTotal ? d.delta < 0 : d.delta > 0;
+            return (
+              <div key={d.name} className="rounded-lg bg-muted/40 border border-border px-2.5 py-1.5 text-center">
+                <p className="text-[9px] text-muted-foreground truncate">{d.name}</p>
+                <p className={cn('text-[11px] font-bold', isGood ? 'text-success' : isBad ? 'text-destructive' : 'text-muted-foreground')}>
+                  {d.delta > 0 ? '+' : ''}{formatUSD(d.delta)}
+                </p>
+                <p className={cn('text-[9px]', isGood ? 'text-success' : isBad ? 'text-destructive' : 'text-muted-foreground')}>
+                  {d.deltaPct > 0 ? '+' : ''}{d.deltaPct}%
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Pareto 80/20 Analysis */}
