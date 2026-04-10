@@ -317,7 +317,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
               <TableHead className="text-xs">Ref.</TableHead>
               <TableHead className="text-xs text-right">Subtotal</TableHead>
               <TableHead className="text-xs text-right">ITBIS</TableHead>
-              <TableHead className="text-xs text-right">Total USD</TableHead>
+              <TableHead className="text-xs text-right">Total RD$</TableHead>
               <TableHead className="text-xs">Estado</TableHead>
               <TableHead className="text-xs">Productos</TableHead>
               <TableHead className="text-xs w-[80px]">Acciones</TableHead>
@@ -329,9 +329,9 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
                 <TableCell className="text-xs">{s.date}</TableCell>
                 <TableCell className="text-xs font-medium">{s.crm_clients?.name || '—'}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.invoice_ref || '—'}</TableCell>
-                <TableCell className="text-xs text-right font-mono">{formatUSD(Number(s.subtotal_usd))}</TableCell>
-                <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(Number(s.itbis_usd))}</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(Number(s.total_usd))}</TableCell>
+                <TableCell className="text-xs text-right font-mono">{formatDOP(Number(s.subtotal_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
+                <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(Number(s.itbis_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatDOP(Number(s.total_dop) || Number(s.total_usd) * rate)}</TableCell>
                 <TableCell>
                   <SaleStatusSelect sale={s} queryClient={queryClient} />
                 </TableCell>
