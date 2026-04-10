@@ -90,8 +90,7 @@ function ExchangeRateKpi({ rate }: { rate: any }) {
 }
 
 export default function FinanzasPage() {
-  const [tab, setTab] = useState('Resumen');
-  const [aiOpen, setAiOpen] = useState(false);
+  const [tab, setTab] = useState('Crear Transacción');
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
   const { rate } = useExchangeRate();
