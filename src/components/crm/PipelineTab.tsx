@@ -219,7 +219,8 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                   </TableRow>
                 )}
               </TableBody>
-          </table>
+            </table>
+          </div>
         </div>
         </>);
       })()}
