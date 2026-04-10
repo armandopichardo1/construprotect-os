@@ -189,16 +189,22 @@ export default function DashboardPage() {
       const { data: sales } = await supabase.from('sales').select('contact_id, total_usd, date, crm_clients(name)').order('date');
       if (!sales) return [];
       const now = new Date();
-      const byClient: Record<string, { name: string; months: number[] }> = {};
+      const byClient: Record<string, { name: string; months: number[]; lastDate: string }> = {};
       sales.forEach((s: any) => {
         const cid = s.contact_id;
         if (!cid) return;
-        if (!byClient[cid]) byClient[cid] = { name: s.crm_clients?.name || '?', months: [0, 0, 0, 0, 0, 0] };
+        if (!byClient[cid]) byClient[cid] = { name: s.crm_clients?.name || '?', months: [0, 0, 0, 0, 0, 0], lastDate: '' };
+        if (!byClient[cid].lastDate || s.date > byClient[cid].lastDate) byClient[cid].lastDate = s.date;
         const d = new Date(s.date);
         const monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
         if (monthsAgo >= 0 && monthsAgo < 6) byClient[cid].months[5 - monthsAgo] += Number(s.total_usd || 0);
       });
-      return Object.values(byClient).sort((a, b) => b.months.reduce((s, v) => s + v, 0) - a.months.reduce((s, v) => s + v, 0)).slice(0, 8);
+      return Object.values(byClient)
+        .map(c => {
+          const daysSince = c.lastDate ? Math.floor((Date.now() - new Date(c.lastDate).getTime()) / 86400000) : 999;
+          return { ...c, daysSince };
+        })
+        .sort((a, b) => b.months.reduce((s, v) => s + v, 0) - a.months.reduce((s, v) => s + v, 0)).slice(0, 8);
     },
   });
 
@@ -387,14 +393,21 @@ export default function DashboardPage() {
                 const recent = client.months[5] + client.months[4];
                 const older = client.months[0] + client.months[1];
                 const trending = recent >= older;
+                const isInactive = client.daysSince > 30;
                 return (
-                  <div key={client.name} className="flex items-center gap-3">
-                    <span className="text-xs text-foreground truncate w-24">{client.name}</span>
+                  <div key={client.name} className={cn('flex items-center gap-3', isInactive && 'opacity-80')}>
+                    <span className={cn('text-xs truncate w-24', isInactive ? 'text-destructive font-semibold' : 'text-foreground')}>{client.name}</span>
                     <ClientSparkline data={client.months} trending={trending} />
                     <span className="text-xs text-muted-foreground font-mono shrink-0">{formatUSD(total)}</span>
-                    <span className={`text-[10px] font-semibold ${trending ? 'text-success' : 'text-destructive'}`}>
-                      {trending ? '↑' : '↓'}
-                    </span>
+                    {isInactive ? (
+                      <span className="text-[10px] font-semibold text-destructive shrink-0" title={`Última compra: ${client.lastDate}`}>
+                        {client.daysSince}d
+                      </span>
+                    ) : (
+                      <span className={`text-[10px] font-semibold ${trending ? 'text-success' : 'text-destructive'}`}>
+                        {trending ? '↑' : '↓'}
+                      </span>
+                    )}
                   </div>
                 );
               })}
