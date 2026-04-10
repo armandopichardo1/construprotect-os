@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Pencil, Trash2, Star, Search, Upload, Plus, Eye } from 'lucide-react';
+import { Pencil, Trash2, Star, Search, Upload, Plus, Eye, Phone, MessageCircle, Mail } from 'lucide-react';
 
 interface ContactsTabProps {
   contacts: Contact[];
@@ -70,9 +70,9 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: Conta
             </div>
           </div>
           <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground items-center">
-            {c.phone && <a href={`tel:${c.phone}`} className="hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>📞 {c.phone}</a>}
-            {c.whatsapp && <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-500 transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>💬 WhatsApp</a>}
-            {c.email && <a href={`mailto:${c.email}`} className="hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>📧 {c.email}</a>}
+            {c.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}><Phone className="w-3 h-3" /> {c.phone}</a>}
+            {c.whatsapp && <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-success transition-colors cursor-pointer" onClick={e => e.stopPropagation()}><MessageCircle className="w-3 h-3" /> WhatsApp</a>}
+            {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}><Mail className="w-3 h-3" /> {c.email}</a>}
             <span className="text-foreground font-medium">${Number(c.lifetime_revenue_usd).toLocaleString()}</span>
             <span>{c.total_orders} pedidos</span>
           </div>
