@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/useTheme';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
@@ -32,7 +33,7 @@ export function AppHeader() {
     <header className="h-12 flex items-center gap-3 border-b border-border bg-card/50 backdrop-blur-sm px-4 shrink-0">
       <SidebarTrigger className="shrink-0" />
       <h1 className="text-sm font-semibold text-foreground">{title}</h1>
-      <div className="flex-1" />
+      <GlobalSearch />
       {rate && (
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>USD/DOP</span>
