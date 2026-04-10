@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
-  LineChart, Line, ComposedChart, Legend, LabelList,
+  LineChart, Line, ComposedChart, Legend, LabelList, AreaChart, Area,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
