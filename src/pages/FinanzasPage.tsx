@@ -20,6 +20,7 @@ import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download, RefreshCw } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from '@/components/finanzas/ResumenAnalytics';
+import { CrearTransaccionTab } from '@/components/finanzas/CrearTransaccionTab';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
