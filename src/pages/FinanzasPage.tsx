@@ -771,7 +771,34 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
               </Select>
             </div>
           </div>
-          <div><Label className="text-xs">Proveedor</Label><Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} className="mt-1" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Proveedor</Label><Input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} className="mt-1" /></div>
+            <div>
+              <Label className="text-xs">Cuenta Contable</Label>
+              <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar cuenta..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin asignar</SelectItem>
+                  {gastoAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Gastos / Costos</div>
+                      {gastoAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {otherAccounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Otras cuentas</div>
+                      {otherAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} · {a.description}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
             <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
