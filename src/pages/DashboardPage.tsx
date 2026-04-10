@@ -95,6 +95,7 @@ export default function DashboardPage() {
       const months: Record<string, { revenue: number; cogs: number; expenses: number; directCosts: number }> = {};
       const productRevenue: Record<string, { name: string; revenue: number }> = {};
       const catRevenue: Record<string, number> = {};
+      const catMonthly: Record<string, Record<string, number>> = {};
       let totalRevenue = 0, totalCogs = 0, totalExpenses = 0, totalDirectCosts = 0;
 
       saleItems.forEach(si => {
@@ -113,6 +114,11 @@ export default function DashboardPage() {
 
         const cat = si.products?.category || 'Otros';
         catRevenue[cat] = (catRevenue[cat] || 0) + lineTotal;
+        if (date) {
+          const mKey = date.substring(0, 7);
+          if (!catMonthly[cat]) catMonthly[cat] = {};
+          catMonthly[cat][mKey] = (catMonthly[cat][mKey] || 0) + lineTotal;
+        }
 
         const pName = si.products?.name || 'Desconocido';
         if (!productRevenue[pName]) productRevenue[pName] = { name: pName, revenue: 0 };
