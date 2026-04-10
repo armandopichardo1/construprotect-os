@@ -17,7 +17,7 @@ type Product = Tables<'products'>;
 
 const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
-const MIN_MARGIN_THRESHOLD = 5; // margen mínimo aceptable en %
+const DEFAULT_MIN_MARGIN = 5;
 
 function calcRealMargin(cost: number, price: number): number | null {
   if (!price || price === 0) return null;
