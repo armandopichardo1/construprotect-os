@@ -13,7 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
 import { formatUSD } from '@/lib/format';
-import { Pencil, Save, X, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Save, X, Plus, Trash2, Mail } from 'lucide-react';
+import { DEFAULT_ALERT_RULES } from '@/hooks/useAlerts';
 import { cn } from '@/lib/utils';
 
 
@@ -402,40 +403,51 @@ function AlertsConfigSection() {
       const { data } = await supabase.from('settings').select('*').eq('key', 'alert_rules').maybeSingle();
       if (data?.value && Array.isArray(data.value)) {
         const saved = data.value as unknown as any[];
-        const defaults = [
-          { id: 'low_margin', label: 'Margen bajo por producto', description: 'Alerta cuando un producto tiene margen real menor al umbral', category: 'margin', enabled: true, threshold: 20, unit: '%' },
-          { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
-          { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
-          { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
-          { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
-          { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
-          { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
-          { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
-          { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
-        ];
+        const defaults = DEFAULT_ALERT_RULES;
         const savedMap = Object.fromEntries(saved.map((r: any) => [r.id, r]));
         return defaults.map(d => savedMap[d.id] ? { ...d, ...savedMap[d.id] } : d);
       }
-      return [
-        { id: 'low_margin', label: 'Margen bajo por producto', description: 'Alerta cuando un producto tiene margen real menor al umbral', category: 'margin', enabled: true, threshold: 20, unit: '%' },
-        { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
-        { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
-        { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
-        { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
-        { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
-        { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
-        { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
-        { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
-      ];
+      return DEFAULT_ALERT_RULES;
+    },
+  });
+
+  const { data: emailPrefs } = useQuery({
+    queryKey: ['alert-email-prefs'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'alert_email_prefs').maybeSingle();
+      return (data?.value as { enabled: boolean; recipients: string[]; frequency: string; enabledRules: string[] } | null) ?? {
+        enabled: false,
+        recipients: [],
+        frequency: 'daily',
+        enabledRules: DEFAULT_ALERT_RULES.filter(r => r.enabled).map(r => r.id),
+      };
     },
   });
 
   const [localRules, setLocalRules] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Email notification state
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailRecipients, setEmailRecipients] = useState('');
+  const [emailFrequency, setEmailFrequency] = useState('daily');
+  const [emailRules, setEmailRules] = useState<string[]>([]);
+  const [newRecipient, setNewRecipient] = useState('');
+  const [recipientsList, setRecipientsList] = useState<string[]>([]);
+  const [sendingTest, setSendingTest] = useState(false);
+
   useEffect(() => {
     if (rules.length > 0 && localRules.length === 0) setLocalRules(rules);
   }, [rules]);
+
+  useEffect(() => {
+    if (emailPrefs) {
+      setEmailEnabled(emailPrefs.enabled);
+      setRecipientsList(emailPrefs.recipients || []);
+      setEmailFrequency(emailPrefs.frequency || 'daily');
+      setEmailRules(emailPrefs.enabledRules || DEFAULT_ALERT_RULES.map(r => r.id));
+    }
+  }, [emailPrefs]);
 
   const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
     margin: { label: 'Márgenes', icon: '📊' },
@@ -455,17 +467,67 @@ function AlertsConfigSection() {
     setLocalRules(prev => prev.map(r => r.id === id ? { ...r, threshold: value } : r));
   };
 
+  const toggleEmailRule = (id: string) => {
+    setEmailRules(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
+  };
+
+  const addRecipient = () => {
+    const email = newRecipient.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Email inválido');
+      return;
+    }
+    if (recipientsList.includes(email)) {
+      toast.error('Email ya agregado');
+      return;
+    }
+    setRecipientsList(prev => [...prev, email]);
+    setNewRecipient('');
+  };
+
+  const removeRecipient = (email: string) => {
+    setRecipientsList(prev => prev.filter(r => r !== email));
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from('settings').upsert(
-      { key: 'alert_rules', value: localRules as any },
-      { onConflict: 'key' }
-    );
+    // Save both alert rules and email prefs in parallel
+    const [rulesResult, emailResult] = await Promise.all([
+      supabase.from('settings').upsert(
+        { key: 'alert_rules', value: localRules as any },
+        { onConflict: 'key' }
+      ),
+      supabase.from('settings').upsert(
+        { key: 'alert_email_prefs', value: { enabled: emailEnabled, recipients: recipientsList, frequency: emailFrequency, enabledRules: emailRules } as any },
+        { onConflict: 'key' }
+      ),
+    ]);
     setSaving(false);
-    if (error) { toast.error('Error al guardar'); return; }
-    toast.success('Configuración de alertas guardada');
+    if (rulesResult.error || emailResult.error) { toast.error('Error al guardar'); return; }
+    toast.success('Configuración guardada');
     queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
+    queryClient.invalidateQueries({ queryKey: ['alert-email-prefs'] });
     queryClient.invalidateQueries({ queryKey: ['computed-alerts'] });
+  };
+
+  const handleSendTest = async () => {
+    if (recipientsList.length === 0) {
+      toast.error('Agrega al menos un destinatario');
+      return;
+    }
+    setSendingTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-alert-email', {
+        body: { test: true, recipients: recipientsList },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Email de prueba enviado');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al enviar email de prueba');
+    } finally {
+      setSendingTest(false);
+    }
   };
 
   const hasThreshold = (rule: any) => !['out_of_stock', 'overdue_activities', 'overdue_payments', 'negative_cashflow'].includes(rule.id);
@@ -480,6 +542,104 @@ function AlertsConfigSection() {
         <Button size="sm" onClick={handleSave} disabled={saving}>
           <Save className="w-3.5 h-3.5 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
         </Button>
+      </div>
+
+      {/* Email Notification Preferences */}
+      <div className="rounded-2xl bg-card border-2 border-primary/20 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📧</span>
+            <div>
+              <h3 className="text-xs font-semibold text-foreground">Notificaciones por Email</h3>
+              <p className="text-[10px] text-muted-foreground">Recibe un resumen de alertas activas por email</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setEmailEnabled(!emailEnabled)}
+            className={cn(
+              'w-10 h-5 rounded-full transition-colors relative shrink-0',
+              emailEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
+            )}
+          >
+            <span className={cn(
+              'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+              emailEnabled ? 'left-5' : 'left-0.5'
+            )} />
+          </button>
+        </div>
+
+        {emailEnabled && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            {/* Recipients */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Destinatarios</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="email@ejemplo.com"
+                  value={newRecipient}
+                  onChange={e => setNewRecipient(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addRecipient()}
+                  className="h-8 text-xs flex-1"
+                />
+                <Button size="sm" variant="outline" onClick={addRecipient} className="h-8 text-xs">
+                  <Plus className="w-3 h-3 mr-1" /> Agregar
+                </Button>
+              </div>
+              {recipientsList.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {recipientsList.map(email => (
+                    <Badge key={email} variant="secondary" className="text-[10px] gap-1 pr-1">
+                      {email}
+                      <button onClick={() => removeRecipient(email)} className="hover:text-destructive">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Frequency */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Frecuencia</Label>
+              <Select value={emailFrequency} onValueChange={setEmailFrequency}>
+                <SelectTrigger className="h-8 text-xs w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="realtime" className="text-xs">⚡ Tiempo real (cada alerta)</SelectItem>
+                  <SelectItem value="daily" className="text-xs">📅 Diario (resumen AM)</SelectItem>
+                  <SelectItem value="weekly" className="text-xs">📆 Semanal (lunes AM)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Which alerts to email */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Alertas a notificar por email</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {localRules.filter(r => r.enabled).map(rule => (
+                  <label key={rule.id} className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={emailRules.includes(rule.id)}
+                      onChange={() => toggleEmailRule(rule.id)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-[10px] text-foreground">{rule.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Test email */}
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={handleSendTest} disabled={sendingTest || recipientsList.length === 0} className="text-xs">
+                {sendingTest ? '⏳ Enviando...' : '🧪 Enviar email de prueba'}
+              </Button>
+              <p className="text-[10px] text-muted-foreground">Envía un resumen de ejemplo a los destinatarios configurados</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {categories.map(cat => {
