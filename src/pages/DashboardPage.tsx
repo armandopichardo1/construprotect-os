@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
-  LineChart, Line, ComposedChart, Legend, LabelList, ReferenceLine,
+  LineChart, Line, ComposedChart, Legend, LabelList, AreaChart, Area,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -49,14 +49,6 @@ export default function DashboardPage() {
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
   const alertsNotifiedRef = useRef(false);
-
-  const { data: targetMargin } = useQuery({
-    queryKey: ['target-margin'],
-    queryFn: async () => {
-      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margin').maybeSingle();
-      return (data?.value as { value: number })?.value ?? 30;
-    },
-  });
 
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
@@ -103,6 +95,7 @@ export default function DashboardPage() {
       const months: Record<string, { revenue: number; cogs: number; expenses: number; directCosts: number }> = {};
       const productRevenue: Record<string, { name: string; revenue: number }> = {};
       const catRevenue: Record<string, number> = {};
+      const catMonthly: Record<string, Record<string, number>> = {};
       let totalRevenue = 0, totalCogs = 0, totalExpenses = 0, totalDirectCosts = 0;
 
       saleItems.forEach(si => {
@@ -121,6 +114,11 @@ export default function DashboardPage() {
 
         const cat = si.products?.category || 'Otros';
         catRevenue[cat] = (catRevenue[cat] || 0) + lineTotal;
+        if (date) {
+          const mKey = date.substring(0, 7);
+          if (!catMonthly[cat]) catMonthly[cat] = {};
+          catMonthly[cat][mKey] = (catMonthly[cat][mKey] || 0) + lineTotal;
+        }
 
         const pName = si.products?.name || 'Desconocido';
         if (!productRevenue[pName]) productRevenue[pName] = { name: pName, revenue: 0 };
@@ -181,7 +179,15 @@ export default function DashboardPage() {
         name, value, color: CATEGORY_COLORS[name] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
-      return { monthly, totalRevenue, totalCogs, totalExpenses, totalDirectCosts, topProducts: topNormalized, revByCategory };
+      // Category trend by month
+      const topCats = Object.entries(catRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
+      const categoryTrend = last12.map(({ key, month }) => {
+        const row: Record<string, any> = { month };
+        topCats.forEach(cat => { row[cat] = Math.round(catMonthly[cat]?.[key] || 0); });
+        return row;
+      });
+
+      return { monthly, totalRevenue, totalCogs, totalExpenses, totalDirectCosts, topProducts: topNormalized, revByCategory, categoryTrend, topCats };
     },
   });
 
@@ -350,11 +356,7 @@ export default function DashboardPage() {
                   </Line>
                   <Line yAxisId="right" type="monotone" dataKey="netMargin" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: 'hsl(38, 92%, 50%)' }} name="Margen Neto">
                     <LabelList dataKey="netMargin" position="bottom" formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 9 }} />
-                   </Line>
-                  {targetMargin != null && (
-                    <ReferenceLine yAxisId="right" y={targetMargin} stroke="hsl(160, 84%, 39%)" strokeDasharray="6 4" strokeWidth={1.5} strokeOpacity={0.6}
-                      label={{ value: `Meta ${targetMargin}%`, position: 'right', fill: 'hsl(160, 84%, 50%)', fontSize: 9 }} />
-                  )}
+                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
@@ -484,6 +486,32 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Category Trend */}
+        {revenueData && revenueData.categoryTrend && revenueData.topCats && revenueData.topCats.length > 0 && (
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Tendencia Mensual por Categoría</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={revenueData.categoryTrend}>
+                <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
+                <YAxis tick={axisTick} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `RD$${(v * rate / 1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmt(v)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {revenueData.topCats.map((cat, i) => (
+                  <Area
+                    key={cat}
+                    type="monotone"
+                    dataKey={cat}
+                    stackId="1"
+                    fill={CATEGORY_COLORS[cat] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1]}
+                    stroke={CATEGORY_COLORS[cat] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1]}
+                    fillOpacity={0.6}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         )}
       </div>

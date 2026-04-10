@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download, ShoppingCart, Trash2 } from 'lucide-react';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
@@ -47,25 +45,6 @@ export function ReorderTab() {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingRows, setEditingRows] = useState<Record<string, EditingRow>>({});
   const [showConfigAll, setShowConfigAll] = useState(false);
-  const [showCart, setShowCart] = useState(false);
-  type CartItem = { product_id: string; name: string; sku: string; qty_to_order: number; unit_cost: number; supplier_name: string; supplier_id: string };
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [cartSaving, setCartSaving] = useState(false);
-
-  // Fetch supplier history for product → supplier mapping
-  const { data: supplierMap } = useQuery({
-    queryKey: ['product-supplier-map'],
-    queryFn: async () => {
-      const { data } = await supabase.from('shipment_items').select('product_id, shipments(supplier_id, supplier_name, order_date)').order('created_at', { ascending: false });
-      const map: Record<string, { supplier_id: string; supplier_name: string }> = {};
-      (data || []).forEach((si: any) => {
-        if (si.product_id && si.shipments && !map[si.product_id]) {
-          map[si.product_id] = { supplier_id: si.shipments.supplier_id || '', supplier_name: si.shipments.supplier_name || '' };
-        }
-      });
-      return map;
-    },
-  });
 
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
@@ -211,91 +190,6 @@ export function ReorderTab() {
   const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
 
-  const generateCart = () => {
-    const reorderItems = items.filter(p => p.qty <= p.reorder_point || (p.arrivalDay < 0 && p.avgMonthly > 0));
-    if (reorderItems.length === 0) { toast.info('No hay productos que requieran reorden'); return; }
-    const cart: CartItem[] = reorderItems.map(p => {
-      const optimalQty = Math.max(
-        p.reorder_qty || 0,
-        Math.ceil(p.dailyVelocity * p.lead_time_days * 2) - p.qty,
-        p.min_order_qty || 1
-      );
-      const sup = supplierMap?.[p.id];
-      return {
-        product_id: p.id, name: p.name, sku: p.sku,
-        qty_to_order: Math.max(optimalQty, 1),
-        unit_cost: Number(p.unit_cost_usd) || 0,
-        supplier_name: sup?.supplier_name || 'Sin proveedor',
-        supplier_id: sup?.supplier_id || '',
-      };
-    });
-    setCartItems(cart);
-    setShowCart(true);
-  };
-
-  const removeFromCart = (productId: string) => setCartItems(prev => prev.filter(i => i.product_id !== productId));
-  const updateCartQty = (productId: string, qty: number) => setCartItems(prev => prev.map(i => i.product_id === productId ? { ...i, qty_to_order: Math.max(1, qty) } : i));
-
-  const cartBySupplier = useMemo(() => {
-    const grouped: Record<string, CartItem[]> = {};
-    cartItems.forEach(i => {
-      const key = i.supplier_name || 'Sin proveedor';
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(i);
-    });
-    return grouped;
-  }, [cartItems]);
-
-  const cartTotal = cartItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
-
-  const createShipments = async () => {
-    setCartSaving(true);
-    try {
-      for (const [supplierName, supplierItems] of Object.entries(cartBySupplier)) {
-        const supplierId = supplierItems[0]?.supplier_id || null;
-        const totalCost = supplierItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
-        const maxLead = Math.max(...supplierItems.map(i => {
-          const p = items.find(x => x.id === i.product_id);
-          return p?.lead_time_days || 21;
-        }));
-        const eta = new Date();
-        eta.setDate(eta.getDate() + maxLead);
-
-        const { data: shipment, error } = await supabase.from('shipments').insert({
-          supplier_id: supplierId,
-          supplier_name: supplierName === 'Sin proveedor' ? 'Por asignar' : supplierName,
-          po_number: `PO-AUTO-${Date.now().toString(36).toUpperCase()}`,
-          status: 'ordered' as any,
-          order_date: new Date().toISOString().split('T')[0],
-          estimated_arrival: eta.toISOString().split('T')[0],
-          total_cost_usd: totalCost,
-          notes: 'Orden generada automáticamente desde análisis de reorden',
-        }).select().single();
-
-        if (error) throw error;
-
-        await supabase.from('shipment_items').insert(
-          supplierItems.map(i => ({
-            shipment_id: shipment.id,
-            product_id: i.product_id,
-            quantity_ordered: i.qty_to_order,
-            unit_cost_usd: i.unit_cost,
-          }))
-        );
-      }
-
-      const supplierCount = Object.keys(cartBySupplier).length;
-      toast.success(`${supplierCount} orden(es) de compra creada(s) con ${cartItems.length} productos`);
-      queryClient.invalidateQueries({ queryKey: ['shipments'] });
-      setShowCart(false);
-      setCartItems([]);
-    } catch (e: any) {
-      toast.error(e.message || 'Error al crear órdenes');
-    } finally {
-      setCartSaving(false);
-    }
-  };
-
   const urgencyStyle = (urgency: string) => {
     if (urgency === 'high') return 'bg-destructive/15 text-destructive';
     if (urgency === 'medium') return 'bg-warning/15 text-warning';
@@ -339,9 +233,6 @@ export function ReorderTab() {
               </div>
             ))}
           </div>
-          <Button size="sm" className="gap-1.5 mt-2" onClick={generateCart}>
-            <ShoppingCart className="w-3.5 h-3.5" /> Generar Orden de Compra ({criticalItems.length} productos)
-          </Button>
         </div>
       )}
 
@@ -385,9 +276,6 @@ export function ReorderTab() {
             <Check className="w-3.5 h-3.5" /> Aplicar todas las sugerencias
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={generateCart} className="gap-1.5" disabled={needsAttention.length === 0}>
-          <ShoppingCart className="w-3.5 h-3.5" /> Generar OC
-        </Button>
         <Button size="sm" variant="outline" className="gap-1.5 ml-auto" onClick={() => {
           if (!items.length) return;
           exportToExcel(items.sort((a, b) => a.daysOfSupply - b.daysOfSupply).map(p => ({
@@ -568,81 +456,6 @@ export function ReorderTab() {
           </Table>
         </div>
       </div>
-
-      {/* Cart Dialog */}
-      <Dialog open={showCart} onOpenChange={setShowCart}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" /> Orden de Compra Propuesta
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Cantidades calculadas según velocidad de venta, lead time y stock de seguridad. Revisa y ajusta antes de crear.
-            </p>
-
-            {Object.entries(cartBySupplier).map(([supplier, supplierItems]) => {
-              const supplierTotal = supplierItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
-              return (
-                <div key={supplier} className="rounded-xl border border-border bg-card overflow-hidden">
-                  <div className="px-4 py-2.5 bg-muted/50 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">📦 {supplier}</span>
-                    <span className="text-xs text-muted-foreground">{supplierItems.length} productos · {formatUSD(supplierTotal)}</span>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-[10px]">SKU</TableHead>
-                        <TableHead className="text-[10px]">Producto</TableHead>
-                        <TableHead className="text-[10px] text-right">Costo Unit.</TableHead>
-                        <TableHead className="text-[10px] text-right">Cantidad</TableHead>
-                        <TableHead className="text-[10px] text-right">Subtotal</TableHead>
-                        <TableHead className="text-[10px] w-10"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {supplierItems.map(item => (
-                        <TableRow key={item.product_id}>
-                          <TableCell className="text-[10px] font-mono text-muted-foreground">{item.sku}</TableCell>
-                          <TableCell className="text-xs">{item.name}</TableCell>
-                          <TableCell className="text-xs text-right font-mono">{formatUSD(item.unit_cost)}</TableCell>
-                          <TableCell className="text-right">
-                            <Input type="number" min={1} value={item.qty_to_order} onChange={e => updateCartQty(item.product_id, parseInt(e.target.value) || 1)}
-                              className="w-20 h-6 text-xs text-right p-1 ml-auto" />
-                          </TableCell>
-                          <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(item.qty_to_order * item.unit_cost)}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => removeFromCart(item.product_id)}>
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              );
-            })}
-
-            {cartItems.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-6">No hay productos en la orden</p>
-            )}
-
-            {cartItems.length > 0 && (
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <div>
-                  <p className="text-xs text-muted-foreground">{cartItems.length} productos · {Object.keys(cartBySupplier).length} proveedor(es)</p>
-                  <p className="text-sm font-bold text-foreground">Total estimado: {formatUSD(cartTotal)}</p>
-                </div>
-                <Button onClick={createShipments} disabled={cartSaving} className="gap-1.5">
-                  <ShoppingCart className="w-3.5 h-3.5" /> {cartSaving ? 'Creando...' : 'Crear Órdenes de Compra'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
