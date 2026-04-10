@@ -16,8 +16,7 @@ import { formatUSD } from '@/lib/format';
 import { Pencil, Save, X, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
-const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 55%)', 'hsl(0, 84%, 60%)', 'hsl(190, 70%, 50%)', 'hsl(330, 70%, 55%)'];
+
 
 const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pendiente', color: 'bg-warning/15 text-warning' },
