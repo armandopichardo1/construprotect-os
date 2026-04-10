@@ -644,6 +644,6 @@ export function ReorderTab() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
