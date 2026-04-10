@@ -39,43 +39,45 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
   const [saving, setSaving] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  if (!contact) return null;
+  const contactId = contact?.id;
 
   const { data: deals = [] } = useQuery({
-    queryKey: ['contact-deals', contact.id],
-    enabled: open,
+    queryKey: ['contact-deals', contactId],
+    enabled: open && !!contactId,
     queryFn: async () => {
-      const { data } = await supabase.from('deals').select('*').eq('contact_id', contact.id).order('created_at', { ascending: false });
+      const { data } = await supabase.from('deals').select('*').eq('contact_id', contactId!).order('created_at', { ascending: false });
       return (data || []) as Deal[];
     },
   });
 
   const { data: activities = [], refetch: refetchActivities } = useQuery({
-    queryKey: ['contact-activities', contact.id],
-    enabled: open,
+    queryKey: ['contact-activities', contactId],
+    enabled: open && !!contactId,
     queryFn: async () => {
-      const { data } = await supabase.from('activities').select('*, deals(title)').eq('contact_id', contact.id).order('created_at', { ascending: false });
+      const { data } = await supabase.from('activities').select('*, deals(title)').eq('contact_id', contactId!).order('created_at', { ascending: false });
       return (data || []) as Activity[];
     },
   });
 
   const { data: quotes = [] } = useQuery({
-    queryKey: ['contact-quotes', contact.id],
-    enabled: open,
+    queryKey: ['contact-quotes', contactId],
+    enabled: open && !!contactId,
     queryFn: async () => {
-      const { data } = await supabase.from('quotes').select('*').eq('contact_id', contact.id).order('created_at', { ascending: false });
+      const { data } = await supabase.from('quotes').select('*').eq('contact_id', contactId!).order('created_at', { ascending: false });
       return (data || []) as Quote[];
     },
   });
 
   const { data: sales = [] } = useQuery({
-    queryKey: ['contact-sales', contact.id],
-    enabled: open,
+    queryKey: ['contact-sales', contactId],
+    enabled: open && !!contactId,
     queryFn: async () => {
-      const { data } = await supabase.from('sales').select('*').eq('contact_id', contact.id).order('date', { ascending: false });
+      const { data } = await supabase.from('sales').select('*').eq('contact_id', contactId!).order('date', { ascending: false });
       return data || [];
     },
   });
+
+  if (!contact) return null;
 
   const handleQuickAdd = async () => {
     if (!quickTitle.trim()) { toast.error('El título es requerido'); return; }
