@@ -5,8 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLin
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Download, TrendingUp } from 'lucide-react';
+import { Download, TrendingUp, AlertTriangle } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
+import { useAlertRules } from '@/hooks/useAlerts';
 
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
