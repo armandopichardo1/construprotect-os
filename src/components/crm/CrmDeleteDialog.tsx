@@ -13,7 +13,6 @@ interface CrmDeleteDialogProps {
   queryClient: any;
 }
 
-const TABLE_MAP = { contact: 'contacts', deal: 'deals', activity: 'activities', quote: 'quotes' } as const;
 const LABEL_MAP = { contact: 'contacto', deal: 'deal', activity: 'actividad', quote: 'cotización' };
 
 export function CrmDeleteDialog({ open, onOpenChange, type, item, queryClient }: CrmDeleteDialogProps) {
@@ -22,33 +21,88 @@ export function CrmDeleteDialog({ open, onOpenChange, type, item, queryClient }:
   const handleDelete = async () => {
     if (!item) return;
     setDeleting(true);
-    const { error } = await supabase.from(TABLE_MAP[type]).delete().eq('id', item.id);
-    setDeleting(false);
-    if (error) { toast.error(`Error al eliminar ${LABEL_MAP[type]}`); return; }
-    toast.success(`${LABEL_MAP[type].charAt(0).toUpperCase() + LABEL_MAP[type].slice(1)} eliminado`);
-    queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
-    queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
-    queryClient.invalidateQueries({ queryKey: ['crm-activities'] });
-    queryClient.invalidateQueries({ queryKey: ['crm-quotes'] });
-    onOpenChange(false);
+    try {
+      if (type === 'contact') {
+        // Cascade: delete activities, deals, quotes linked to this contact
+        await supabase.from('activities').delete().eq('contact_id', item.id);
+        // Delete quote_items for quotes of this contact
+        const { data: contactQuotes } = await supabase.from('quotes').select('id').eq('contact_id', item.id);
+        if (contactQuotes && contactQuotes.length > 0) {
+          for (const q of contactQuotes) {
+            await supabase.from('quote_items').delete().eq('quote_id', q.id);
+          }
+          await supabase.from('quotes').delete().eq('contact_id', item.id);
+        }
+        await supabase.from('deals').delete().eq('contact_id', item.id);
+        const { error } = await supabase.from('contacts').delete().eq('id', item.id);
+        if (error) throw error;
+      } else if (type === 'deal') {
+        // Cascade: delete activities linked to this deal
+        await supabase.from('activities').delete().eq('deal_id', item.id);
+        // Delete quotes linked to this deal
+        const { data: dealQuotes } = await supabase.from('quotes').select('id').eq('deal_id', item.id);
+        if (dealQuotes && dealQuotes.length > 0) {
+          for (const q of dealQuotes) {
+            await supabase.from('quote_items').delete().eq('quote_id', q.id);
+          }
+          await supabase.from('quotes').delete().eq('deal_id', item.id);
+        }
+        const { error } = await supabase.from('deals').delete().eq('id', item.id);
+        if (error) throw error;
+      } else if (type === 'quote') {
+        await supabase.from('quote_items').delete().eq('quote_id', item.id);
+        const { error } = await supabase.from('quotes').delete().eq('id', item.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('activities').delete().eq('id', item.id);
+        if (error) throw error;
+      }
+
+      const label = LABEL_MAP[type];
+      toast.success(`${label.charAt(0).toUpperCase() + label.slice(1)} eliminado`);
+      queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-quotes'] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(`Error al eliminar: ${e.message || 'Error desconocido'}`);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const name = type === 'contact' ? item?.contact_name : type === 'deal' ? item?.title : type === 'quote' ? item?.quote_number : item?.title;
 
+  const warningMessages: Record<string, string> = {
+    contact: 'Se eliminarán todos los deals, actividades y cotizaciones asociados a este contacto.',
+    deal: 'Se eliminarán todas las actividades y cotizaciones asociadas a este deal.',
+    quote: 'Se eliminarán todos los ítems de esta cotización.',
+    activity: '',
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xs">
+      <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle className="text-base">Confirmar eliminación</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-full bg-destructive/10"><AlertTriangle className="w-5 h-5 text-destructive" /></div>
-            <p className="text-sm text-muted-foreground">
-              ¿Eliminar <strong className="text-foreground">{name}</strong>? {type === 'contact' && 'Se eliminarán todos los deals y actividades asociados. '}Esta acción no se puede deshacer.
-            </p>
+            <div className="p-2 rounded-full bg-destructive/10 shrink-0"><AlertTriangle className="w-5 h-5 text-destructive" /></div>
+            <div className="space-y-1">
+              <p className="text-sm text-foreground font-medium">
+                ¿Eliminar {LABEL_MAP[type]} "{name}"?
+              </p>
+              {warningMessages[type] && (
+                <p className="text-xs text-muted-foreground">{warningMessages[type]}</p>
+              )}
+              <p className="text-xs text-destructive font-medium">Esta acción no se puede deshacer.</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl text-xs">Cancelar</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="flex-1 rounded-xl text-xs">{deleting ? 'Eliminando...' : 'Eliminar'}</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="flex-1 rounded-xl text-xs">
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </Button>
           </div>
         </div>
       </DialogContent>
