@@ -6,7 +6,7 @@ export async function streamBusinessAI({
   onDelta,
   onDone,
 }: {
-  action: "review" | "deal-plan" | "weekly-agenda" | "po-recommender" | "pitch" | "cross-sell";
+  action: "review" | "deal-plan" | "weekly-agenda" | "po-recommender" | "pitch" | "cross-sell" | "reorder-recommendations";
   payload?: any;
   onDelta: (text: string) => void;
   onDone: () => void;

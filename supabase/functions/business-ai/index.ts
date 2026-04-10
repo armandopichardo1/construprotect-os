@@ -13,6 +13,13 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const validActions = ["review", "deal-plan", "weekly-agenda", "po-recommender", "pitch", "cross-sell", "reorder-recommendations"];
+    if (!validActions.includes(action)) {
+      return new Response(JSON.stringify({ error: "Acción no válida" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -368,10 +375,81 @@ ${(products || []).map((p: any) => `${p.name} (SKU:${p.sku}, Cat:${p.category}, 
 
 Genera las recomendaciones de cross-sell.`;
 
-    } else {
-      return new Response(JSON.stringify({ error: "Acción no válida" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    } else if (action === "reorder-recommendations") {
+      const [{ data: inventory }, { data: movements }, { data: deals }] = await Promise.all([
+        supabase.from("inventory").select("*, products(id, name, sku, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand)"),
+        supabase.from("inventory_movements").select("product_id, quantity, movement_type, created_at").order("created_at"),
+        supabase.from("deals").select("products_of_interest, value_usd, stage, probability").not("stage", "in", '("won","lost")'),
+      ]);
+
+      const now2 = new Date();
+      const velMap: Record<string, { sold: number; months: number[]; receipts: number }> = {};
+      (movements || []).forEach((m: any) => {
+        const date = new Date(m.created_at);
+        const monthsAgo = (now2.getFullYear() - date.getFullYear()) * 12 + now2.getMonth() - date.getMonth();
+        if (monthsAgo > 5 || monthsAgo < 0) return;
+        if (!velMap[m.product_id]) velMap[m.product_id] = { sold: 0, months: [0,0,0,0,0,0], receipts: 0 };
+        if (m.movement_type === "sale") {
+          velMap[m.product_id].sold += Math.abs(m.quantity);
+          velMap[m.product_id].months[5 - monthsAgo] += Math.abs(m.quantity);
+        }
+        if (m.movement_type === "receipt") velMap[m.product_id].receipts += Math.abs(m.quantity);
       });
+
+      const lines = (inventory || []).map((i: any) => {
+        const p = i.products;
+        if (!p) return null;
+        const vel = velMap[p.id];
+        const avgMonthly = vel ? vel.sold / 6 : 0;
+        const recentMonths = vel?.months?.slice(3) || [0,0,0];
+        const recentAvg = recentMonths.reduce((a: number, b: number) => a + b, 0) / 3;
+        const olderMonths = vel?.months?.slice(0, 3) || [0,0,0];
+        const olderAvg = olderMonths.reduce((a: number, b: number) => a + b, 0) / 3;
+        const trend = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg * 100).toFixed(0) : "N/A";
+        const daysOfSupply = avgMonthly > 0 ? Math.round((i.quantity_on_hand / avgMonthly) * 30) : 999;
+        return `${p.sku} | ${p.name} | Stock:${i.quantity_on_hand} | ReordenActual:${p.reorder_point} | QtyReorden:${p.reorder_qty} | Costo:$${p.unit_cost_usd} | Lead:${p.lead_time_days}d | VelProm:${avgMonthly.toFixed(1)}/mes | VelReciente:${recentAvg.toFixed(1)}/mes | Tendencia:${trend}% | DiasStock:${daysOfSupply} | Meses:[${vel?.months?.join(",") || "0,0,0,0,0,0"}]`;
+      }).filter(Boolean);
+
+      systemPrompt = `Eres el Director de Supply Chain de ConstruProtect SRL, experto en optimización de inventario para distribución de materiales de construcción.
+
+Analiza cada producto y genera recomendaciones inteligentes de punto de reorden.
+
+IMPORTANTE — Responde SOLO con un JSON válido, sin markdown ni texto adicional. El JSON debe tener esta estructura exacta:
+{
+  "recommendations": [
+    {
+      "sku": "SKU del producto",
+      "product_name": "Nombre",
+      "current_reorder_point": 10,
+      "suggested_reorder_point": 25,
+      "current_reorder_qty": 50,
+      "suggested_reorder_qty": 80,
+      "reason": "Explicación breve en español de por qué se sugiere este cambio",
+      "urgency": "high" | "medium" | "low",
+      "velocity_trend": "increasing" | "stable" | "decreasing",
+      "days_of_supply": 45,
+      "avg_monthly_sales": 12.5
+    }
+  ],
+  "summary": "Resumen ejecutivo breve del análisis general",
+  "alerts": ["Lista de alertas importantes"]
+}
+
+Criterios para recomendaciones:
+1. Si velocidad reciente > velocidad promedio en >30%, AUMENTAR punto de reorden
+2. Si días de suministro < lead time, marcar como urgency "high"
+3. Si tendencia es creciente, aumentar reorder_qty proporcionalmente
+4. Si producto no se mueve, sugerir reducir o mantener bajo
+5. Considerar lead_time_days para calcular safety stock (vel_mensual * lead_time/30 * 1.5)
+6. Incluir TODOS los productos, no solo los que necesitan cambio`;
+
+      userPrompt = `INVENTARIO Y VELOCIDADES:
+${lines.join("\n")}
+
+PIPELINE (demanda futura):
+${(deals || []).slice(0, 10).map((d: any) => `$${Number(d.value_usd).toLocaleString()} (${d.stage}, ${d.probability}%) — Productos: ${JSON.stringify(d.products_of_interest || [])}`).join("\n") || "Sin deals activos"}
+
+Genera las recomendaciones de punto de reorden en JSON.`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
