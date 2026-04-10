@@ -102,7 +102,7 @@ export default function FinanzasPage() {
   const { data: saleItems = [] } = useQuery({
     queryKey: ['sale-items'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name)');
+      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name, margin_list_pct, margin_architect_pct, margin_project_pct, margin_wholesale_pct)');
       if (error) throw error;
       return data;
     },
@@ -1041,11 +1041,14 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
   }, [filteredSales]);
 
   const productData = useMemo(() => {
-    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number }> = {};
+    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetMargin: number }> = {};
     filteredItems.forEach((si: any) => {
       const key = si.product_id || 'unknown';
       const name = si.products?.name || 'Producto Desconocido';
-      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0 };
+      const prod = si.products || {};
+      const avgTarget = [prod.margin_list_pct, prod.margin_architect_pct, prod.margin_project_pct, prod.margin_wholesale_pct]
+        .filter((v: any) => v != null && v > 0).reduce((a: number, b: number, _: number, arr: number[]) => a + b / arr.length, 0);
+      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0, targetMargin: avgTarget || 0 };
       map[key].revenue += Number(si.line_total_usd || 0);
       map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
       map[key].units += Number(si.quantity || 0);
@@ -1175,6 +1178,50 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
 
       {/* Monthly Trend Chart */}
       <MonthlyTrendChart sales={sales} saleItems={saleItems} view={view} />
+
+      {/* Margin vs Target (products only) */}
+      {view === 'productos' && productData.length > 0 && (
+        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-foreground">Margen Real vs Objetivo por Producto</h2>
+          <ResponsiveContainer width="100%" height={Math.max(200, Math.min(productData.length * 50, 400))}>
+            <BarChart data={productData.slice(0, 10).map(p => ({
+              name: p.name,
+              real: p.revenue > 0 ? +((p.revenue - p.cogs) / p.revenue * 100).toFixed(1) : 0,
+              objetivo: +(p.targetMargin || 0).toFixed(1),
+            }))} layout="vertical">
+              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+              <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={140} />
+              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => `${v}%`} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="real" name="Margen Real" fill="hsl(160, 84%, 39%)" radius={[0,4,4,0]} barSize={14} />
+              <Bar dataKey="objetivo" name="Margen Objetivo" fill="hsl(220, 12%, 40%)" radius={[0,4,4,0]} barSize={14} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="space-y-1.5">
+            {productData.slice(0, 10).map((p, i) => {
+              const realPct = p.revenue > 0 ? (p.revenue - p.cogs) / p.revenue * 100 : 0;
+              const target = p.targetMargin || 0;
+              const diff = realPct - target;
+              const hasTarget = target > 0;
+              return (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="text-foreground truncate flex-1">{p.name}</span>
+                  <span className={cn('font-mono w-16 text-right', realPct >= target ? 'text-success' : 'text-destructive')}>{realPct.toFixed(1)}%</span>
+                  {hasTarget && (
+                    <>
+                      <span className="text-muted-foreground font-mono w-16 text-right">/ {target.toFixed(1)}%</span>
+                      <span className={cn('font-mono w-16 text-right font-semibold', diff >= 0 ? 'text-success' : 'text-destructive')}>
+                        {diff >= 0 ? '+' : ''}{diff.toFixed(1)}pp
+                      </span>
+                    </>
+                  )}
+                  {!hasTarget && <span className="text-muted-foreground text-[10px] w-32 text-right">Sin objetivo configurado</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
