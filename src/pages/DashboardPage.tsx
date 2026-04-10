@@ -374,7 +374,11 @@ export default function DashboardPage() {
                     <Pie data={revenueData.revByCategory} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {revenueData.revByCategory.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => {
+                      const total = revenueData.revByCategory.reduce((s, c) => s + c.value, 0);
+                      const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '0';
+                      return `${formatUSD(v)} (${pct}%)`;
+                    }} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-1.5">
