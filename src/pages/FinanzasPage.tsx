@@ -138,14 +138,14 @@ export default function FinanzasPage() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString('es-DO', { month: 'short' });
-      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0) * rate;
       const cogs = saleItems.filter((si: any) => si.sales?.date?.startsWith(key))
-        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+        .reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0) * rate;
+      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + (Number(r.amount_dop) || Number(r.amount_usd || 0) * rate), 0);
       months.push({ month: label, revenue: rev, cogs, expenses: exp, profit: rev - cogs - exp });
     }
     return months;
-  }, [sales, expenses, saleItems]);
+  }, [sales, expenses, saleItems, rate]);
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
