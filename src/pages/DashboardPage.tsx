@@ -222,7 +222,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!computedAlerts.length || alertsNotifiedRef.current) return;
     alertsNotifiedRef.current = true;
-    const inventoryAlerts = computedAlerts.filter(a => ['reorder_needed', 'low_stock', 'out_of_stock', 'shipment_delayed'].includes(a.ruleId));
+    const inventoryAlerts = computedAlerts.filter(a => ['reorder_needed', 'low_stock', 'out_of_stock', 'shipment_delayed', 'client_declining'].includes(a.ruleId));
     inventoryAlerts.forEach(alert => {
       if (alert.severity === 'critical') {
         toast.error(alert.message, { duration: 8000 });
