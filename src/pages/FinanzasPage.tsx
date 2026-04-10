@@ -215,12 +215,7 @@ export default function FinanzasPage() {
             Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
           })), 'gastos', 'Gastos');
         }} />}
-        {tab === 'P&L' && <PLTab monthlyData={monthlyData} revenueMTD={revenueMTD} cogsMTD={cogsMTD} expensesMTD={expensesMTD} expenses={expenses} onExport={() => {
-          exportToExcel(monthlyData.map((m: any) => ({
-            Mes: m.month, 'Ingresos USD': m.revenue, 'COGS USD': m.cogs,
-            'Gastos USD': m.expenses, 'Utilidad USD': m.profit,
-          })), 'estado_resultados', 'P&L');
-        }} />}
+        {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
