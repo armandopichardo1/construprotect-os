@@ -131,9 +131,10 @@ export default function ProductosPage() {
                   <TableHead className="text-xs">Marca</TableHead>
                   <TableHead className="text-xs">Categoría</TableHead>
                   <TableHead className="text-xs text-right">Costo</TableHead>
-                  <TableHead className="text-xs text-right">Precio Lista</TableHead>
-                  <TableHead className="text-xs text-right">Arq.</TableHead>
-                  <TableHead className="text-xs text-right">Proy.</TableHead>
+                  <TableHead className="text-xs text-right">P. Lista</TableHead>
+                  <TableHead className="text-xs text-center">M. Lista</TableHead>
+                  <TableHead className="text-xs text-center">M. Arq.</TableHead>
+                  <TableHead className="text-xs text-center">M. Proy.</TableHead>
                   <TableHead className="text-xs">Dimensiones</TableHead>
                   <TableHead className="text-xs w-[80px]">Acciones</TableHead>
                 </TableRow>
