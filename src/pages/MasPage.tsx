@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
 import { formatUSD } from '@/lib/format';
-import { Pencil, Save, X, Plus, Trash2, Eye, MapPin } from 'lucide-react';
+import { Pencil, Save, X, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts';
 
