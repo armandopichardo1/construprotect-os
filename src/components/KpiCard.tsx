@@ -26,7 +26,7 @@ export function KpiCard({ title, value, subtitle, icon, trend, variant = 'defaul
           <p className="text-2xl font-bold text-foreground">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
-        <span className="text-3xl">{icon}</span>
+        <span className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl bg-muted/50 shrink-0">{icon}</span>
       </div>
       {trend && (
         <div className="mt-3 flex items-center gap-1">
