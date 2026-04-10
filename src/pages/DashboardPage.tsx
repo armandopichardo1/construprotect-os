@@ -272,8 +272,12 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {computedAlerts.map(alert => (
                 <div key={alert.ruleId} className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => alert.navigateTo && navigate(alert.navigateTo)}>
-                  <p className={cn('text-lg font-bold', alert.severity === 'critical' ? 'text-destructive' : 'text-warning')}>{alert.count}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium">{alert.label}</p>
+                  <p className={cn('text-lg font-bold', alert.severity === 'critical' ? 'text-destructive' : 'text-warning')}>
+                    {alert.count}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium">
+                    {{ inventory: '📦', finance: '💰', margin: '📊', crm: '🤝', concentration: '⚖️' }[alert.category] || '🔔'}{' '}{alert.label}
+                  </p>
                   <p className="text-[9px] text-muted-foreground/70 mt-0.5 line-clamp-2">{alert.message}</p>
                 </div>
               ))}
