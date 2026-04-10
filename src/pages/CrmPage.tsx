@@ -64,6 +64,15 @@ export default function CrmPage() {
     }
   }, [contacts, searchParams]);
 
+  const { data: deals = [] } = useQuery({
+    queryKey: ['crm-deals'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('deals').select('*, contacts(contact_name, company_name, phone, email, whatsapp)').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as Deal[];
+    },
+  });
+
   // Auto-open deal detail from URL params (e.g., from global search)
   useEffect(() => {
     const viewId = searchParams.get('viewDeal');
@@ -79,15 +88,6 @@ export default function CrmPage() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [deals, searchParams]);
-
-  const { data: deals = [] } = useQuery({
-    queryKey: ['crm-deals'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('deals').select('*, contacts(contact_name, company_name, phone, email, whatsapp)').order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as Deal[];
-    },
-  });
 
   const { data: activities = [] } = useQuery({
     queryKey: ['crm-activities'],
