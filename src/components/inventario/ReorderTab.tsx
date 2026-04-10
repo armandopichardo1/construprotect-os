@@ -203,12 +203,49 @@ export function ReorderTab() {
 
   return (
     <div className="space-y-5">
+      {/* Critical stockout simulation alert */}
+      {criticalItems.length > 0 && (
+        <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
+          <h3 className="text-xs font-semibold text-destructive flex items-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5" /> Simulación de Agotamiento — {criticalItems.length} producto(s) en riesgo
+          </h3>
+          <p className="text-[10px] text-muted-foreground">
+            Estos productos se agotarán antes de que llegue un nuevo pedido si ordenas hoy (basado en velocidad de rotación + lead time).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+            {criticalItems.slice(0, 6).map(p => (
+              <div key={p.id} className="rounded-lg bg-card border border-destructive/20 p-2.5 space-y-1">
+                <p className="text-[11px] font-semibold text-foreground truncate">{p.name}</p>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-muted-foreground">Stock: <span className="font-mono text-foreground">{p.qty}</span></span>
+                  <span className="text-muted-foreground">Vel: <span className="font-mono text-foreground">{p.avgMonthly.toFixed(1)}/mes</span></span>
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-destructive flex items-center gap-0.5">
+                    <Clock className="w-3 h-3" /> Agotado en {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
+                  </span>
+                  <span className="text-muted-foreground">Lead: {p.lead_time_days}d</span>
+                </div>
+                <p className="text-[9px] text-destructive/80">
+                  ⚠️ Déficit de {Math.abs(p.arrivalDay)}d — el pedido llega {Math.abs(p.arrivalDay)} días después del agotamiento
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPI cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div className="rounded-xl bg-card border border-border p-4 space-y-1">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Requieren Atención</p>
           <p className="text-2xl font-bold text-destructive">{needsAttention.length}</p>
           <p className="text-[10px] text-muted-foreground">Stock ≤ reorden o días &lt; lead time</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-4 space-y-1">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Riesgo Agotamiento</p>
+          <p className="text-2xl font-bold text-destructive">{criticalItems.length}</p>
+          <p className="text-[10px] text-muted-foreground">Se agotan antes de reposición</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-4 space-y-1">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Velocidad Creciente</p>
