@@ -58,12 +58,27 @@ export default function CrmPage() {
         setViewContact(found);
         setTab('contacts');
       }
-      // Clean URL params after opening
       searchParams.delete('viewContact');
       searchParams.delete('tab');
       setSearchParams(searchParams, { replace: true });
     }
   }, [contacts, searchParams]);
+
+  // Auto-open deal detail from URL params (e.g., from global search)
+  useEffect(() => {
+    const viewId = searchParams.get('viewDeal');
+    if (viewId && deals.length > 0) {
+      const found = deals.find(d => d.id === viewId);
+      if (found) {
+        setEditDeal(found);
+        setShowDealDialog(true);
+        setTab('pipeline');
+      }
+      searchParams.delete('viewDeal');
+      searchParams.delete('tab');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [deals, searchParams]);
 
   const { data: deals = [] } = useQuery({
     queryKey: ['crm-deals'],
