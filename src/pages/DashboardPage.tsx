@@ -5,7 +5,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUSD } from '@/lib/format';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
+  LineChart, Line, ComposedChart, Legend, LabelList,
+} from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package } from 'lucide-react';
@@ -76,13 +79,16 @@ export default function DashboardPage() {
   const { data: revenueData } = useQuery({
     queryKey: ['dashboard-revenue'],
     queryFn: async () => {
-      const { data: saleItems } = await supabase.from('sale_items').select('*, sales(date), products(name, category)');
-      if (!saleItems) return { monthly: [], totalRevenue: 0, totalCogs: 0, topProducts: [], revByCategory: [] };
+      const [{ data: saleItems }, { data: expenses }] = await Promise.all([
+        supabase.from('sale_items').select('*, sales(date), products(name, category)'),
+        supabase.from('expenses').select('date, amount_usd'),
+      ]);
+      if (!saleItems) return { monthly: [], totalRevenue: 0, totalCogs: 0, totalExpenses: 0, topProducts: [], revByCategory: [] };
 
-      const months: Record<string, { revenue: number; cogs: number }> = {};
+      const months: Record<string, { revenue: number; cogs: number; expenses: number }> = {};
       const productRevenue: Record<string, { name: string; revenue: number }> = {};
       const catRevenue: Record<string, number> = {};
-      let totalRevenue = 0, totalCogs = 0;
+      let totalRevenue = 0, totalCogs = 0, totalExpenses = 0;
 
       saleItems.forEach(si => {
         const lineTotal = Number(si.line_total_usd || 0);
@@ -93,7 +99,7 @@ export default function DashboardPage() {
         const date = si.sales?.date;
         if (date) {
           const key = date.substring(0, 7);
-          if (!months[key]) months[key] = { revenue: 0, cogs: 0 };
+          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0 };
           months[key].revenue += lineTotal;
           months[key].cogs += lineCogs;
         }
@@ -106,11 +112,40 @@ export default function DashboardPage() {
         productRevenue[pName].revenue += lineTotal;
       });
 
+      // Add expenses by month
+      (expenses || []).forEach(e => {
+        const amt = Number(e.amount_usd || 0);
+        totalExpenses += amt;
+        if (e.date) {
+          const key = e.date.substring(0, 7);
+          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0 };
+          months[key].expenses += amt;
+        }
+      });
+
       const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-      const monthly = Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => ({
-        month: monthNames[parseInt(key.split('-')[1]) - 1] || key,
-        revenue: Math.round(val.revenue), cogs: Math.round(val.cogs),
-      }));
+      
+      // Build last 12 months
+      const now = new Date();
+      const last12: { key: string; month: string }[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        last12.push({ key, month: monthNames[d.getMonth()] });
+      }
+
+      const monthly = last12.map(({ key, month }) => {
+        const val = months[key] || { revenue: 0, cogs: 0, expenses: 0 };
+        const grossMargin = val.revenue > 0 ? ((val.revenue - val.cogs) / val.revenue * 100) : 0;
+        const netMargin = val.revenue > 0 ? ((val.revenue - val.cogs - val.expenses) / val.revenue * 100) : 0;
+        return {
+          month,
+          revenue: Math.round(val.revenue),
+          cogs: Math.round(val.cogs),
+          grossMargin: Math.round(grossMargin * 10) / 10,
+          netMargin: Math.round(netMargin * 10) / 10,
+        };
+      });
 
       const topProducts = Object.values(productRevenue).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
       const maxRev = topProducts[0]?.revenue || 1;
@@ -120,7 +155,7 @@ export default function DashboardPage() {
         name, value, color: CATEGORY_COLORS[name.toLowerCase().replace(/\s+/g, '_')] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
-      return { monthly, totalRevenue, totalCogs, topProducts: topNormalized, revByCategory };
+      return { monthly, totalRevenue, totalCogs, totalExpenses, topProducts: topNormalized, revByCategory };
     },
   });
 
@@ -163,6 +198,8 @@ export default function DashboardPage() {
 
   const margin = revenueData && revenueData.totalRevenue > 0
     ? ((revenueData.totalRevenue - revenueData.totalCogs) / revenueData.totalRevenue * 100) : 0;
+  const netMargin = revenueData && revenueData.totalRevenue > 0
+    ? ((revenueData.totalRevenue - revenueData.totalCogs - (revenueData.totalExpenses || 0)) / revenueData.totalRevenue * 100) : 0;
 
   const lowStockItems = inventoryStats?.stockItems.filter(i => i.status === 'low' || i.status === 'out') || [];
 
@@ -257,9 +294,10 @@ export default function DashboardPage() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard title="Ingresos Total" value={formatUSD(revenueData?.totalRevenue || 0)} icon="💰" variant="primary" />
           <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon="📈" variant="success" />
+          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon="📊" variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${formatUSD(revenueData?.totalExpenses || 0)}`} />
           <KpiCard title="Valor Inventario" value={formatUSD(inventoryStats?.totalValue || 0)} icon="📦" />
           <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon="🔔"
             variant={inventoryStats?.alerts ? 'warning' : 'default'}
@@ -269,19 +307,32 @@ export default function DashboardPage() {
         {/* Row 2: Revenue chart + Revenue by Category donut */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 rounded-2xl bg-card border border-border p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-foreground">Ingresos vs Costos</h2>
+            <h2 className="text-sm font-semibold text-foreground">Ingresos vs Costos (12 meses)</h2>
             {revenueData && revenueData.monthly.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={revenueData.monthly} barGap={2}>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={revenueData.monthly} barGap={2}>
                   <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTick} axisLine={false} tickLine={false} width={50} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
-                  <Bar dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos" />
-                  <Bar dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos" />
-                </BarChart>
+                  <YAxis yAxisId="left" tick={axisTick} axisLine={false} tickLine={false} width={50} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis yAxisId="right" orientation="right" tick={axisTick} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
+                    if (name === 'Margen Bruto' || name === 'Margen Neto') return `${v}%`;
+                    return formatUSD(v);
+                  }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="left" dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos">
+                    <LabelList dataKey="revenue" position="top" formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ''} style={{ fill: 'hsl(220, 12%, 60%)', fontSize: 9 }} />
+                  </Bar>
+                  <Bar yAxisId="left" dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos" />
+                  <Line yAxisId="right" type="monotone" dataKey="grossMargin" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 3, fill: 'hsl(160, 84%, 39%)' }} name="Margen Bruto">
+                    <LabelList dataKey="grossMargin" position="top" formatter={(v: number) => v > 0 ? `${v}%` : ''} style={{ fill: 'hsl(160, 84%, 50%)', fontSize: 9 }} />
+                  </Line>
+                  <Line yAxisId="right" type="monotone" dataKey="netMargin" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: 'hsl(38, 92%, 50%)' }} name="Margen Neto">
+                    <LabelList dataKey="netMargin" position="bottom" formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 9 }} />
+                  </Line>
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin datos de ventas</div>
+              <div className="flex items-center justify-center h-[320px] text-sm text-muted-foreground">Sin datos de ventas</div>
             )}
           </div>
 
