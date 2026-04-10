@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, formatDOP } from '@/lib/format';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, Legend } from 'recharts';
