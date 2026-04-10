@@ -25,6 +25,7 @@ const defaultForm = {
   price_project_usd: '', price_wholesale_usd: '', coverage_m2: '',
   reorder_point: '10', dimensions: '', units_per_pack: '1', lead_time_days: '21',
   margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
+  cbm_per_unit: '', weight_kg_per_unit: '', min_order_qty: '1', reorder_qty: '50',
 };
 
 export function ProductDialog({ open, onOpenChange, product, onSuccess }: ProductDialogProps) {
