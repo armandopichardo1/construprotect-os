@@ -177,10 +177,10 @@ export default function FinanzasPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
-                { label: 'Ingresos MTD', value: formatUSD(revenueMTD), color: 'text-primary' },
+                { label: 'Ingresos MTD', value: fmt(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
-                { label: 'Gastos MTD', value: formatUSD(expensesMTD), color: 'text-destructive' },
-                { label: 'Ingreso Neto', value: formatUSD(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
+                { label: 'Gastos MTD', value: fmtDop(expensesMTD_dop), color: 'text-destructive' },
+                { label: 'Ingreso Neto', value: fmtDop(netIncome), color: netIncome >= 0 ? 'text-success' : 'text-destructive' },
               ].map(kpi => (
                 <div key={kpi.label} className="rounded-2xl bg-card border border-border p-5 text-center">
                   <p className={cn('text-2xl font-bold', kpi.color)}>{kpi.value}</p>
