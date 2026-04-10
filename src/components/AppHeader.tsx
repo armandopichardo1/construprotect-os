@@ -6,6 +6,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlobalSearch } from '@/components/GlobalSearch';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
@@ -41,6 +42,7 @@ export function AppHeader() {
           <span className="text-foreground font-medium">V: {Number(rate.usd_sell).toFixed(2)}</span>
         </div>
       )}
+      <NotificationCenter />
       <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8 shrink-0">
         {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </Button>
