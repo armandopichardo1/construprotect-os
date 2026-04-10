@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { type Contact, type Deal, type Activity, type Quote, DEAL_STAGES, ACTIVITY_TYPES, PRICE_TIER_LABELS } from '@/lib/crm-utils';
+import { type Contact, type Deal, type Activity, type Quote, DEAL_STAGES, ACTIVITY_TYPES, PRICE_TIER_LABELS, type ActivityType } from '@/lib/crm-utils';
 import { formatUSD } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Star, Phone, Mail, MapPin, MessageCircle, Building2, Calendar, FileText, TrendingUp, Clock } from 'lucide-react';
+import { toast } from 'sonner';
+import { Star, Phone, Mail, MapPin, MessageCircle, Building2, Plus, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -16,7 +20,25 @@ interface Props {
   contact: Contact | null;
 }
 
+const QUICK_ACTIONS: { type: ActivityType; label: string; emoji: string }[] = [
+  { type: 'call', label: 'Llamada', emoji: '📞' },
+  { type: 'email', label: 'Email', emoji: '📧' },
+  { type: 'whatsapp', label: 'WhatsApp', emoji: '💬' },
+  { type: 'visit', label: 'Visita', emoji: '🏢' },
+  { type: 'meeting', label: 'Reunión', emoji: '👥' },
+  { type: 'note', label: 'Nota', emoji: '📝' },
+];
+
 export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
+  const queryClient = useQueryClient();
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickType, setQuickType] = useState<ActivityType>('call');
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickDesc, setQuickDesc] = useState('');
+  const [quickOutcome, setQuickOutcome] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+
   if (!contact) return null;
 
   const { data: deals = [] } = useQuery({
@@ -28,7 +50,7 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
     },
   });
 
-  const { data: activities = [] } = useQuery({
+  const { data: activities = [], refetch: refetchActivities } = useQuery({
     queryKey: ['contact-activities', contact.id],
     enabled: open,
     queryFn: async () => {
@@ -54,6 +76,54 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
       return data || [];
     },
   });
+
+  const handleQuickAdd = async () => {
+    if (!quickTitle.trim()) { toast.error('El título es requerido'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('activities').insert({
+      contact_id: contact.id,
+      activity_type: quickType,
+      title: quickTitle.trim(),
+      description: quickDesc.trim() || null,
+      outcome: quickOutcome.trim() || null,
+      is_completed: true,
+      completed_at: new Date().toISOString(),
+    });
+    setSaving(false);
+    if (error) { toast.error('Error al registrar'); return; }
+    toast.success('Actividad registrada');
+    setQuickTitle(''); setQuickDesc(''); setQuickOutcome('');
+    setShowQuickAdd(false);
+    refetchActivities();
+    queryClient.invalidateQueries({ queryKey: ['crm-activities'] });
+    // Update last_activity_date on contact
+    await supabase.from('contacts').update({ last_activity_date: new Date().toISOString() }).eq('id', contact.id);
+  };
+
+  const handleToggleComplete = async (activity: Activity) => {
+    const newCompleted = !activity.is_completed;
+    await supabase.from('activities').update({
+      is_completed: newCompleted,
+      completed_at: newCompleted ? new Date().toISOString() : null,
+    }).eq('id', activity.id);
+    refetchActivities();
+  };
+
+  const filteredActivities = typeFilter === 'all'
+    ? activities
+    : activities.filter(a => a.activity_type === typeFilter);
+
+  // Group activities by date
+  const groupedActivities: Record<string, Activity[]> = {};
+  filteredActivities.forEach(a => {
+    const date = new Date(a.created_at).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (!groupedActivities[date]) groupedActivities[date] = [];
+    groupedActivities[date].push(a);
+  });
+
+  // Count by type for summary
+  const typeCounts: Record<string, number> = {};
+  activities.forEach(a => { typeCounts[a.activity_type] = (typeCounts[a.activity_type] || 0) + 1; });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,37 +173,137 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
 
         <Tabs defaultValue="timeline" className="mt-2">
           <TabsList className="grid grid-cols-4 h-8">
-            <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+            <TabsTrigger value="timeline" className="text-xs">Timeline ({activities.length})</TabsTrigger>
             <TabsTrigger value="deals" className="text-xs">Deals ({deals.length})</TabsTrigger>
             <TabsTrigger value="quotes" className="text-xs">Cotizaciones ({quotes.length})</TabsTrigger>
             <TabsTrigger value="sales" className="text-xs">Ventas ({sales.length})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="timeline" className="mt-3 space-y-2 max-h-[300px] overflow-y-auto">
-            {activities.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Sin actividades</p>}
-            {activities.map(a => {
-              const typeInfo = ACTIVITY_TYPES[a.activity_type] || { label: a.activity_type, emoji: '📌' };
-              return (
-                <div key={a.id} className="flex gap-3 items-start">
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm">{typeInfo.emoji}</span>
-                    <div className="w-px h-full bg-border min-h-[20px]" />
-                  </div>
-                  <div className="flex-1 pb-3">
-                    <p className="text-xs font-medium text-foreground">{a.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-muted-foreground">{typeInfo.label}</span>
-                      {a.deals?.title && <span className="text-[10px] text-primary">→ {a.deals.title}</span>}
-                      {a.is_completed && <Badge variant="secondary" className="text-[8px] h-3.5">✓</Badge>}
-                    </div>
-                    {a.description && <p className="text-[10px] text-muted-foreground mt-0.5">{a.description}</p>}
-                    <p className="text-[9px] text-muted-foreground mt-1">
-                      {new Date(a.created_at).toLocaleDateString('es-DO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
+          <TabsContent value="timeline" className="mt-3 space-y-3">
+            {/* Quick action buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {QUICK_ACTIONS.map(qa => (
+                <Button key={qa.type} size="sm" variant="outline"
+                  className="h-7 text-[10px] gap-1 rounded-full"
+                  onClick={() => { setQuickType(qa.type); setQuickTitle(`${qa.label} con ${contact.contact_name}`); setShowQuickAdd(true); }}>
+                  <span>{qa.emoji}</span> {qa.label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Activity type summary */}
+            {Object.keys(typeCounts).length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setTypeFilter('all')}
+                  className={cn('px-2 py-0.5 rounded-full text-[9px] font-medium transition-colors',
+                    typeFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground')}>
+                  Todas ({activities.length})
+                </button>
+                {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                  const info = ACTIVITY_TYPES[type as ActivityType];
+                  return (
+                    <button key={type}
+                      onClick={() => setTypeFilter(type === typeFilter ? 'all' : type)}
+                      className={cn('px-2 py-0.5 rounded-full text-[9px] font-medium transition-colors',
+                        typeFilter === type ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground')}>
+                      {info?.emoji} {info?.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick add form */}
+            {showQuickAdd && (
+              <div className="rounded-xl border-2 border-primary/20 bg-card p-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{ACTIVITY_TYPES[quickType]?.emoji}</span>
+                  <p className="text-xs font-semibold text-foreground">Registrar {ACTIVITY_TYPES[quickType]?.label}</p>
                 </div>
-              );
-            })}
+                <Input value={quickTitle} onChange={e => setQuickTitle(e.target.value)}
+                  placeholder="Título de la actividad" className="h-7 text-xs" />
+                <Textarea value={quickDesc} onChange={e => setQuickDesc(e.target.value)}
+                  placeholder="Descripción (opcional)" className="text-xs min-h-[50px]" rows={2} />
+                <Input value={quickOutcome} onChange={e => setQuickOutcome(e.target.value)}
+                  placeholder="Resultado / Outcome (opcional)" className="h-7 text-xs" />
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleQuickAdd} disabled={saving}>
+                    {saving ? 'Guardando...' : 'Registrar'}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowQuickAdd(false)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div className="max-h-[280px] overflow-y-auto space-y-0 pr-1">
+              {filteredActivities.length === 0 && (
+                <div className="text-center py-6">
+                  <p className="text-xs text-muted-foreground">Sin actividades registradas</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Usa los botones de arriba para registrar una</p>
+                </div>
+              )}
+              {Object.entries(groupedActivities).map(([date, acts]) => (
+                <div key={date}>
+                  <div className="sticky top-0 bg-background/90 backdrop-blur-sm py-1 z-10">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{date}</p>
+                  </div>
+                  {acts.map((a, idx) => {
+                    const typeInfo = ACTIVITY_TYPES[a.activity_type] || { label: a.activity_type, emoji: '📌' };
+                    const isLast = idx === acts.length - 1;
+                    return (
+                      <div key={a.id} className="flex gap-3 items-stretch">
+                        {/* Timeline line + icon */}
+                        <div className="flex flex-col items-center w-6 shrink-0">
+                          <button
+                            onClick={() => handleToggleComplete(a)}
+                            className={cn(
+                              'w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 transition-all border-2',
+                              a.is_completed
+                                ? 'bg-success/20 border-success text-success'
+                                : 'bg-muted border-border text-muted-foreground hover:border-primary'
+                            )}>
+                            {a.is_completed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span className="text-[10px]">{typeInfo.emoji}</span>}
+                          </button>
+                          {!isLast && <div className="w-px flex-1 bg-border min-h-[12px]" />}
+                        </div>
+                        {/* Content */}
+                        <div className={cn('flex-1 pb-3 min-w-0', a.is_completed && 'opacity-70')}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className={cn('text-xs font-medium text-foreground truncate', a.is_completed && 'line-through')}>{a.title}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className={cn(
+                                  'px-1.5 py-0.5 rounded-full text-[8px] font-semibold',
+                                  a.activity_type === 'call' ? 'bg-primary/15 text-primary' :
+                                  a.activity_type === 'email' ? 'bg-blue-500/15 text-blue-500' :
+                                  a.activity_type === 'whatsapp' ? 'bg-green-500/15 text-green-500' :
+                                  a.activity_type === 'visit' || a.activity_type === 'meeting' ? 'bg-purple-500/15 text-purple-500' :
+                                  'bg-muted text-muted-foreground'
+                                )}>
+                                  {typeInfo.emoji} {typeInfo.label}
+                                </span>
+                                {a.deals?.title && <span className="text-[9px] text-primary">→ {a.deals.title}</span>}
+                              </div>
+                            </div>
+                            <span className="text-[9px] text-muted-foreground shrink-0">
+                              {new Date(a.created_at).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {a.description && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{a.description}</p>}
+                          {a.outcome && (
+                            <div className="mt-1 rounded-md bg-success/5 border border-success/10 px-2 py-1">
+                              <p className="text-[9px] text-success font-medium">Resultado: {a.outcome}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </TabsContent>
 
           <TabsContent value="deals" className="mt-3 space-y-2 max-h-[300px] overflow-y-auto">
