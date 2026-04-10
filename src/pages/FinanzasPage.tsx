@@ -1139,6 +1139,12 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
     return Array.from(cats).sort();
   }, [current, prev, yoy]);
 
+  const allCostCats = useMemo(() => {
+    const cats = new Set<string>();
+    [current, prev, yoy].forEach(p => Object.keys(p.costsByCategory).forEach(k => cats.add(k)));
+    return Array.from(cats).sort();
+  }, [current, prev, yoy]);
+
   const allCogProducts = useMemo(() => {
     const prods = new Set<string>();
     [current, prev, yoy].forEach(p => Object.keys(p.cogsByProduct).forEach(k => prods.add(k)));
@@ -1147,7 +1153,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
 
   // Waterfall chart data
   const waterfallData = useMemo(() => {
-    const categories = ['Ingresos', 'COGS', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
+    const categories = ['Ingresos', 'COGS', 'Costos Directos', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
 
     return categories.map(name => {
       let curVal = 0, prvVal = 0;
