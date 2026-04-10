@@ -149,11 +149,11 @@ export default function FinanzasPage() {
 
   const expenseByCategory = useMemo(() => {
     const cats: Record<string, number> = {};
-    expenses.forEach((e: any) => { cats[e.category] = (cats[e.category] || 0) + Number(e.amount_usd || 0); });
+    expenses.forEach((e: any) => { cats[e.category] = (cats[e.category] || 0) + (Number(e.amount_dop) || Number(e.amount_usd || 0) * rate); });
     return Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([key, value], i) => ({
       name: EXPENSE_CATEGORIES[key]?.label || key, value, color: PIE_COLORS[i % PIE_COLORS.length],
     }));
-  }, [expenses]);
+  }, [expenses, rate]);
 
   return (
     <AppLayout>
@@ -196,8 +196,8 @@ export default function FinanzasPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={monthlyData}>
                     <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                    <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v/1000).toFixed(0)}K`} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                     <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
                     <Bar dataKey="cogs" name="COGS" fill="hsl(38, 92%, 50%)" radius={[6,6,0,0]} />
                     <Bar dataKey="expenses" name="Gastos" fill="hsl(0, 84%, 60%)" radius={[6,6,0,0]} />
@@ -211,14 +211,14 @@ export default function FinanzasPage() {
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart><Pie data={expenseByCategory} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {expenseByCategory.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
-                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
+                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} /></PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-1.5">
                     {expenseByCategory.slice(0,6).map((c: any) => (
                       <div key={c.name} className="flex items-center gap-2">
                         <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.color }} />
                         <span className="text-xs text-foreground truncate">{c.name}</span>
-                        <span className="text-xs text-muted-foreground ml-auto shrink-0">{formatUSD(c.value)}</span>
+                        <span className="text-xs text-muted-foreground ml-auto shrink-0">{fmtDop(c.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -231,8 +231,8 @@ export default function FinanzasPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={monthlyData}>
                   <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => fmtDop(v)} />
                   <Line type="monotone" dataKey="profit" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
