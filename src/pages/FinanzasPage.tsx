@@ -1404,7 +1404,7 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }
 const TREND_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems: any[]; view: 'clientes' | 'productos' }) {
-  const [metric, setMetric] = useState<'ingresos' | 'margen'>('ingresos');
+  const [metric, setMetric] = useState<'ingresos' | 'margen' | 'gm_pct'>('ingresos');
 
   const trendData = useMemo(() => {
     const now = new Date();
@@ -1460,7 +1460,17 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
       Object.values(revenueMatrix).forEach(m => Object.entries(m).forEach(([cid, v]) => { totals[cid] = (totals[cid] || 0) + v; }));
       const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
       const series = topIds.map(id => ({ id, name: clientNames[id] || id }));
-      const activeMatrix = metric === 'ingresos' ? revenueMatrix : marginMatrix;
+      // GM% matrix: margin / revenue * 100
+      const gmPctMatrix: Record<string, Record<string, number>> = {};
+      Object.keys(revenueMatrixFromItems).forEach(mk => {
+        gmPctMatrix[mk] = {};
+        Object.keys(revenueMatrixFromItems[mk] || {}).forEach(cid => {
+          const rev = revenueMatrixFromItems[mk][cid] || 0;
+          const mar = marginMatrix[mk]?.[cid] || 0;
+          gmPctMatrix[mk][cid] = rev > 0 ? (mar / rev) * 100 : 0;
+        });
+      });
+      const activeMatrix = metric === 'ingresos' ? revenueMatrix : metric === 'margen' ? marginMatrix : gmPctMatrix;
       const rows = months.map(m => {
         const row: any = { month: m.label };
         series.forEach(s => { row[s.name] = activeMatrix[m.key]?.[s.id] || 0; });
@@ -1487,7 +1497,17 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
       Object.values(revMatrix).forEach(m => Object.entries(m).forEach(([pid, v]) => { totals[pid] = (totals[pid] || 0) + v; }));
       const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
       const series = topIds.map(id => ({ id, name: prodNames[id] || id }));
-      const activeMatrix = metric === 'ingresos' ? revMatrix : marginMatrix;
+      // GM% matrix for products
+      const gmPctMatrix: Record<string, Record<string, number>> = {};
+      Object.keys(revMatrix).forEach(mk => {
+        gmPctMatrix[mk] = {};
+        Object.keys(revMatrix[mk] || {}).forEach(pid => {
+          const rev = revMatrix[mk][pid] || 0;
+          const mar = marginMatrix[mk]?.[pid] || 0;
+          gmPctMatrix[mk][pid] = rev > 0 ? (mar / rev) * 100 : 0;
+        });
+      });
+      const activeMatrix = metric === 'ingresos' ? revMatrix : metric === 'margen' ? marginMatrix : gmPctMatrix;
       const rows = months.map(m => {
         const row: any = { month: m.label };
         series.forEach(s => { row[s.name] = activeMatrix[m.key]?.[s.id] || 0; });
@@ -1516,13 +1536,20 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
             className={cn('px-3 py-1 text-xs rounded-md transition-colors',
               metric === 'margen' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
           >Margen</button>
+          <button
+            onClick={() => setMetric('gm_pct')}
+            className={cn('px-3 py-1 text-xs rounded-md transition-colors',
+              metric === 'gm_pct' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground')}
+          >GM%</button>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={trendData.rows}>
           <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-          <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+          <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false}
+            tickFormatter={metric === 'gm_pct' ? (v: number) => `${v.toFixed(0)}%` : (v: number) => `$${(v/1000).toFixed(0)}K`} />
+          <Tooltip contentStyle={chartTooltipStyle}
+            formatter={(v: number) => metric === 'gm_pct' ? `${v.toFixed(1)}%` : formatUSD(v)} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           {trendData.series.map((s, i) => (
             <Line key={s.id} type="monotone" dataKey={s.name} stroke={TREND_COLORS[i % TREND_COLORS.length]}
