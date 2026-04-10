@@ -309,7 +309,7 @@ export function ReorderTab() {
   };
 
   return (
-    <div className="space-y-5">
+    <>
       {/* Critical stockout simulation alert */}
       {criticalItems.length > 0 && (
         <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
