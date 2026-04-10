@@ -7,7 +7,7 @@ import { type Deal, type Contact, DEAL_STAGES, type DealStage, daysInStage, stag
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Pencil, Trash2, Bot, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Bot, RefreshCw, Megaphone } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
@@ -123,10 +123,22 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
 
 function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal: Deal; onEdit: (d: Deal) => void; onDelete: (d: Deal) => void; onStageChange: (id: string, stage: DealStage) => void; isDragging?: boolean }) {
   const [showPlan, setShowPlan] = useState(false);
+  const [showPitch, setShowPitch] = useState(false);
   const [planContent, setPlanContent] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
+  const [pitchContent, setPitchContent] = useState('');
+  const [pitchLoading, setPitchLoading] = useState(false);
   const days = daysInStage(deal.updated_at);
   const dayColor = stageColor(days);
+
+  // Rotting visual: border color based on days stale
+  const rottingBorder = days >= 21
+    ? 'border-destructive/60 bg-destructive/5'
+    : days >= 14
+    ? 'border-warning/60 bg-warning/5'
+    : days >= 7
+    ? 'border-yellow-500/30'
+    : 'border-border';
 
   const { data: contact } = useQuery({
     queryKey: ['contact-for-deal', deal.contact_id],
@@ -134,7 +146,7 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
       const { data } = await supabase.from('contacts').select('*').eq('id', deal.contact_id).single();
       return data;
     },
-    enabled: showPlan,
+    enabled: showPlan || showPitch,
   });
 
   const generatePlan = async () => {
@@ -154,9 +166,30 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
     }
   };
 
+  const generatePitch = async () => {
+    setShowPitch(true);
+    setPitchContent('');
+    setPitchLoading(true);
+    try {
+      await streamBusinessAI({
+        action: 'pitch',
+        payload: { deal, contact },
+        onDelta: (chunk) => setPitchContent(prev => prev + chunk),
+        onDone: () => setPitchLoading(false),
+      });
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+      setPitchLoading(false);
+    }
+  };
+
   return (
     <>
-      <div className={cn('rounded-lg bg-card border border-border p-2.5 space-y-1.5 shadow-sm transition-shadow', isDragging && 'shadow-lg ring-2 ring-primary/40')}>
+      <div className={cn(
+        'rounded-lg bg-card border p-2.5 space-y-1.5 shadow-sm transition-all',
+        rottingBorder,
+        isDragging && 'shadow-lg ring-2 ring-primary/40'
+      )}>
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
@@ -166,13 +199,18 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
             <button onClick={generatePlan} className="p-1 rounded text-primary hover:text-primary/80" title="AI Game Plan">
               <Bot className="w-3 h-3" />
             </button>
+            <button onClick={generatePitch} className="p-1 rounded text-accent-foreground hover:text-primary" title="AI Pitch">
+              <Megaphone className="w-3 h-3" />
+            </button>
             <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
             <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
           </div>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
-          <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
+          <span className={cn('text-[9px] font-medium', dayColor)}>
+            {days >= 21 ? '🔴' : days >= 14 ? '🟡' : days >= 7 ? '🟠' : ''} {days}d
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <Select value={deal.stage} onValueChange={(v) => onStageChange(deal.id, v as DealStage)}>
@@ -189,6 +227,7 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
         </div>
       </div>
 
+      {/* AI Game Plan Dialog */}
       <Dialog open={showPlan} onOpenChange={setShowPlan}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -203,6 +242,27 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
             {planContent ? <ReactMarkdown>{planContent}</ReactMarkdown> : (
               <div className="text-center text-muted-foreground py-8">
                 {planLoading ? <p className="animate-pulse">Generando plan de acción...</p> : <p>Generando...</p>}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Pitch Dialog */}
+      <Dialog open={showPitch} onOpenChange={setShowPitch}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4" /> AI Pitch: {deal.title}
+              <Button size="sm" variant="ghost" onClick={generatePitch} disabled={pitchLoading} className="ml-auto">
+                <RefreshCw className={`w-3.5 h-3.5 ${pitchLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="prose prose-sm prose-invert max-w-none">
+            {pitchContent ? <ReactMarkdown>{pitchContent}</ReactMarkdown> : (
+              <div className="text-center text-muted-foreground py-8">
+                {pitchLoading ? <p className="animate-pulse">Generando pitch...</p> : <p>Generando...</p>}
               </div>
             )}
           </div>

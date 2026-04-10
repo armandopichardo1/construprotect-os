@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type Contact, type Deal, type Activity, type Quote, DEAL_STAGES, ACTIVITY_TYPES, PRICE_TIER_LABELS, type ActivityType } from '@/lib/crm-utils';
 import { formatUSD } from '@/lib/format';
@@ -12,7 +11,9 @@ import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Star, Phone, Mail, MapPin, MessageCircle, Building2, Plus, CheckCircle2 } from 'lucide-react';
+import { Star, Phone, Mail, MapPin, MessageCircle, Building2, CheckCircle2, AlertTriangle, RefreshCw, Bot } from 'lucide-react';
+import { streamBusinessAI } from '@/lib/business-ai';
+import ReactMarkdown from 'react-markdown';
 
 interface Props {
   open: boolean;
@@ -38,6 +39,9 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
   const [quickOutcome, setQuickOutcome] = useState('');
   const [saving, setSaving] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [showCrossSell, setShowCrossSell] = useState(false);
+  const [crossSellContent, setCrossSellContent] = useState('');
+  const [crossSellLoading, setCrossSellLoading] = useState(false);
 
   const contactId = contact?.id;
 
@@ -72,12 +76,18 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
     queryKey: ['contact-sales', contactId],
     enabled: open && !!contactId,
     queryFn: async () => {
-      const { data } = await supabase.from('sales').select('*').eq('contact_id', contactId!).order('date', { ascending: false });
+      const { data } = await supabase.from('sales').select('*, sale_items(*, products(name, sku))').eq('contact_id', contactId!).order('date', { ascending: false });
       return data || [];
     },
   });
 
   if (!contact) return null;
+
+  // Reorder reminder: check if client is recurring and hasn't ordered in a while
+  const lastOrderDate = contact.last_order_date ? new Date(contact.last_order_date) : null;
+  const daysSinceOrder = lastOrderDate ? Math.floor((Date.now() - lastOrderDate.getTime()) / 86400000) : null;
+  const isRecurring = (contact.total_orders || 0) >= 3;
+  const needsReorder = isRecurring && daysSinceOrder !== null && daysSinceOrder > 45;
 
   const handleQuickAdd = async () => {
     if (!quickTitle.trim()) { toast.error('El título es requerido'); return; }
@@ -98,7 +108,6 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
     setShowQuickAdd(false);
     refetchActivities();
     queryClient.invalidateQueries({ queryKey: ['crm-activities'] });
-    // Update last_activity_date on contact
     await supabase.from('contacts').update({ last_activity_date: new Date().toISOString() }).eq('id', contact.id);
   };
 
@@ -111,11 +120,30 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
     refetchActivities();
   };
 
+  const generateCrossSell = async () => {
+    setShowCrossSell(true);
+    setCrossSellContent('');
+    setCrossSellLoading(true);
+    const purchaseHistory = sales.map((s: any) =>
+      `${s.date}: $${Number(s.total_usd).toFixed(0)} — ${(s.sale_items || []).map((si: any) => `${si.products?.name || '?'} x${si.quantity}`).join(', ')}`
+    ).join('\n');
+    try {
+      await streamBusinessAI({
+        action: 'cross-sell',
+        payload: { contact, purchaseHistory },
+        onDelta: (chunk) => setCrossSellContent(prev => prev + chunk),
+        onDone: () => setCrossSellLoading(false),
+      });
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+      setCrossSellLoading(false);
+    }
+  };
+
   const filteredActivities = typeFilter === 'all'
     ? activities
     : activities.filter(a => a.activity_type === typeFilter);
 
-  // Group activities by date
   const groupedActivities: Record<string, Activity[]> = {};
   filteredActivities.forEach(a => {
     const date = new Date(a.created_at).toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -123,7 +151,6 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
     groupedActivities[date].push(a);
   });
 
-  // Count by type for summary
   const typeCounts: Record<string, number> = {};
   activities.forEach(a => { typeCounts[a.activity_type] = (typeCounts[a.activity_type] || 0) + 1; });
 
@@ -136,6 +163,23 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
             {contact.contact_name}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Reorder reminder */}
+        {needsReorder && (
+          <div className="rounded-xl bg-warning/10 border border-warning/30 p-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-warning">⏰ Recordatorio de Reorden</p>
+              <p className="text-[10px] text-muted-foreground">
+                Este cliente tiene {contact.total_orders} pedidos pero no ordena hace {daysSinceOrder} días.
+                Considera hacer seguimiento.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 text-[10px] h-7" onClick={generateCrossSell}>
+              <Bot className="w-3 h-3 mr-1" /> Cross-sell
+            </Button>
+          </div>
+        )}
 
         {/* Header info */}
         <div className="grid grid-cols-2 gap-4">
@@ -191,6 +235,9 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
                   <span>{qa.emoji}</span> {qa.label}
                 </Button>
               ))}
+              <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1 rounded-full" onClick={generateCrossSell}>
+                <Bot className="w-3 h-3" /> Cross-sell AI
+              </Button>
             </div>
 
             {/* Activity type summary */}
@@ -256,7 +303,6 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
                     const isLast = idx === acts.length - 1;
                     return (
                       <div key={a.id} className="flex gap-3 items-stretch">
-                        {/* Timeline line + icon */}
                         <div className="flex flex-col items-center w-6 shrink-0">
                           <button
                             onClick={() => handleToggleComplete(a)}
@@ -270,7 +316,6 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
                           </button>
                           {!isLast && <div className="w-px flex-1 bg-border min-h-[12px]" />}
                         </div>
-                        {/* Content */}
                         <div className={cn('flex-1 pb-3 min-w-0', a.is_completed && 'opacity-70')}>
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -349,15 +394,28 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
           <TabsContent value="sales" className="mt-3 space-y-2 max-h-[300px] overflow-y-auto">
             {sales.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Sin ventas</p>}
             {sales.map((s: any) => (
-              <div key={s.id} className="rounded-lg bg-muted/50 p-3 flex justify-between items-center">
-                <div>
-                  <p className="text-xs font-medium text-foreground">{s.invoice_ref || s.date}</p>
-                  <Badge variant="outline" className="text-[9px] mt-1">{s.payment_status}</Badge>
+              <div key={s.id} className="rounded-lg bg-muted/50 p-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{s.invoice_ref || s.date}</p>
+                    <Badge variant="outline" className="text-[9px] mt-1">{s.payment_status}</Badge>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-primary">{formatUSD(Number(s.total_usd))}</p>
+                    <p className="text-[10px] text-muted-foreground">{s.date}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-primary">{formatUSD(Number(s.total_usd))}</p>
-                  <p className="text-[10px] text-muted-foreground">{s.date}</p>
-                </div>
+                {/* Product details for this sale */}
+                {(s.sale_items || []).length > 0 && (
+                  <div className="pl-2 border-l-2 border-primary/20 space-y-0.5">
+                    {(s.sale_items || []).map((si: any) => (
+                      <div key={si.id} className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">{si.products?.name || si.products?.sku || 'Producto'} × {si.quantity}</span>
+                        <span className="text-foreground">{formatUSD(Number(si.line_total_usd))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </TabsContent>
@@ -369,6 +427,27 @@ export function ContactDetailDialog({ open, onOpenChange, contact }: Props) {
             <p className="text-xs text-foreground">{contact.notes}</p>
           </div>
         )}
+
+        {/* Cross-sell AI Dialog */}
+        <Dialog open={showCrossSell} onOpenChange={setShowCrossSell}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bot className="w-4 h-4" /> Cross-sell: {contact.contact_name}
+                <Button size="sm" variant="ghost" onClick={generateCrossSell} disabled={crossSellLoading} className="ml-auto">
+                  <RefreshCw className={`w-3.5 h-3.5 ${crossSellLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="prose prose-sm prose-invert max-w-none">
+              {crossSellContent ? <ReactMarkdown>{crossSellContent}</ReactMarkdown> : (
+                <div className="text-center text-muted-foreground py-8">
+                  {crossSellLoading ? <p className="animate-pulse">Analizando historial...</p> : <p>Generando...</p>}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
