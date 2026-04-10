@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download, ShoppingCart, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
