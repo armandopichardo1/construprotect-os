@@ -1087,6 +1087,9 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Monthly Trend Chart */}
+      <MonthlyTrendChart sales={sales} saleItems={saleItems} view={view} />
     </div>
   );
 }
