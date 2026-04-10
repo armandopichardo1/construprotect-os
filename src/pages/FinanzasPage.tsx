@@ -1028,35 +1028,61 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
   const filteredItems = useMemo(() => saleItems.filter((si: any) => filteredSaleIds.has(si.sale_id)), [saleItems, filteredSaleIds]);
 
   const clientData = useMemo(() => {
-    const map: Record<string, { name: string; revenue: number; cogs: number; units: number }> = {};
+    const map: Record<string, { name: string; revenue: number; cogs: number; units: number; lastDate: string; monthlyRevenue: number[] }> = {};
+    const nowDate = new Date();
     filteredSales.forEach((s: any) => {
       const key = s.contact_id || 'sin_cliente';
       const name = s.crm_clients?.name || 'Sin Cliente';
-      if (!map[key]) map[key] = { name, revenue: 0, cogs: 0, units: 0 };
+      if (!map[key]) map[key] = { name, revenue: 0, cogs: 0, units: 0, lastDate: '', monthlyRevenue: [0, 0, 0, 0, 0, 0] };
       map[key].revenue += Number(s.total_usd || 0);
+      if (!map[key].lastDate || s.date > map[key].lastDate) map[key].lastDate = s.date;
+      // monthly sparkline (6 months)
+      const d = new Date(s.date);
+      const monthsAgo = (nowDate.getFullYear() - d.getFullYear()) * 12 + nowDate.getMonth() - d.getMonth();
+      if (monthsAgo >= 0 && monthsAgo < 6) map[key].monthlyRevenue[5 - monthsAgo] += Number(s.total_usd || 0);
       const items = s.sale_items || [];
       items.forEach((si: any) => {
         map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
         map[key].units += Number(si.quantity || 0);
       });
     });
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).map(c => {
+      const daysSince = c.lastDate ? Math.floor((Date.now() - new Date(c.lastDate).getTime()) / 86400000) : 999;
+      const recent3 = c.monthlyRevenue[5] + c.monthlyRevenue[4] + c.monthlyRevenue[3];
+      const older3 = c.monthlyRevenue[2] + c.monthlyRevenue[1] + c.monthlyRevenue[0];
+      const trendPct = older3 > 0 ? ((recent3 - older3) / older3 * 100) : (recent3 > 0 ? 100 : 0);
+      return { ...c, daysSince, trendPct };
+    });
   }, [filteredSales]);
 
   const productData = useMemo(() => {
-    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetMargin: number }> = {};
+    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetMargin: number; monthlyUnits: number[] }> = {};
+    const nowDate = new Date();
     filteredItems.forEach((si: any) => {
       const key = si.product_id || 'unknown';
       const name = si.products?.name || 'Producto Desconocido';
       const prod = si.products || {};
       const avgTarget = [prod.margin_list_pct, prod.margin_architect_pct, prod.margin_project_pct, prod.margin_wholesale_pct]
         .filter((v: any) => v != null && v > 0).reduce((a: number, b: number, _: number, arr: number[]) => a + b / arr.length, 0);
-      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0, targetMargin: avgTarget || 0 };
+      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0, targetMargin: avgTarget || 0, monthlyUnits: [0, 0, 0, 0, 0, 0] };
       map[key].revenue += Number(si.line_total_usd || 0);
       map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
       map[key].units += Number(si.quantity || 0);
+      // monthly units for velocity
+      const saleDate = si.sales?.date;
+      if (saleDate) {
+        const d = new Date(saleDate);
+        const monthsAgo = (nowDate.getFullYear() - d.getFullYear()) * 12 + nowDate.getMonth() - d.getMonth();
+        if (monthsAgo >= 0 && monthsAgo < 6) map[key].monthlyUnits[5 - monthsAgo] += Number(si.quantity || 0);
+      }
     });
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).map(p => {
+      const recent3 = p.monthlyUnits[5] + p.monthlyUnits[4] + p.monthlyUnits[3];
+      const older3 = p.monthlyUnits[2] + p.monthlyUnits[1] + p.monthlyUnits[0];
+      const velocity = Math.round(recent3 / 3);
+      const trendPct = older3 > 0 ? ((recent3 - older3) / older3 * 100) : (recent3 > 0 ? 100 : 0);
+      return { ...p, velocity, trendPct };
+    });
   }, [filteredItems]);
 
   const data = view === 'clientes' ? clientData : productData;
