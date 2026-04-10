@@ -65,6 +65,20 @@ export default function MasPage() {
     },
   });
 
+  const { data: marginThreshold, refetch: refetchMargin } = useQuery({
+    queryKey: ['margin-threshold'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'min_margin_threshold').maybeSingle();
+      return (data?.value as { value: number })?.value ?? 5;
+    },
+  });
+  const [marginInput, setMarginInput] = useState('');
+  const [savingMargin, setSavingMargin] = useState(false);
+
+  useEffect(() => {
+    if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
+  }, [marginThreshold]);
+
   const { data: productRequests = [], refetch: refetchRequests } = useQuery({
     queryKey: ['product-requests'],
     queryFn: async () => {
