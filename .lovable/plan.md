@@ -1,85 +1,124 @@
 
 
-# ConstruProtect OS — Desktop Operating System Redesign
+# ConstruProtect OS — Gap Analysis & Implementation Plan
 
-## The Problem
-Currently the app is built as a **mobile-first phone app** with a 480px max-width container, bottom navigation, and stacked card layouts. For a desktop OS that will be the **core of your organization**, this is severely limiting. You need a proper desktop workspace: sidebar navigation, multi-panel layouts, data-dense tables, and larger charts.
+## What's Been Built (Status: Done)
+- Auth + profiles (3 users)
+- Database: products, inventory, locations, inventory_movements, exchange_rates, settings, contacts, deals, activities, quotes, quote_items, sales, sale_items, expenses
+- Product catalog CRUD + Excel import + 20 SKUs seeded
+- Inventory page with Stock, Analytics (ABC, bubble chart), Envios (hardcoded), AI PO Recommender
+- CRM: Pipeline, Contacts, Agenda, Quotes tabs with AI Deal Game Plan, AI Weekly Agenda
+- Finanzas: Resumen, Ventas, Gastos, P&L, AI Asesor + AI Transaction Assistant
+- Dashboard: KPIs, charts (revenue donut, pipeline funnel, client sparklines), AI Business Review
+- PDF Quotes (branded, dual currency, ITBIS)
+- Realtime for inventory table
+- Exchange rate fetch edge function
+- Desktop sidebar layout
 
-## What Changes
+## What's Missing (from the Architecture Document)
 
-### 1. Navigation: Bottom tabs → Sidebar
-- Replace `BottomNav` with a collapsible **sidebar** using shadcn's `Sidebar` component
-- Icons from Lucide (LayoutDashboard, Package, Users, DollarSign, Settings)
-- Logo + company name at top, user profile + sign-out at bottom
-- Collapsed mode shows icons only (icon strip)
-- Active route highlighting
+### Database Tables Not Created
+1. **`shipments`** — supplier PO tracking (status pipeline: ordered → in_transit → customs → warehouse → received)
+2. **`shipment_items`** — line items per shipment
+3. **`client_projects`** — project planner per contact (m2 calc, product needs, status)
+4. **`product_requests`** — track requested products not yet in catalog
 
-### 2. Layout: Phone → Desktop workspace
-- Remove the `max-w-[480px]` constraint from `AppLayout`
-- New layout: `SidebarProvider` → `Sidebar` + `main` area that fills the screen
-- Content areas use proper desktop widths with padding
+### Missing Features
 
-### 3. Dashboard: Stacked cards → Multi-column grid
-- **4-column KPI row** across the top (full width)
-- **2-column layout** below: Revenue chart (left, wider) + Category donut + Stock alerts (right)
-- Top products as a horizontal bar chart instead of progress bars
-- AI Summary as a persistent banner at the bottom
-- Exchange rate in the top header bar
+| # | Feature | Section | Priority |
+|---|---------|---------|----------|
+| 1 | **Shipments CRUD** — real data instead of hardcoded Envios tab. Create/edit shipments with step-progress, receive to inventory | Inventario > Envios | High |
+| 2 | **Drag-and-drop pipeline** — kanban columns with drag between stages | CRM > Pipeline | High |
+| 3 | **AI Pitch Creator** — per-deal button generating customized sales pitch | CRM > Pipeline deals | Medium |
+| 4 | **AI Expense Categorizer** — auto-suggest category during expense entry | Finanzas > Gastos | Medium |
+| 5 | **AI Cross-sell Advisor** — on contact detail view, suggest products from purchase history | CRM > Contactos | Medium |
+| 6 | **AI Anomaly Detection** — flag unusual patterns on data entry | Financial entries | Low |
+| 7 | **Dashboard Quick Actions** — "+ Venta, + Gasto, + Actividad" buttons | Dashboard | Medium |
+| 8 | **Dashboard Alerts Section** — low stock, stale deals (7+ days), overdue activities, overdue payments | Dashboard | High |
+| 9 | **Sale inventory auto-deduction** — creating a sale should deduct from inventory + create movement | Finanzas > Ventas | High |
+| 10 | **Client Projects planner** — per-contact project tracker (m2, product needs, timeline) | CRM | Low |
+| 11 | **Product Requests tracker** — log products clients ask for that aren't in catalog | CRM/Settings | Low |
+| 12 | **Data Export** — export tables to Excel/PDF | Settings | Medium |
+| 13 | **P&L Export to PDF** | Finanzas > P&L | Medium |
+| 14 | **Contact detail view** — full detail with activity timeline, deals history, order history, quick actions | CRM > Contactos | Medium |
+| 15 | **Quote wizard flow** — step-by-step: select client → add products → preview → generate PDF | CRM > Cotizaciones | Medium |
+| 16 | **Company settings** — editable name, RNC, address, logo in Settings | Mas | Low |
+| 17 | **155 Contacts import** — still pending user uploading the Excel file | Data seed | High |
+| 18 | **Deal stage: "delivered"** — missing from current enum (spec includes it) | DB | Low |
+| 19 | **Deal fields: `project_location`, `is_recurring`** — in spec but not in DB | DB | Low |
+| 20 | **Products fields: `additional_costs_usd`, `taxes_per_unit_usd`, `notes`** — in spec but not in DB | DB | Low |
 
-### 4. Inventario: Single-column → Split panels
-- Left panel: stock table (proper `<table>` with sortable columns: SKU, Name, Category, Qty, Status, Value, Trend)
-- Status filter chips above the table
-- Sub-tabs (Stock, Productos, Analytics, Envíos, ABC) remain but content fills desktop width
-- Analytics tab: side-by-side charts instead of stacked
-- Products tab uses the dedicated `/productos` route with data table
+## Implementation Plan (Ordered by Priority)
 
-### 5. CRM: Stacked tabs → Desktop kanban
-- Pipeline: **full-width horizontal kanban** that uses the available screen space (no 210px constraint)
-- Deal cards wider with more info visible
-- Contacts tab: **data table** with columns (Name, Company, Segment, Priority, Revenue, Last Activity, Actions)
-- Agenda: **2-column layout** — overdue/today on left, this week on right
-- Quotes: proper table with status badges
+### Step 1: Database Migrations
+Create missing tables and add missing columns:
+- Create `shipments` and `shipment_items` tables with RLS
+- Create `client_projects` table with RLS
+- Create `product_requests` table with RLS
+- Add `project_location`, `is_recurring` to `deals`
+- Add `additional_costs_usd`, `taxes_per_unit_usd`, `notes` to `products`
+- Add `delivered` to deal_stage enum
+- Enable realtime for `shipments`
 
-### 6. Finanzas: Stacked sections → Dashboard grid
-- Summary tab: **3-column grid** — KPIs row, Revenue/COGS/Expenses bar chart (2/3), Expense donut (1/3), Profit trend full-width
-- Sales/Expenses: proper sortable data tables instead of card lists
-- P&L: formatted financial statement with indentation, full-width
+### Step 2: Sale Inventory Auto-Deduction
+- When a sale is saved, auto-create `inventory_movements` (type `sale`, negative quantity) and update `inventory.quantity_on_hand` for each sale_item
 
-### 7. Settings (Más): Proper settings page
-- 2-column layout: navigation on left, content on right
-- Sections: Company, Exchange Rate, Users, Data Import/Export
+### Step 3: Shipments Module (Real Data)
+- Replace hardcoded Envios tab with full CRUD
+- Shipment form: supplier, PO number, dates, status, items with products + quantities
+- Step-progress visualization from DB status
+- "Receive" action that creates `inventory_movements` (type `receipt`) and updates stock
 
-### 8. Header bar
-- Add a top header bar with: page title, breadcrumbs, search (global), notifications bell, user avatar + name
-- SidebarTrigger button always visible
+### Step 4: Pipeline Drag-and-Drop
+- Add `@hello-pangea/dnd` library
+- Refactor `PipelineTab` to use `DragDropContext`, `Droppable`, `Draggable`
+- On drop, update deal stage via Supabase
 
-### 9. Login page
-- Centered card with subtle background pattern, wider form (max-w-md), company branding
+### Step 5: Dashboard Enhancements
+- Add Quick Actions row: "+ Venta", "+ Gasto", "+ Actividad" (open respective forms)
+- Add Alerts section: low stock items, stale deals (7+ days no activity), overdue activities, overdue payments
 
-## Files to Create/Modify
+### Step 6: AI Features (add to `business-ai` edge function)
+- **AI Pitch Creator**: new action `pitch` — input deal/client/segment, output customized pitch in Spanish
+- **AI Expense Categorizer**: new action in `financial-ai` — input description, output suggested category
+- **AI Cross-sell Advisor**: new action `cross-sell` — input contact purchase history + catalog, output product recommendations
 
-| File | Action |
-|------|--------|
-| `src/components/AppLayout.tsx` | **Rewrite** — SidebarProvider + Sidebar + header + main |
-| `src/components/AppSidebar.tsx` | **Create** — Sidebar with navigation items |
-| `src/components/AppHeader.tsx` | **Create** — Top header bar |
-| `src/components/BottomNav.tsx` | **Delete** — No longer needed |
-| `src/pages/DashboardPage.tsx` | **Rewrite** — Multi-column desktop grid |
-| `src/pages/InventarioPage.tsx` | **Rewrite** — Table-based layout |
-| `src/pages/CrmPage.tsx` | **Rewrite** — Desktop kanban + tables |
-| `src/pages/FinanzasPage.tsx` | **Rewrite** — Dashboard grid layout |
-| `src/pages/MasPage.tsx` | **Rewrite** — Desktop settings layout |
-| `src/pages/ProductosPage.tsx` | **Rewrite** — Data table with actions |
-| `src/pages/LoginPage.tsx` | **Update** — Desktop-sized centered card |
-| `src/components/KpiCard.tsx` | **Update** — Desktop-optimized sizing |
-| `src/index.css` | **Update** — Add DM Sans + workspace-scale typography |
+### Step 7: Contact Detail View
+- Create `ContactDetailDialog` or expand existing contact card
+- Show: full info, activity timeline, deals history, order history, quick action buttons
 
-## Design Principles
-- **Data density**: Tables over cards for lists. Show more data per screen.
-- **Multi-panel layouts**: Use CSS Grid `grid-cols-3`, `grid-cols-4` for dashboards.
-- **Professional dark theme**: Keep existing color system, increase contrast and whitespace for desktop.
-- **No mobile bottom nav**: Sidebar is the primary navigation paradigm.
-- **Charts expand**: Larger chart areas (300px+ height instead of 180px).
+### Step 8: Data Export
+- Add Excel export buttons to Ventas, Gastos, Productos tables (using xlsx library already installed)
+- Add P&L export to PDF
 
-No database changes required — this is purely a frontend layout transformation.
+### Step 9: Settings Enhancements
+- Company info form (name, RNC, address, logo upload to storage)
+- Product requests tracker page
+
+### Step 10: Client Projects (Phase 5)
+- Client project planner UI with m2 calculator, product needs, timeline
+- Linked to contacts and deals
+
+### Technical Details
+
+**New dependencies**: `@hello-pangea/dnd` (for drag-and-drop)
+
+**Edge function changes**: Add `pitch`, `cross-sell`, `expense-categorize` actions to existing edge functions
+
+**Migration count**: 1 migration with all table/column changes
+
+**Files to create**:
+- `src/components/inventario/ShipmentDialog.tsx`
+- `src/components/crm/ContactDetailDialog.tsx`
+- `src/components/dashboard/QuickActions.tsx`
+- `src/components/dashboard/AlertsSection.tsx`
+
+**Files to modify**:
+- `src/pages/InventarioPage.tsx` — Envios tab with real data
+- `src/components/crm/PipelineTab.tsx` — drag-and-drop
+- `src/pages/DashboardPage.tsx` — quick actions + alerts
+- `src/pages/FinanzasPage.tsx` — expense categorizer + sale inventory deduction
+- `src/pages/MasPage.tsx` — company settings + export
+- `supabase/functions/business-ai/index.ts` — new AI actions
+- `supabase/functions/financial-ai/index.ts` — expense categorizer
 
