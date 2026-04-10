@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAlertHistory, type AlertHistoryRow } from '@/hooks/useAlertHistory';
 import { cn } from '@/lib/utils';
-import { Bell, Package, DollarSign, TrendingDown, Users, ShieldAlert, Clock, Filter, Trash2 } from 'lucide-react';
+import { Bell, Package, DollarSign, TrendingDown, Users, ShieldAlert, Clock, Filter, Trash2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
