@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
-const categories = ['Pisos', 'Revestimientos', 'Mosaicos', 'Accesorios', 'Adhesivos', 'Herramientas'];
+const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
 type Product = Tables<'products'>;
 
@@ -24,6 +24,7 @@ const defaultForm = {
   unit_cost_usd: '', price_list_usd: '', price_architect_usd: '',
   price_project_usd: '', price_wholesale_usd: '', coverage_m2: '',
   reorder_point: '10', dimensions: '', units_per_pack: '1', lead_time_days: '21',
+  margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
 };
 
 export function ProductDialog({ open, onOpenChange, product, onSuccess }: ProductDialogProps) {
@@ -48,6 +49,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
         dimensions: product.dimensions || '',
         units_per_pack: String(product.units_per_pack ?? '1'),
         lead_time_days: String(product.lead_time_days ?? '21'),
+        margin_list_pct: String(product.margin_list_pct ?? ''),
+        margin_architect_pct: String(product.margin_architect_pct ?? ''),
+        margin_project_pct: String(product.margin_project_pct ?? ''),
+        margin_wholesale_pct: String(product.margin_wholesale_pct ?? ''),
       });
     } else {
       setForm(defaultForm);
@@ -77,6 +82,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
       dimensions: form.dimensions.trim() || null,
       units_per_pack: Number(form.units_per_pack) || 1,
       lead_time_days: Number(form.lead_time_days) || 21,
+      margin_list_pct: Number(form.margin_list_pct) || 0,
+      margin_architect_pct: Number(form.margin_architect_pct) || 0,
+      margin_project_pct: Number(form.margin_project_pct) || 0,
+      margin_wholesale_pct: Number(form.margin_wholesale_pct) || 0,
     };
 
     const { error } = isEdit
@@ -92,7 +101,7 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">{isEdit ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
         </DialogHeader>
@@ -119,11 +128,19 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
             <div><Label className="text-xs">Precio Mayoreo</Label><Input type="number" step="0.01" value={form.price_wholesale_usd} onChange={e => set('price_wholesale_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
           </div>
 
+          <p className="text-[10px] font-semibold text-muted-foreground pt-1">🎯 Márgenes Objetivo (%)</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label className="text-xs">Margen Lista</Label><Input type="number" step="0.1" value={form.margin_list_pct} onChange={e => set('margin_list_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="55.0" /></div>
+            <div><Label className="text-xs">Margen Arquitecto</Label><Input type="number" step="0.1" value={form.margin_architect_pct} onChange={e => set('margin_architect_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="53.0" /></div>
+            <div><Label className="text-xs">Margen Proyecto</Label><Input type="number" step="0.1" value={form.margin_project_pct} onChange={e => set('margin_project_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="50.0" /></div>
+            <div><Label className="text-xs">Margen Mayoreo</Label><Input type="number" step="0.1" value={form.margin_wholesale_pct} onChange={e => set('margin_wholesale_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="44.0" /></div>
+          </div>
+
           <p className="text-[10px] font-semibold text-muted-foreground pt-1">📦 Inventario & Specs</p>
           <div className="grid grid-cols-2 gap-2">
             <div><Label className="text-xs">Cobertura m²</Label><Input type="number" step="0.01" value={form.coverage_m2} onChange={e => set('coverage_m2', e.target.value)} className="h-8 text-xs mt-1" /></div>
             <div><Label className="text-xs">Punto Reorden</Label><Input type="number" value={form.reorder_point} onChange={e => set('reorder_point', e.target.value)} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Dimensiones</Label><Input value={form.dimensions} onChange={e => set('dimensions', e.target.value)} className="h-8 text-xs mt-1" placeholder="60x60cm" /></div>
+            <div><Label className="text-xs">Dimensiones</Label><Input value={form.dimensions} onChange={e => set('dimensions', e.target.value)} className="h-8 text-xs mt-1" placeholder="38x100'" /></div>
             <div><Label className="text-xs">Uds/Caja</Label><Input type="number" value={form.units_per_pack} onChange={e => set('units_per_pack', e.target.value)} className="h-8 text-xs mt-1" /></div>
             <div><Label className="text-xs">Lead Time (días)</Label><Input type="number" value={form.lead_time_days} onChange={e => set('lead_time_days', e.target.value)} className="h-8 text-xs mt-1" /></div>
           </div>
