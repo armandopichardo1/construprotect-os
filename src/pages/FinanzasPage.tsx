@@ -1104,7 +1104,7 @@ function deltaStr(cur: number, prev: number): string {
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
-function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[]; expenses: any[] }) {
+function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[] }) {
   const [period, setPeriod] = useState('current_month');
   const [expandCogs, setExpandCogs] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
