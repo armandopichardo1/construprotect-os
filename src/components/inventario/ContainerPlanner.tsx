@@ -41,8 +41,15 @@ type ProductLine = {
 };
 
 export function ContainerPlanner() {
+  const queryClient = useQueryClient();
   const [containerType, setContainerType] = useState<ContainerType>('40hc');
   const [orderLines, setOrderLines] = useState<Record<string, number>>({});
+  const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [shipmentSupplierId, setShipmentSupplierId] = useState('');
+  const [shipmentPoNumber, setShipmentPoNumber] = useState('');
+  const [shipmentEta, setShipmentEta] = useState('');
+  const [shipmentNotes, setShipmentNotes] = useState('');
+  const [creatingShipment, setCreatingShipment] = useState(false);
   const container = CONTAINER_TYPES[containerType];
 
   const { data: products } = useQuery({
