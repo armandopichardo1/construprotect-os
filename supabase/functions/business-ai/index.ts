@@ -202,7 +202,7 @@ Genera la agenda semanal priorizada.`;
 
     } else if (action === "po-recommender") {
       const [{ data: inventory }, { data: movements }, { data: deals }, { data: sales }, { data: expenses }, { data: rates }] = await Promise.all([
-        supabase.from("inventory").select("*, products(id, name, sku, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand)"),
+        supabase.from("inventory").select("*, products(id, name, sku, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand, cbm_per_unit, weight_kg_per_unit, min_order_qty)"),
         supabase.from("inventory_movements").select("product_id, quantity, movement_type, created_at").order("created_at"),
         supabase.from("deals").select("products_of_interest, value_usd, stage, probability").not("stage", "in", '("won","lost")'),
         supabase.from("sales").select("total_usd, date").order("date", { ascending: false }).limit(90),
@@ -240,7 +240,10 @@ Genera la agenda semanal priorizada.`;
         const avgMonthly = vel ? vel.sold / 6 : 0;
         const daysOfSupply = avgMonthly > 0 ? Math.round((i.quantity_on_hand / avgMonthly) * 30) : 999;
         const trend = vel?.months || [0,0,0,0,0,0];
-        return `SKU:${p.sku} | ${p.name} | Stock:${i.quantity_on_hand} | Reorden:${p.reorder_point} | ReordenQty:${p.reorder_qty} | Costo:$${p.unit_cost_usd} | Lead:${p.lead_time_days}d | VelProm:${avgMonthly.toFixed(1)}/mes | DiasStock:${daysOfSupply} | Tendencia:[${trend.join(",")}] | Marca:${p.brand || "?"}`;
+        const dailyVel = avgMonthly / 30;
+        const safetyStock = Math.ceil(dailyVel * (p.lead_time_days || 21) * 1.5);
+        const daysToStockout = dailyVel > 0 ? Math.round(i.quantity_on_hand / dailyVel) : 999;
+        return `SKU:${p.sku} | ${p.name} | Stock:${i.quantity_on_hand} | Reorden:${p.reorder_point} | ReordenQty:${p.reorder_qty} | MinBatch:${p.min_order_qty || 1} | Costo:$${p.unit_cost_usd} | Lead:${p.lead_time_days}d | VelProm:${avgMonthly.toFixed(1)}/mes | DiasStock:${daysOfSupply} | DiasAgotam:${daysToStockout} | SafetyStock:${safetyStock} | CBM:${p.cbm_per_unit || 0} | Kg:${p.weight_kg_per_unit || 0} | Tendencia:[${trend.join(",")}] | Marca:${p.brand || "?"}`;
       }).filter(Boolean);
 
       systemPrompt = `Eres el Director de Compras de ConstruProtect SRL. Genera una orden de compra recomendada basada en análisis de inventario.
