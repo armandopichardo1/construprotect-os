@@ -169,7 +169,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                   const dayColor = stageColor(days);
                   const stageCfg = DEAL_STAGES[deal.stage];
                   return (
-                    <TableRow key={deal.id} className="group hover:bg-muted/30">
+                    <TableRow key={deal.id} className="group hover:bg-muted/30 cursor-pointer sm:cursor-default" onClick={() => onEdit(deal)}>
                       <TableCell className="py-1.5">
                         <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{deal.title}</p>
                         <p className="text-[9px] text-muted-foreground truncate sm:hidden">{deal.contacts?.contact_name || ''}</p>
@@ -180,7 +180,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                           <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.company_name || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="py-1.5 hidden sm:table-cell">
+                      <TableCell className="py-1.5 hidden sm:table-cell" onClick={e => e.stopPropagation()}>
                         <Select value={deal.stage} onValueChange={(v) => updateStage(deal.id, v as DealStage)}>
                           <SelectTrigger className="h-6 text-[10px] w-auto min-w-[110px] rounded-lg border-0 bg-muted px-2">
                             <SelectValue />
@@ -204,7 +204,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                       <TableCell className="py-1.5 hidden lg:table-cell">
                         <span className="text-[11px] text-muted-foreground truncate">{deal.project_name || '—'}</span>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onEdit(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
                           <button onClick={() => onDelete(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
