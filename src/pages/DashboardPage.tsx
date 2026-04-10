@@ -218,6 +218,7 @@ export default function DashboardPage() {
 
   // Dynamic alerts from configurable rules
   const { data: computedAlerts = [] } = useAlerts();
+  useAlertLogger(computedAlerts.length > 0 ? computedAlerts : undefined);
 
   // Toast notifications for critical inventory/shipment alerts
   useEffect(() => {
