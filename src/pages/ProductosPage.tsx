@@ -150,8 +150,15 @@ export default function ProductosPage() {
                     </TableCell>
                     <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.unit_cost_usd))}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-medium text-primary">{formatUSD(Number(p.price_list_usd))}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_architect_usd))}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_project_usd))}</TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || 30)} label="Margen Lista" />
+                    </TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || 25)} label="Margen Arquitecto" />
+                    </TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || 20)} label="Margen Proyecto" />
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
