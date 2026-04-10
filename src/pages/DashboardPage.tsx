@@ -179,7 +179,15 @@ export default function DashboardPage() {
         name, value, color: CATEGORY_COLORS[name] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
-      return { monthly, totalRevenue, totalCogs, totalExpenses, totalDirectCosts, topProducts: topNormalized, revByCategory };
+      // Category trend by month
+      const topCats = Object.entries(catRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
+      const categoryTrend = last12.map(({ key, month }) => {
+        const row: Record<string, any> = { month };
+        topCats.forEach(cat => { row[cat] = Math.round(catMonthly[cat]?.[key] || 0); });
+        return row;
+      });
+
+      return { monthly, totalRevenue, totalCogs, totalExpenses, totalDirectCosts, topProducts: topNormalized, revByCategory, categoryTrend, topCats };
     },
   });
 
