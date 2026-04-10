@@ -16,6 +16,8 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
   { id: 'client_concentration', label: 'Concentración de cliente', description: 'Alerta cuando un cliente concentra más del umbral del ingreso total', category: 'concentration', enabled: true, threshold: 40, unit: '%' },
   { id: 'low_stock', label: 'Stock bajo', description: 'Alerta cuando el inventario está en o debajo del punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
   { id: 'out_of_stock', label: 'Sin stock', description: 'Alerta cuando el inventario llega a cero', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+  { id: 'reorder_needed', label: 'Reorden necesario', description: 'Alerta cuando un producto alcanza exactamente su punto de reorden', category: 'inventory', enabled: true, threshold: 0, unit: 'units' },
+  { id: 'shipment_delayed', label: 'Envío retrasado', description: 'Alerta cuando un envío supera su ETA sin ser recibido', category: 'inventory', enabled: true, threshold: 0, unit: 'days' },
   { id: 'stale_deals', label: 'Deals estancados', description: 'Alerta cuando un deal no se mueve en X días', category: 'crm', enabled: true, threshold: 7, unit: 'days' },
   { id: 'overdue_activities', label: 'Actividades vencidas', description: 'Alerta cuando hay actividades pasadas de su fecha límite', category: 'crm', enabled: true, threshold: 0, unit: 'days' },
   { id: 'overdue_payments', label: 'Pagos vencidos', description: 'Alerta cuando hay ventas con estado vencido', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
