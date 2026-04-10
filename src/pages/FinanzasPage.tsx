@@ -50,6 +50,8 @@ const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4
 export default function FinanzasPage() {
   const [tab, setTab] = useState('Resumen');
   const [aiOpen, setAiOpen] = useState(false);
+  const [salePrefill, setSalePrefill] = useState<any>(null);
+  const [expensePrefill, setExpensePrefill] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: sales = [] } = useQuery({
@@ -214,7 +216,7 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'Ventas' && <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} onExport={() => {
+        {tab === 'Ventas' && <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} prefill={salePrefill} clearPrefill={() => setSalePrefill(null)} onExport={() => {
           exportToExcel(sales.map((s: any) => ({
             Fecha: s.date, Ref: s.invoice_ref, Cliente: s.crm_clients?.name,
             'Subtotal USD': s.subtotal_usd, 'ITBIS USD': s.itbis_usd, 'Total USD': s.total_usd,
