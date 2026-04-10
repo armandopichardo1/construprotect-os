@@ -245,14 +245,11 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <p className="text-sm text-muted-foreground">Hola, {user?.user_metadata?.full_name || 'usuario'} 👋</p>
           <div className="flex gap-2 ml-auto">
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/finanzas')}>
-              <Plus className="w-3 h-3" /> Venta
-            </Button>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/finanzas')}>
-              <DollarSign className="w-3 h-3" /> Gasto
-            </Button>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/crm')}>
               <Clock className="w-3 h-3" /> Actividad
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/inventario')}>
+              <Package className="w-3 h-3" /> Inventario
             </Button>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={generateReview}>
               <Bot className="w-3.5 h-3.5" /> AI Business Review
