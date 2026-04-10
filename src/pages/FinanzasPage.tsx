@@ -47,6 +47,33 @@ const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6'];
 
+function ExchangeRateKpi({ rate }: { rate: any }) {
+  const queryClient = useQueryClient();
+  const [fetching, setFetching] = useState(false);
+
+  const fetchRate = async () => {
+    setFetching(true);
+    try {
+      const resp = await supabase.functions.invoke('fetch-exchange-rate');
+      if (resp.error) throw resp.error;
+      toast.success('Tasa actualizada');
+      queryClient.invalidateQueries({ queryKey: ['latest-rate'] });
+    } catch { toast.error('Error al obtener tasa'); }
+    setFetching(false);
+  };
+
+  return (
+    <div className="rounded-2xl bg-card border border-border p-5 text-center relative">
+      <p className="text-2xl font-bold text-foreground">{rate?.usd_sell ? `${Number(rate.usd_sell).toFixed(2)}` : '—'}</p>
+      <p className="text-xs text-muted-foreground mt-1">USD/DOP Venta</p>
+      <button onClick={fetchRate} disabled={fetching}
+        className="absolute top-2 right-2 p-1 rounded-lg text-muted-foreground hover:text-primary transition-colors">
+        <RefreshCw className={cn('w-3.5 h-3.5', fetching && 'animate-spin')} />
+      </button>
+    </div>
+  );
+}
+
 export default function FinanzasPage() {
   const [tab, setTab] = useState('Resumen');
   const [aiOpen, setAiOpen] = useState(false);
