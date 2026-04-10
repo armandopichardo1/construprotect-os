@@ -506,6 +506,20 @@ export default function InventarioPage() {
               </Button>
             </DialogTitle>
           </DialogHeader>
+
+          {/* Cash Flow Check */}
+          {cashData && (
+            <div className={cn('rounded-xl p-3 flex items-center gap-3 text-xs',
+              cashData.estimatedCash > 0 ? 'bg-success/10' : 'bg-destructive/10')}>
+              <AlertTriangle className={cn('w-4 h-4 shrink-0', cashData.estimatedCash > 0 ? 'text-success' : 'text-destructive')} />
+              <div className="flex-1 grid grid-cols-4 gap-2">
+                <div><span className="text-muted-foreground">Cobrado:</span> <span className="font-mono font-semibold text-success">{formatUSD(cashData.totalReceived)}</span></div>
+                <div><span className="text-muted-foreground">Gastos mes:</span> <span className="font-mono text-destructive">{formatUSD(cashData.totalExpenses)}</span></div>
+                <div><span className="text-muted-foreground">POs pend.:</span> <span className="font-mono text-warning">{formatUSD(cashData.pendingPOCost)}</span></div>
+                <div><span className="text-muted-foreground">Disponible:</span> <span className={cn('font-mono font-bold', cashData.estimatedCash >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(cashData.estimatedCash)}</span></div>
+              </div>
+            </div>
+          )}
           
           {poContent ? (
             poTableData ? (
