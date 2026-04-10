@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List } from 'lucide-react';
+import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List, Phone, MessageCircle, Mail } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
