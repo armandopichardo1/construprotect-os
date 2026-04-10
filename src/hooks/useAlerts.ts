@@ -310,7 +310,37 @@ export function useAlerts() {
         }
       }
 
-      // Sort: critical first
+      // 9. Client declining — no purchases in X days
+      if (ruleMap['client_declining'] && sales?.length) {
+        const threshold = ruleMap['client_declining'].threshold;
+        const now = Date.now();
+        // Group sales by contact_id → find last purchase date
+        const lastPurchase: Record<string, { name: string; lastDate: string }> = {};
+        sales.forEach((s: any) => {
+          const cid = s.contact_id;
+          if (!cid) return;
+          if (!lastPurchase[cid] || s.date > lastPurchase[cid].lastDate) {
+            lastPurchase[cid] = { name: s.crm_clients?.name || '?', lastDate: s.date };
+          }
+        });
+        const inactive = Object.values(lastPurchase).filter(c => {
+          const daysSince = (now - new Date(c.lastDate).getTime()) / 86400000;
+          return daysSince > threshold;
+        });
+        if (inactive.length > 0) {
+          const sorted = inactive.sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+          alerts.push({
+            ruleId: 'client_declining',
+            label: 'Clientes inactivos',
+            category: 'crm',
+            severity: 'warning',
+            count: inactive.length,
+            message: `${inactive.length} cliente(s) sin compras en ${threshold}+ días: ${sorted.slice(0, 3).map(c => c.name).join(', ')}`,
+            navigateTo: '/finanzas',
+          });
+        }
+      }
+
       alerts.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
       return alerts;
     },
