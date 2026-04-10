@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, MessageCircle } from 'lucide-react';
 
 interface ClientCardProps {
   client: any;
