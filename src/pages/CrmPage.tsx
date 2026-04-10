@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus, Download, Calculator } from 'lucide-react';
+import { Plus, Download, Calculator, Upload } from 'lucide-react';
 import { type Contact, type Deal, type Activity, type Quote } from '@/lib/crm-utils';
 import { PipelineTab } from '@/components/crm/PipelineTab';
 import { ContactsTab, ContactDialog } from '@/components/crm/ContactsTab';
@@ -17,6 +17,7 @@ import { ContactDetailDialog } from '@/components/crm/ContactDetailDialog';
 import { ClientProjectsTab } from '@/components/crm/ClientProjectsTab';
 import { QuoteCreateDialog } from '@/components/crm/QuoteCreateDialog';
 import { ProjectPlannerDialog } from '@/components/crm/ProjectPlannerDialog';
+import { ContactImportDialog } from '@/components/crm/ContactImportDialog';
 import { exportToExcel } from '@/lib/export-utils';
 
 type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes' | 'projects';
@@ -35,6 +36,7 @@ export default function CrmPage() {
   const [deleteItem, setDeleteItem] = useState<{ type: 'contact' | 'deal' | 'activity' | 'quote'; item: any } | null>(null);
   const [showQuoteCreate, setShowQuoteCreate] = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
+  const [showContactImport, setShowContactImport] = useState(false);
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['crm-contacts'],
@@ -127,6 +129,11 @@ export default function CrmPage() {
               <Download className="w-3.5 h-3.5 mr-1" /> Excel
             </Button>
           )}
+          {tab === 'contacts' && (
+            <Button size="sm" variant="outline" onClick={() => setShowContactImport(true)}>
+              <Upload className="w-3.5 h-3.5 mr-1" /> Importar
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setShowPlanner(true)}>
             <Calculator className="w-3.5 h-3.5 mr-1" /> Planificador m²
           </Button>
@@ -171,6 +178,7 @@ export default function CrmPage() {
       <ContactDetailDialog open={!!viewContact} onOpenChange={(v) => { if (!v) setViewContact(null); }} contact={viewContact} />
       <QuoteCreateDialog open={showQuoteCreate} onOpenChange={setShowQuoteCreate} contacts={contacts} queryClient={queryClient} />
       <ProjectPlannerDialog open={showPlanner} onOpenChange={setShowPlanner} />
+      <ContactImportDialog open={showContactImport} onOpenChange={setShowContactImport} />
     </AppLayout>
   );
 }
