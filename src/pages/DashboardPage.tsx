@@ -30,9 +30,9 @@ const PIE_COLORS = ['hsl(217, 91%, 60%)', 'hsl(160, 84%, 39%)', 'hsl(38, 92%, 50
 
 const DEAL_STAGE_LABELS: Record<string, string> = {
   prospecting: 'Prospección', initial_contact: 'Contacto', demo_sample: 'Demo',
-  quote_sent: 'Cotización', negotiation: 'Negociación', closing: 'Cierre',
+  quote_sent: 'Cotización', negotiation: 'Negociación', closing: 'Cierre', delivered: 'Entregado',
 };
-const FUNNEL_COLORS = ['hsl(217, 91%, 65%)', 'hsl(217, 91%, 58%)', 'hsl(217, 91%, 52%)', 'hsl(217, 91%, 46%)', 'hsl(217, 91%, 40%)', 'hsl(217, 91%, 34%)'];
+const FUNNEL_COLORS = ['hsl(217, 91%, 65%)', 'hsl(217, 91%, 58%)', 'hsl(217, 91%, 52%)', 'hsl(217, 91%, 46%)', 'hsl(217, 91%, 40%)', 'hsl(217, 91%, 34%)', 'hsl(217, 91%, 28%)'];
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -129,7 +129,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: deals } = await supabase.from('deals').select('stage, value_usd');
       if (!deals) return [];
-      const stages = ['prospecting', 'initial_contact', 'demo_sample', 'quote_sent', 'negotiation', 'closing'];
+      const stages = ['prospecting', 'initial_contact', 'demo_sample', 'quote_sent', 'negotiation', 'closing', 'delivered'];
       return stages.map((stage, i) => {
         const stageDeals = deals.filter(d => d.stage === stage);
         return {
