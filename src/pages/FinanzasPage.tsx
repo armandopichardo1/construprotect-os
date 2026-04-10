@@ -216,6 +216,7 @@ export default function FinanzasPage() {
           })), 'gastos', 'Gastos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
+        {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
 
