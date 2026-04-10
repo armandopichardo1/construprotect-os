@@ -74,6 +74,66 @@ export type Database = {
           },
         ]
       }
+      brands: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chart_of_accounts: {
+        Row: {
+          account_type: string
+          classification: string | null
+          code: string | null
+          created_at: string
+          currency: string | null
+          description: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_type: string
+          classification?: string | null
+          code?: string | null
+          created_at?: string
+          currency?: string | null
+          description: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_type?: string
+          classification?: string | null
+          code?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_projects: {
         Row: {
           area_m2: number | null
@@ -1008,6 +1068,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      services: {
+        Row: {
+          business_line: string | null
+          created_at: string
+          description: string
+          family: string | null
+          id: string
+          is_active: boolean
+          sku: string
+          updated_at: string
+        }
+        Insert: {
+          business_line?: string | null
+          created_at?: string
+          description: string
+          family?: string | null
+          id?: string
+          is_active?: boolean
+          sku: string
+          updated_at?: string
+        }
+        Update: {
+          business_line?: string | null
+          created_at?: string
+          description?: string
+          family?: string | null
+          id?: string
+          is_active?: boolean
+          sku?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       settings: {
         Row: {

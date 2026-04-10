@@ -10,6 +10,7 @@ import ProductosPage from "./pages/ProductosPage";
 import CrmPage from "./pages/CrmPage";
 import FinanzasPage from "./pages/FinanzasPage";
 import MasPage from "./pages/MasPage";
+import MaestrasPage from "./pages/MaestrasPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ function ProtectedRoutes() {
       <Route path="/productos" element={<ProductosPage />} />
       <Route path="/crm" element={<CrmPage />} />
       <Route path="/finanzas" element={<FinanzasPage />} />
+      <Route path="/maestras" element={<MaestrasPage />} />
       <Route path="/mas" element={<MasPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
