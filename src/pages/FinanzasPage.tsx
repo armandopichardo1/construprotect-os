@@ -738,6 +738,7 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
       amount_usd: Math.round(amtUsd * 100) / 100,
       amount_dop: Math.round(amtDop * 100) / 100,
       exchange_rate: xr,
+      account_id: form.account_id || null,
     };
 
     const { error } = isEdit
