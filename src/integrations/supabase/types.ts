@@ -143,6 +143,45 @@ export type Database = {
           },
         ]
       }
+      competitor_entries: {
+        Row: {
+          competitor_name: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          our_price_usd: number | null
+          price_usd: number | null
+          product_category: string | null
+          source: string | null
+          spotted_at: string
+        }
+        Insert: {
+          competitor_name: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          our_price_usd?: number | null
+          price_usd?: number | null
+          product_category?: string | null
+          source?: string | null
+          spotted_at?: string
+        }
+        Update: {
+          competitor_name?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          our_price_usd?: number | null
+          price_usd?: number | null
+          product_category?: string | null
+          source?: string | null
+          spotted_at?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           address: string | null
