@@ -71,6 +71,7 @@ export function useAlerts() {
         { data: deals },
         { data: activities },
         { data: expenses },
+        { data: shipments },
       ] = await Promise.all([
         supabase.from('products').select('id, name, margin_list_pct, margin_wholesale_pct, margin_project_pct, margin_architect_pct'),
         supabase.from('inventory').select('product_id, quantity_on_hand, products(name, reorder_point)'),
@@ -79,6 +80,7 @@ export function useAlerts() {
         supabase.from('deals').select('id, title, value_usd, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
         supabase.from('activities').select('id, title, due_date, contacts(contact_name)').eq('is_completed', false),
         supabase.from('expenses').select('date, amount_usd'),
+        supabase.from('shipments').select('id, po_number, supplier_name, status, estimated_arrival, actual_arrival').not('status', 'eq', 'received'),
       ]);
 
       const ruleMap = Object.fromEntries(enabledRules.map(r => [r.id, r]));
