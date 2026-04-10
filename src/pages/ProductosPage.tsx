@@ -17,6 +17,47 @@ type Product = Tables<'products'>;
 
 const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
+const MIN_MARGIN_THRESHOLD = 5; // margen mínimo aceptable en %
+
+function calcRealMargin(cost: number, price: number): number | null {
+  if (!price || price === 0) return null;
+  return ((price - cost) / price) * 100;
+}
+
+function MarginCell({ cost, price, targetPct, label }: { cost: number; price: number; targetPct: number; label: string }) {
+  const real = calcRealMargin(cost, price);
+  if (real === null) return <span className="text-muted-foreground">—</span>;
+
+  const belowTarget = real < targetPct;
+  const critical = real < MIN_MARGIN_THRESHOLD;
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={`inline-flex items-center gap-1 font-mono ${
+            critical ? 'text-destructive font-semibold' : belowTarget ? 'text-amber-500' : 'text-emerald-500'
+          }`}>
+            {critical ? (
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+            ) : belowTarget ? (
+              <TrendingDown className="w-3 h-3 shrink-0" />
+            ) : (
+              <TrendingUp className="w-3 h-3 shrink-0 opacity-60" />
+            )}
+            {real.toFixed(1)}%
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p className="font-medium">{label}</p>
+          <p>Real: {real.toFixed(1)}% — Objetivo: {targetPct.toFixed(1)}%</p>
+          {belowTarget && <p className="text-amber-400">⚠ {(targetPct - real).toFixed(1)} pts debajo del objetivo</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function ProductosPage() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
