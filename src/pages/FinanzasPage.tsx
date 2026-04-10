@@ -1632,6 +1632,8 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
   const [view, setView] = useState<'pl_detail' | 'margin' | 'aging' | 'monthly' | 'clientes' | 'productos'>('pl_detail');
   const [periodFilter, setPeriodFilter] = useState('ytd');
   const [trendMode, setTrendMode] = useState<'bars' | 'margin'>('bars');
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
   const now = useMemo(() => new Date(), []);
   const xr = Number(rate?.usd_sell) || 60.76;
 
@@ -1644,9 +1646,13 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
       case 'quarter': return { start: fmt(new Date(y, m - 3, 1)), end: fmt(now) };
       case 'ytd': return { start: `${y}-01-01`, end: fmt(now) };
       case 'year': return { start: `${y}-01-01`, end: `${y}-12-31` };
+      case 'custom': return {
+        start: customFrom ? fmt(customFrom) : '2000-01-01',
+        end: customTo ? fmt(customTo) : fmt(now),
+      };
       default: return { start: '2000-01-01', end: '2099-12-31' };
     }
-  }, [periodFilter, now]);
+  }, [periodFilter, now, customFrom, customTo]);
 
   const filteredSales = useMemo(() => sales.filter((s: any) => s.date >= dateRange.start && s.date <= dateRange.end), [sales, dateRange]);
   const filteredSaleIds = useMemo(() => new Set(filteredSales.map((s: any) => s.id)), [filteredSales]);
