@@ -11,12 +11,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-const CATEGORY_CONFIG: Record<string, { icon: typeof Bell; label: string; color: string }> = {
-  inventory: { icon: Package, label: 'Inventario', color: 'text-primary' },
-  finance: { icon: DollarSign, label: 'Finanzas', color: 'text-warning' },
-  margin: { icon: TrendingDown, label: 'Márgenes', color: 'text-destructive' },
-  crm: { icon: Users, label: 'CRM', color: 'text-success' },
-  concentration: { icon: ShieldAlert, label: 'Concentración', color: 'text-destructive' },
+const CATEGORY_CONFIG: Record<string, { icon: typeof Bell; label: string; color: string; route: string }> = {
+  inventory: { icon: Package, label: 'Inventario', color: 'text-primary', route: '/inventario?tab=reorden' },
+  finance: { icon: DollarSign, label: 'Finanzas', color: 'text-warning', route: '/finanzas' },
+  margin: { icon: TrendingDown, label: 'Márgenes', color: 'text-destructive', route: '/productos' },
+  crm: { icon: Users, label: 'CRM', color: 'text-success', route: '/crm?tab=pipeline' },
+  concentration: { icon: ShieldAlert, label: 'Concentración', color: 'text-destructive', route: '/crm?tab=pipeline' },
 };
 
 function timeAgo(dateStr: string): string {
