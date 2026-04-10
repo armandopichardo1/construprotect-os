@@ -69,9 +69,10 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: Conta
               <button onClick={() => onDelete(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
-            {c.phone && <span>📞 {c.phone}</span>}
-            {c.email && <span>📧 {c.email}</span>}
+          <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground items-center">
+            {c.phone && <a href={`tel:${c.phone}`} className="hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>📞 {c.phone}</a>}
+            {c.whatsapp && <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-green-500 transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>💬 WhatsApp</a>}
+            {c.email && <a href={`mailto:${c.email}`} className="hover:text-primary transition-colors cursor-pointer" onClick={e => e.stopPropagation()}>📧 {c.email}</a>}
             <span className="text-foreground font-medium">${Number(c.lifetime_revenue_usd).toLocaleString()}</span>
             <span>{c.total_orders} pedidos</span>
           </div>
