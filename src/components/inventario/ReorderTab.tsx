@@ -339,6 +339,9 @@ export function ReorderTab() {
               </div>
             ))}
           </div>
+          <Button size="sm" className="gap-1.5 mt-2" onClick={generateCart}>
+            <ShoppingCart className="w-3.5 h-3.5" /> Generar Orden de Compra ({criticalItems.length} productos)
+          </Button>
         </div>
       )}
 
@@ -382,6 +385,9 @@ export function ReorderTab() {
             <Check className="w-3.5 h-3.5" /> Aplicar todas las sugerencias
           </Button>
         )}
+        <Button size="sm" variant="outline" onClick={generateCart} className="gap-1.5" disabled={needsAttention.length === 0}>
+          <ShoppingCart className="w-3.5 h-3.5" /> Generar OC
+        </Button>
         <Button size="sm" variant="outline" className="gap-1.5 ml-auto" onClick={() => {
           if (!items.length) return;
           exportToExcel(items.sort((a, b) => a.daysOfSupply - b.daysOfSupply).map(p => ({
@@ -562,6 +568,82 @@ export function ReorderTab() {
           </Table>
         </div>
       </div>
+    </div>
+
+      {/* Cart Dialog */}
+      <Dialog open={showCart} onOpenChange={setShowCart}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" /> Orden de Compra Propuesta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Cantidades calculadas según velocidad de venta, lead time y stock de seguridad. Revisa y ajusta antes de crear.
+            </p>
+
+            {Object.entries(cartBySupplier).map(([supplier, supplierItems]) => {
+              const supplierTotal = supplierItems.reduce((s, i) => s + i.qty_to_order * i.unit_cost, 0);
+              return (
+                <div key={supplier} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="px-4 py-2.5 bg-muted/50 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">📦 {supplier}</span>
+                    <span className="text-xs text-muted-foreground">{supplierItems.length} productos · {formatUSD(supplierTotal)}</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-[10px]">SKU</TableHead>
+                        <TableHead className="text-[10px]">Producto</TableHead>
+                        <TableHead className="text-[10px] text-right">Costo Unit.</TableHead>
+                        <TableHead className="text-[10px] text-right">Cantidad</TableHead>
+                        <TableHead className="text-[10px] text-right">Subtotal</TableHead>
+                        <TableHead className="text-[10px] w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {supplierItems.map(item => (
+                        <TableRow key={item.product_id}>
+                          <TableCell className="text-[10px] font-mono text-muted-foreground">{item.sku}</TableCell>
+                          <TableCell className="text-xs">{item.name}</TableCell>
+                          <TableCell className="text-xs text-right font-mono">{formatUSD(item.unit_cost)}</TableCell>
+                          <TableCell className="text-right">
+                            <Input type="number" min={1} value={item.qty_to_order} onChange={e => updateCartQty(item.product_id, parseInt(e.target.value) || 1)}
+                              className="w-20 h-6 text-xs text-right p-1 ml-auto" />
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(item.qty_to_order * item.unit_cost)}</TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => removeFromCart(item.product_id)}>
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              );
+            })}
+
+            {cartItems.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-6">No hay productos en la orden</p>
+            )}
+
+            {cartItems.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <div>
+                  <p className="text-xs text-muted-foreground">{cartItems.length} productos · {Object.keys(cartBySupplier).length} proveedor(es)</p>
+                  <p className="text-sm font-bold text-foreground">Total estimado: {formatUSD(cartTotal)}</p>
+                </div>
+                <Button onClick={createShipments} disabled={cartSaving} className="gap-1.5">
+                  <ShoppingCart className="w-3.5 h-3.5" /> {cartSaving ? 'Creando...' : 'Crear Órdenes de Compra'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
