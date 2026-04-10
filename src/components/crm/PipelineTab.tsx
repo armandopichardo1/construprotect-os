@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils';
 import { type Deal, type Contact, DEAL_STAGES, type DealStage, daysInStage, stageColor } from '@/lib/crm-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List, Phone, MessageCircle, Mail } from 'lucide-react';
+import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List, Phone, MessageCircle, Mail, Search, Filter } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
@@ -24,6 +25,8 @@ const PIPELINE_STAGES: DealStage[] = ['prospecting', 'initial_contact', 'demo_sa
 export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<'board' | 'table'>('board');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const activeStages = PIPELINE_STAGES.filter(s => s !== 'won' && s !== 'lost');
 
   const updateStage = async (dealId: string, newStage: DealStage) => {
@@ -122,7 +125,30 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
       )}
 
       {/* Table view */}
-      {view === 'table' && (
+      {view === 'table' && (() => {
+        const filteredDeals = deals.filter(d => {
+          const matchesStage = stageFilter === 'all' || d.stage === stageFilter;
+          const q = searchQuery.toLowerCase();
+          const matchesSearch = !q || d.title.toLowerCase().includes(q) || (d.contacts?.contact_name || '').toLowerCase().includes(q) || (d.contacts?.company_name || '').toLowerCase().includes(q) || (d.project_name || '').toLowerCase().includes(q);
+          return matchesStage && matchesSearch;
+        });
+        return (<>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-[260px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input placeholder="Buscar deal, contacto, empresa..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
+          </div>
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="h-8 text-[11px] w-auto min-w-[130px] rounded-lg">
+              <Filter className="w-3 h-3 mr-1.5" /><SelectValue placeholder="Etapa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">Todas las etapas</SelectItem>
+              {PIPELINE_STAGES.map(s => (<SelectItem key={s} value={s} className="text-[11px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <span className="text-[10px] text-muted-foreground">{filteredDeals.length} de {deals.length}</span>
+        </div>
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -139,7 +165,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deals.map(deal => {
+                {filteredDeals.map(deal => {
                   const days = daysInStage(deal.updated_at);
                   const dayColor = stageColor(days);
                   const stageCfg = DEAL_STAGES[deal.stage];
@@ -187,16 +213,17 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                     </TableRow>
                   );
                 })}
-                {deals.length === 0 && (
+                {filteredDeals.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-6 text-xs text-muted-foreground">No hay deals</TableCell>
+                    <TableCell colSpan={8} className="text-center py-6 text-xs text-muted-foreground">{searchQuery || stageFilter !== 'all' ? 'Sin resultados' : 'No hay deals'}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         </div>
-      )}
+        </>);
+      })()}
 
       {(wonDeals.length > 0 || deals.filter(d => d.stage === 'lost').length > 0) && (
         <div className="grid grid-cols-2 gap-2">
