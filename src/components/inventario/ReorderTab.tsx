@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
@@ -49,7 +50,7 @@ export function ReorderTab() {
     queryFn: async () => {
       const [{ data: inv }, { data: prods }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
-        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand').eq('is_active', true),
+        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, brand, min_order_qty').eq('is_active', true),
         supabase.from('inventory_movements').select('product_id, quantity, movement_type, created_at').order('created_at'),
       ]);
       if (!prods) return [];
@@ -74,6 +75,13 @@ export function ReorderTab() {
         const olderAvg = sales ? sales.months.slice(0, 3).reduce((a, b) => a + b, 0) / 3 : 0;
         const trendPct = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
         const daysOfSupply = avgMonthly > 0 ? Math.round(((inv?.quantity_on_hand || 0) / avgMonthly) * 30) : 999;
+        const dailyVelocity = avgMonthly / 30;
+        const leadTime = Number(p.lead_time_days) || 21;
+        const minBatch = Number((p as any).min_order_qty) || 1;
+        const safetyStock = Math.ceil(dailyVelocity * leadTime * 1.5);
+        const reorderPointCalc = safetyStock + Math.ceil(dailyVelocity * leadTime);
+        const daysToStockout = dailyVelocity > 0 ? Math.round((inv?.quantity_on_hand || 0) / dailyVelocity) : 999;
+        const arrivalDay = daysToStockout - leadTime;
         return {
           ...p,
           qty: inv?.quantity_on_hand || 0,
@@ -83,7 +91,13 @@ export function ReorderTab() {
           daysOfSupply,
           reorder_point: Number(p.reorder_point) || 0,
           reorder_qty: Number(p.reorder_qty) || 0,
-          lead_time_days: Number(p.lead_time_days) || 21,
+          lead_time_days: leadTime,
+          min_order_qty: minBatch,
+          safetyStock,
+          reorderPointCalc,
+          daysToStockout,
+          arrivalDay, // negative = will stockout before order arrives
+          dailyVelocity,
         };
       });
     },
@@ -172,6 +186,7 @@ export function ReorderTab() {
 
   const items = products || [];
   const needsAttention = items.filter(p => p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point);
+  const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
 
   const urgencyStyle = (urgency: string) => {
