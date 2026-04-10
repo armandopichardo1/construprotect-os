@@ -24,7 +24,19 @@ import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+
+const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
+  freight: { label: 'Flete', icon: '🚢' },
+  customs: { label: 'Aduanas', icon: '🛃' },
+  raw_materials: { label: 'Materiales', icon: '🧱' },
+  packaging: { label: 'Empaque', icon: '📦' },
+  labor: { label: 'Mano de Obra', icon: '👷' },
+  logistics: { label: 'Logística', icon: '🚚' },
+  warehousing: { label: 'Almacenaje', icon: '🏭' },
+  insurance: { label: 'Seguro', icon: '🛡️' },
+  other: { label: 'Otro', icon: '📎' },
+};
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
@@ -99,6 +111,15 @@ export default function FinanzasPage() {
     queryKey: ['expenses'],
     queryFn: async () => {
       const { data, error } = await supabase.from('expenses').select('*, chart_of_accounts(code, description)').order('date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: costs = [] } = useQuery({
+    queryKey: ['costs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('costs').select('*, chart_of_accounts(code, description)').order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -285,6 +306,12 @@ export default function FinanzasPage() {
             Fecha: e.date, Descripción: e.description, Categoría: e.category,
             Proveedor: e.vendor, 'Monto USD': e.amount_usd, 'Monto DOP': e.amount_dop,
           })), 'gastos', 'Gastos');
+        }} />}
+        {tab === 'Costos' && <CostosTab costs={costs} queryClient={queryClient} rate={latestRate} onExport={() => {
+          exportToExcel(costs.map((c: any) => ({
+            Fecha: c.date, Descripción: c.description, Categoría: c.category,
+            Proveedor: c.vendor, 'Monto USD': c.amount_usd, 'Monto DOP': c.amount_dop,
+          })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} />}
