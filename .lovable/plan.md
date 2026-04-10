@@ -1,43 +1,47 @@
 
 
-## Plan: Analítica por Cliente/Producto + Alerta de Cliente Inactivo
+## Plan: Módulo "Crear Transacción" con IA en Finanzas
 
-### Resumen
-Agregar una nueva alerta "Cliente sin compras recientes" al motor de alertas, y enriquecer la analítica existente en el Dashboard y Finanzas > Reportes con métricas de tendencia de ventas por cliente y producto.
+### Concepto
+Reemplazar el actual diálogo flotante "AI Asistente" con una pestaña completa "Crear Transacción" en el módulo de Finanzas. El usuario escribe en lenguaje natural lo que sucedió (ej: "Pagué RD$5,000 de electricidad", "Vendí 10 Ram Board a Pedralbes") y la IA clasifica automáticamente la transacción, asigna cuenta contable, calcula montos y presenta una vista previa para aprobar, editar o rechazar.
 
 ### Cambios
 
-**1. Nueva alerta: `client_declining` en `useAlerts.ts`**
-- Agregar regla `client_declining` con threshold configurable (ej. 30 días sin compras)
-- Lógica: comparar la última fecha de compra de cada cliente activo contra el umbral. Si un cliente que ha comprado antes no ha comprado en X días, disparar alerta
-- Categoría: `crm`, severity: `warning`
-- Navega a `/finanzas` (pestaña Reportes)
+**1. Nueva pestaña en Finanzas**
+- Agregar "Crear Transacción" como primera pestaña en el array `tabs` (posición prominente)
+- Eliminar el botón flotante "AI Asistente" y el `AIAssistantDialog` actual — su funcionalidad se absorbe en la nueva pestaña
 
-**2. Dashboard — Mejorar panel "Tendencia por Cliente"**
-- Agregar indicador de "días sin comprar" junto a cada cliente en el sparkline existente
-- Resaltar en rojo clientes que llevan más de 30 días sin comprar
-- Agregar tooltip con última fecha de compra y variación porcentual
+**2. Componente `CrearTransaccionTab`** (inline en FinanzasPage o componente separado)
+- **Input principal**: Un textarea grande y limpio con placeholder: "Describe qué pasó... Ej: Pagué $200 USD de flete a DHL"
+- **Botón "Clasificar con IA"**: Envía al edge function `financial-ai` con action `classify`
+- **Vista previa de resultado**: Card con los datos clasificados:
+  - Tipo (Venta / Gasto / Costo) con badge de color
+  - Cuenta contable sugerida (del catálogo `chart_of_accounts`)
+  - Categoría, descripción, montos USD/DOP, tasa de cambio
+  - Para ventas: items, cliente, ITBIS, total
+  - Confianza de la IA (barra visual)
+  - Explicación de la clasificación
+- **3 acciones**: Aprobar (guarda directo), Editar (abre form pre-llenado), Rechazar
+- **Historial reciente**: Lista de las últimas 5 transacciones creadas en esta sesión
 
-**3. Finanzas > Reportes — Enriquecer vista "Por Cliente"**
-- Agregar columnas: "Última Compra", "Días sin Comprar", "Tendencia" (flecha arriba/abajo basada en comparación últimos 3 meses vs 3 meses anteriores)
-- Ordenar opcionalmente por "Mayor caída" para identificar clientes que se están yendo
-- Agregar mini-sparkline inline en la tabla para visualizar tendencia de 6 meses
+**3. Actualizar edge function `financial-ai`**
+- Ampliar el prompt de `classify` para que también sugiera `account_id` y `account_code` del catálogo de cuentas contables
+- Agregar soporte para tipo `cost` (además de `expense` y `sale`)
+- Incluir las categorías de costos en el prompt del sistema
 
-**4. Finanzas > Reportes — Enriquecer vista "Por Producto"**
-- Agregar columnas: "Velocidad" (unidades/mes promedio últimos 3 meses), "Tendencia" (comparación vs período anterior)
-- Resaltar productos con tendencia a la baja
+**4. Lógica de aprobación expandida**
+- Soportar 3 tipos: `sale`, `expense`, `cost`
+- Al aprobar un gasto o costo, vincular automáticamente el `account_id` sugerido por la IA
+- Invalidar queries correspondientes tras insertar
 
-**5. Configuración — Agregar regla al panel de alertas**
-- La nueva regla `client_declining` aparecerá automáticamente en MasPage > Alertas con su umbral editable (días sin compra)
+**5. Ejemplos rápidos (chips clickeables)**
+- Mostrar 4-5 ejemplos debajo del textarea: "Pagué flete DHL $350", "Vendí 20 cajas a Pedralbes", "Compré materiales por RD$15,000", "Nómina almacén RD$45,000"
+- Al hacer click, se pre-llena el textarea
 
 ### Archivos a modificar
-- `src/hooks/useAlerts.ts` — nueva regla + lógica de evaluación
-- `src/pages/DashboardPage.tsx` — enriquecer panel de tendencia por cliente
-- `src/pages/FinanzasPage.tsx` — columnas adicionales en ReportesTab para ambas vistas
-- `src/pages/MasPage.tsx` — la regla aparece automáticamente (ya usa DEFAULT_ALERT_RULES)
+- `src/pages/FinanzasPage.tsx` — nueva pestaña, remover AIAssistantDialog, agregar CrearTransaccionTab
+- `supabase/functions/financial-ai/index.ts` — expandir prompt classify para incluir costos y cuentas contables
 
-### Detalles técnicos
-- La consulta de sales ya incluye `contact_id` y `crm_clients(name)` — se reutiliza para calcular última compra y tendencia
-- Se usa `last_order_date` de la tabla `contacts` como referencia rápida, con fallback al cálculo desde `sales`
-- No se requieren cambios de base de datos
+### Resultado
+El usuario tiene un flujo conversacional directo dentro de Finanzas donde escribe qué pasó y con un click la transacción queda registrada con su cuenta contable, categoría y montos correctos.
 
