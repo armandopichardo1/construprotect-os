@@ -334,7 +334,7 @@ function ProductRequestsSection({ requests, refetch }: { requests: any[]; refetc
   };
 
   const updateStatus = async (id: string, status: string) => {
-    await supabase.from('product_requests').update({ status }).eq('id', id);
+    await supabase.from('product_requests').update({ status: status as any }).eq('id', id);
     refetch();
   };
 
