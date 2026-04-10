@@ -228,7 +228,7 @@ export default function FinanzasPage() {
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {[
                 { label: 'Ingresos MTD', value: fmt(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
