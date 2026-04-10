@@ -95,7 +95,7 @@ export function GlobalSearch() {
     if (r.type === 'contact') {
       navigate(`${cfg.route}?tab=contacts&viewContact=${r.id}`);
     } else if (r.type === 'deal') {
-      navigate(`${cfg.route}?tab=pipeline`);
+      navigate(`${cfg.route}?tab=pipeline&viewDeal=${r.id}`);
     } else {
       navigate(cfg.route);
     }
