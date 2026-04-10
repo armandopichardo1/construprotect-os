@@ -1,4 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
+import { format } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { formatUSD, formatDOP } from '@/lib/format';
@@ -1095,7 +1099,7 @@ function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], start
   return { revenue, cogs, grossProfit, cogsByProduct, directCosts, costsByCategory, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
 }
 
-function getDateRange(period: string, now: Date): { start: string; end: string; label: string } {
+function getDateRange(period: string, now: Date, customFrom?: Date, customTo?: Date): { start: string; end: string; label: string } {
   const fmt = (d: Date) => d.toISOString().split('T')[0];
   const y = now.getFullYear(), m = now.getMonth();
   switch (period) {
@@ -1103,6 +1107,11 @@ function getDateRange(period: string, now: Date): { start: string; end: string; 
     case 'ytd': return { start: `${y}-01-01`, end: fmt(now), label: `YTD ${y}` };
     case 'last_quarter': { const s = new Date(y, m - 3, 1); const e = new Date(y, m, 0); return { start: fmt(s), end: fmt(e), label: 'Últ. Trimestre' }; }
     case 'full_year': return { start: `${y}-01-01`, end: `${y}-12-31`, label: `Año ${y}` };
+    case 'custom': {
+      const s = customFrom ? fmt(customFrom) : '2000-01-01';
+      const e = customTo ? fmt(customTo) : fmt(now);
+      return { start: s, end: e, label: 'Personalizado' };
+    }
     default: { const s = new Date(y, m, 1); return { start: fmt(s), end: fmt(now), label: s.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' }) }; }
   }
 }
@@ -1132,8 +1141,10 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   const [expandCogs, setExpandCogs] = useState(false);
   const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
+  const [plCustomFrom, setPlCustomFrom] = useState<Date | undefined>(undefined);
+  const [plCustomTo, setPlCustomTo] = useState<Date | undefined>(undefined);
   const now = useMemo(() => new Date(), []);
-  const range = useMemo(() => getDateRange(period, now), [period, now]);
+  const range = useMemo(() => getDateRange(period, now, plCustomFrom, plCustomTo), [period, now, plCustomFrom, plCustomTo]);
   const prevRange = useMemo(() => getPrevRange(range), [range]);
   const yoyRange = useMemo(() => getYoYRange(range), [range]);
 
@@ -1252,8 +1263,36 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
             <SelectItem value="ytd">YTD (Año en Curso)</SelectItem>
             <SelectItem value="last_quarter">Último Trimestre</SelectItem>
             <SelectItem value="full_year">Año Completo</SelectItem>
+            <SelectItem value="custom">Personalizado</SelectItem>
           </SelectContent>
         </Select>
+        {period === 'custom' && (
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !plCustomFrom && 'text-muted-foreground')}>
+                  <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                  {plCustomFrom ? format(plCustomFrom, 'dd/MM/yyyy') : 'Desde'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={plCustomFrom} onSelect={setPlCustomFrom} initialFocus className={cn('p-3 pointer-events-auto')} />
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs text-muted-foreground">→</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !plCustomTo && 'text-muted-foreground')}>
+                  <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                  {plCustomTo ? format(plCustomTo, 'dd/MM/yyyy') : 'Hasta'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={plCustomTo} onSelect={setPlCustomTo} initialFocus className={cn('p-3 pointer-events-auto')} />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
         <span className="text-xs text-muted-foreground">{range.start} → {range.end}</span>
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
@@ -1628,6 +1667,8 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
   const [view, setView] = useState<'pl_detail' | 'margin' | 'aging' | 'monthly' | 'clientes' | 'productos'>('pl_detail');
   const [periodFilter, setPeriodFilter] = useState('ytd');
   const [trendMode, setTrendMode] = useState<'bars' | 'margin'>('bars');
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
   const now = useMemo(() => new Date(), []);
   const xr = Number(rate?.usd_sell) || 60.76;
 
@@ -1640,9 +1681,13 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
       case 'quarter': return { start: fmt(new Date(y, m - 3, 1)), end: fmt(now) };
       case 'ytd': return { start: `${y}-01-01`, end: fmt(now) };
       case 'year': return { start: `${y}-01-01`, end: `${y}-12-31` };
+      case 'custom': return {
+        start: customFrom ? fmt(customFrom) : '2000-01-01',
+        end: customTo ? fmt(customTo) : fmt(now),
+      };
       default: return { start: '2000-01-01', end: '2099-12-31' };
     }
-  }, [periodFilter, now]);
+  }, [periodFilter, now, customFrom, customTo]);
 
   const filteredSales = useMemo(() => sales.filter((s: any) => s.date >= dateRange.start && s.date <= dateRange.end), [sales, dateRange]);
   const filteredSaleIds = useMemo(() => new Set(filteredSales.map((s: any) => s.id)), [filteredSales]);
@@ -1802,17 +1847,47 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
           ))}
         </div>
         {view !== 'aging' && (
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo el Tiempo</SelectItem>
-              <SelectItem value="month">Mes Actual</SelectItem>
-              <SelectItem value="prev_month">Mes Anterior</SelectItem>
-              <SelectItem value="quarter">Último Trimestre</SelectItem>
-              <SelectItem value="ytd">YTD</SelectItem>
-              <SelectItem value="year">Año Completo</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo el Tiempo</SelectItem>
+                <SelectItem value="month">Mes Actual</SelectItem>
+                <SelectItem value="prev_month">Mes Anterior</SelectItem>
+                <SelectItem value="quarter">Último Trimestre</SelectItem>
+                <SelectItem value="ytd">YTD</SelectItem>
+                <SelectItem value="year">Año Completo</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+            {periodFilter === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !customFrom && 'text-muted-foreground')}>
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                      {customFrom ? format(customFrom, 'dd/MM/yyyy') : 'Desde'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={customFrom} onSelect={setCustomFrom} initialFocus className={cn('p-3 pointer-events-auto')} />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-xs text-muted-foreground">→</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('w-[130px] justify-start text-left text-xs font-normal', !customTo && 'text-muted-foreground')}>
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                      {customTo ? format(customTo, 'dd/MM/yyyy') : 'Hasta'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={customTo} onSelect={setCustomTo} initialFocus className={cn('p-3 pointer-events-auto')} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </>
         )}
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
