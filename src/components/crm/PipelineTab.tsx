@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Pencil, Trash2, Bot, RefreshCw } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 interface PipelineTabProps {
   deals: Deal[];
@@ -17,7 +18,7 @@ interface PipelineTabProps {
   onDelete: (deal: Deal) => void;
 }
 
-const PIPELINE_STAGES: DealStage[] = ['prospecting', 'initial_contact', 'demo_sample', 'quote_sent', 'negotiation', 'closing', 'won', 'lost'];
+const PIPELINE_STAGES: DealStage[] = ['prospecting', 'initial_contact', 'demo_sample', 'quote_sent', 'negotiation', 'closing', 'delivered', 'won', 'lost'];
 
 export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
   const queryClient = useQueryClient();
@@ -30,6 +31,15 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
     if (error) { toast.error('Error al mover deal'); return; }
     queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
     toast.success('Deal actualizado');
+  };
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const dealId = result.draggableId;
+    const newStage = result.destination.droppableId as DealStage;
+    const deal = deals.find(d => d.id === dealId);
+    if (!deal || deal.stage === newStage) return;
+    updateStage(dealId, newStage);
   };
 
   const activeDeals = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
@@ -54,33 +64,46 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
         </div>
       </div>
 
-      <div className="overflow-x-auto -mx-4 px-4 pb-2">
-        <div className="flex gap-2.5" style={{ minWidth: `${activeStages.length * 220}px` }}>
-          {activeStages.map(stage => {
-            const cfg = DEAL_STAGES[stage];
-            const stageDeals = deals.filter(d => d.stage === stage);
-            const stageValue = stageDeals.reduce((s, d) => s + Number(d.value_usd || 0), 0);
-            return (
-              <div key={stage} className="flex-shrink-0 w-[210px]">
-                <div className="rounded-xl bg-muted/50 p-2 space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-[11px] font-semibold text-foreground">{cfg.emoji} {cfg.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{stageDeals.length} · ${stageValue >= 1000 ? (stageValue / 1000).toFixed(0) + 'K' : stageValue}</span>
-                  </div>
-                  <div className="space-y-1.5 min-h-[60px]">
-                    {stageDeals.map(deal => (
-                      <DealCard key={deal.id} deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} />
-                    ))}
-                    {stageDeals.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-muted-foreground">Sin deals</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="overflow-x-auto -mx-4 px-4 pb-2">
+          <div className="flex gap-2.5" style={{ minWidth: `${activeStages.length * 220}px` }}>
+            {activeStages.map(stage => {
+              const cfg = DEAL_STAGES[stage];
+              const stageDeals = deals.filter(d => d.stage === stage);
+              const stageValue = stageDeals.reduce((s, d) => s + Number(d.value_usd || 0), 0);
+              return (
+                <Droppable droppableId={stage} key={stage}>
+                  {(provided, snapshot) => (
+                    <div className="flex-shrink-0 w-[210px]" ref={provided.innerRef} {...provided.droppableProps}>
+                      <div className={cn('rounded-xl bg-muted/50 p-2 space-y-2 min-h-[120px] transition-colors', snapshot.isDraggingOver && 'bg-primary/10 ring-1 ring-primary/30')}>
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[11px] font-semibold text-foreground">{cfg.emoji} {cfg.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{stageDeals.length} · ${stageValue >= 1000 ? (stageValue / 1000).toFixed(0) + 'K' : stageValue}</span>
+                        </div>
+                        <div className="space-y-1.5 min-h-[60px]">
+                          {stageDeals.map((deal, index) => (
+                            <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                              {(dragProvided, dragSnapshot) => (
+                                <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}>
+                                  <DealCard deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} isDragging={dragSnapshot.isDragging} />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {stageDeals.length === 0 && (
+                            <div className="rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-muted-foreground">Sin deals</div>
+                          )}
+                          {provided.placeholder}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Droppable>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </DragDropContext>
 
       {(wonDeals.length > 0 || deals.filter(d => d.stage === 'lost').length > 0) && (
         <div className="grid grid-cols-2 gap-2">
@@ -98,14 +121,13 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
   );
 }
 
-function DealCard({ deal, onEdit, onDelete, onStageChange }: { deal: Deal; onEdit: (d: Deal) => void; onDelete: (d: Deal) => void; onStageChange: (id: string, stage: DealStage) => void }) {
+function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal: Deal; onEdit: (d: Deal) => void; onDelete: (d: Deal) => void; onStageChange: (id: string, stage: DealStage) => void; isDragging?: boolean }) {
   const [showPlan, setShowPlan] = useState(false);
   const [planContent, setPlanContent] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
   const days = daysInStage(deal.updated_at);
   const dayColor = stageColor(days);
 
-  // Fetch contact info for AI plan
   const { data: contact } = useQuery({
     queryKey: ['contact-for-deal', deal.contact_id],
     queryFn: async () => {
@@ -134,7 +156,7 @@ function DealCard({ deal, onEdit, onDelete, onStageChange }: { deal: Deal; onEdi
 
   return (
     <>
-      <div className="rounded-lg bg-card border border-border p-2.5 space-y-1.5 shadow-sm">
+      <div className={cn('rounded-lg bg-card border border-border p-2.5 space-y-1.5 shadow-sm transition-shadow', isDragging && 'shadow-lg ring-2 ring-primary/40')}>
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
@@ -167,7 +189,6 @@ function DealCard({ deal, onEdit, onDelete, onStageChange }: { deal: Deal; onEdi
         </div>
       </div>
 
-      {/* AI Deal Game Plan Dialog */}
       <Dialog open={showPlan} onOpenChange={setShowPlan}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
