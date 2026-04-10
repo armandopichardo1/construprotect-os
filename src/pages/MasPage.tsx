@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,9 @@ const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = 
   declined: { label: 'Declinado', color: 'bg-destructive/15 text-destructive' },
 };
 
-type Tab = 'general' | 'requests' | 'alerts';
+import { useAlertHistory, type AlertHistoryRow } from '@/hooks/useAlertHistory';
+
+type Tab = 'general' | 'requests' | 'alerts' | 'historial';
 
 export default function MasPage() {
   const { user, signOut } = useAuth();
@@ -156,6 +158,7 @@ export default function MasPage() {
           {([
             { key: 'general' as Tab, label: 'General' },
             { key: 'alerts' as Tab, label: '🔔 Alertas' },
+            { key: 'historial' as Tab, label: '📋 Historial' },
             { key: 'requests' as Tab, label: 'Solicitudes Producto' },
           ]).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} className={cn(
@@ -271,6 +274,7 @@ export default function MasPage() {
         )}
 
         {tab === 'alerts' && <AlertsConfigSection />}
+        {tab === 'historial' && <AlertHistorySection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
       </div>
     </AppLayout>
