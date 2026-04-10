@@ -85,16 +85,17 @@ export default function DashboardPage() {
   const { data: revenueData } = useQuery({
     queryKey: ['dashboard-revenue'],
     queryFn: async () => {
-      const [{ data: saleItems }, { data: expenses }] = await Promise.all([
+      const [{ data: saleItems }, { data: expenses }, { data: directCosts }] = await Promise.all([
         supabase.from('sale_items').select('*, sales(date), products(name, category)'),
         supabase.from('expenses').select('date, amount_usd'),
+        supabase.from('costs').select('date, amount_usd'),
       ]);
-      if (!saleItems) return { monthly: [], totalRevenue: 0, totalCogs: 0, totalExpenses: 0, topProducts: [], revByCategory: [] };
+      if (!saleItems) return { monthly: [], totalRevenue: 0, totalCogs: 0, totalExpenses: 0, totalDirectCosts: 0, topProducts: [], revByCategory: [] };
 
-      const months: Record<string, { revenue: number; cogs: number; expenses: number }> = {};
+      const months: Record<string, { revenue: number; cogs: number; expenses: number; directCosts: number }> = {};
       const productRevenue: Record<string, { name: string; revenue: number }> = {};
       const catRevenue: Record<string, number> = {};
-      let totalRevenue = 0, totalCogs = 0, totalExpenses = 0;
+      let totalRevenue = 0, totalCogs = 0, totalExpenses = 0, totalDirectCosts = 0;
 
       saleItems.forEach(si => {
         const lineTotal = Number(si.line_total_usd || 0);
@@ -105,7 +106,7 @@ export default function DashboardPage() {
         const date = si.sales?.date;
         if (date) {
           const key = date.substring(0, 7);
-          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0 };
+          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0, directCosts: 0 };
           months[key].revenue += lineTotal;
           months[key].cogs += lineCogs;
         }
@@ -124,8 +125,19 @@ export default function DashboardPage() {
         totalExpenses += amt;
         if (e.date) {
           const key = e.date.substring(0, 7);
-          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0 };
+          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0, directCosts: 0 };
           months[key].expenses += amt;
+        }
+      });
+
+      // Add direct costs by month
+      (directCosts || []).forEach(c => {
+        const amt = Number(c.amount_usd || 0);
+        totalDirectCosts += amt;
+        if (c.date) {
+          const key = c.date.substring(0, 7);
+          if (!months[key]) months[key] = { revenue: 0, cogs: 0, expenses: 0, directCosts: 0 };
+          months[key].directCosts += amt;
         }
       });
 
@@ -141,9 +153,9 @@ export default function DashboardPage() {
       }
 
       const monthly = last12.map(({ key, month }) => {
-        const val = months[key] || { revenue: 0, cogs: 0, expenses: 0 };
-        const grossMargin = val.revenue > 0 ? ((val.revenue - val.cogs) / val.revenue * 100) : 0;
-        const netMargin = val.revenue > 0 ? ((val.revenue - val.cogs - val.expenses) / val.revenue * 100) : 0;
+        const val = months[key] || { revenue: 0, cogs: 0, expenses: 0, directCosts: 0 };
+        const grossMargin = val.revenue > 0 ? ((val.revenue - val.cogs - val.directCosts) / val.revenue * 100) : 0;
+        const netMargin = val.revenue > 0 ? ((val.revenue - val.cogs - val.directCosts - val.expenses) / val.revenue * 100) : 0;
         return {
           month,
           revenue: Math.round(val.revenue),
@@ -161,7 +173,7 @@ export default function DashboardPage() {
         name, value, color: CATEGORY_COLORS[name] || PIE_COLORS[i] || PIE_COLORS[PIE_COLORS.length - 1],
       }));
 
-      return { monthly, totalRevenue, totalCogs, totalExpenses, topProducts: topNormalized, revByCategory };
+      return { monthly, totalRevenue, totalCogs, totalExpenses, totalDirectCosts, topProducts: topNormalized, revByCategory };
     },
   });
 
