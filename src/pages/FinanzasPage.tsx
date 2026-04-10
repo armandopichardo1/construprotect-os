@@ -1624,10 +1624,11 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
 }
 
 // ============ REPORTES TAB ============
-function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
-  const [view, setView] = useState<'clientes' | 'productos'>('clientes');
-  const [periodFilter, setPeriodFilter] = useState('all');
+function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[]; rate: any; rateForMonth: (ym: string) => number }) {
+  const [view, setView] = useState<'pl_detail' | 'margin' | 'aging' | 'monthly' | 'clientes' | 'productos'>('pl_detail');
+  const [periodFilter, setPeriodFilter] = useState('ytd');
   const now = useMemo(() => new Date(), []);
+  const xr = Number(rate?.usd_sell) || 60.76;
 
   const dateRange = useMemo(() => {
     const fmt = (d: Date) => d.toISOString().split('T')[0];
@@ -1645,258 +1646,482 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
   const filteredSales = useMemo(() => sales.filter((s: any) => s.date >= dateRange.start && s.date <= dateRange.end), [sales, dateRange]);
   const filteredSaleIds = useMemo(() => new Set(filteredSales.map((s: any) => s.id)), [filteredSales]);
   const filteredItems = useMemo(() => saleItems.filter((si: any) => filteredSaleIds.has(si.sale_id)), [saleItems, filteredSaleIds]);
+  const filteredExpenses = useMemo(() => expenses.filter((e: any) => e.date >= dateRange.start && e.date <= dateRange.end), [expenses, dateRange]);
+  const filteredCosts = useMemo(() => costs.filter((c: any) => c.date >= dateRange.start && c.date <= dateRange.end), [costs, dateRange]);
 
+  // ---- P&L Detallado ----
+  const plData = useMemo(() => {
+    const revenue = filteredSales.reduce((s: number, r: any) => s + Number(r.subtotal_usd || 0), 0);
+    const itbis = filteredSales.reduce((s: number, r: any) => s + Number(r.itbis_usd || 0), 0);
+    const totalRevenue = filteredSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+    const cogs = filteredItems.reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
+    const directCosts = filteredCosts.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+    const grossProfit = revenue - cogs - directCosts;
+
+    const expByCat: Record<string, number> = {};
+    filteredExpenses.forEach((e: any) => {
+      const mr = rateForMonth(e.date?.substring(0, 7) || '');
+      const usd = Number(e.amount_usd) || (Number(e.amount_dop) / mr);
+      expByCat[e.category] = (expByCat[e.category] || 0) + usd;
+    });
+    const totalExpenses = Object.values(expByCat).reduce((s, v) => s + v, 0);
+
+    const costByCat: Record<string, number> = {};
+    filteredCosts.forEach((c: any) => { costByCat[c.category] = (costByCat[c.category] || 0) + Number(c.amount_usd || 0); });
+
+    const netIncome = grossProfit - totalExpenses;
+    return { revenue, itbis, totalRevenue, cogs, directCosts, costByCat, grossProfit, expByCat, totalExpenses, netIncome };
+  }, [filteredSales, filteredItems, filteredExpenses, filteredCosts, rateForMonth]);
+
+  // ---- Margen por Producto ----
+  const marginData = useMemo(() => {
+    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetList: number; targetArch: number; targetProj: number; targetWhole: number }> = {};
+    filteredItems.forEach((si: any) => {
+      const key = si.product_id || 'unknown';
+      const prod = si.products || {};
+      if (!map[key]) map[key] = { name: prod.name || '?', sku: prod.sku || '', revenue: 0, cogs: 0, units: 0,
+        targetList: Number(prod.margin_list_pct || 0), targetArch: Number(prod.margin_architect_pct || 0),
+        targetProj: Number(prod.margin_project_pct || 0), targetWhole: Number(prod.margin_wholesale_pct || 0) };
+      map[key].revenue += Number(si.line_total_usd || 0);
+      map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+      map[key].units += Number(si.quantity || 0);
+    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue).map(p => {
+      const gm = p.revenue - p.cogs;
+      const gmPct = p.revenue > 0 ? gm / p.revenue * 100 : 0;
+      const avgTarget = [p.targetList, p.targetArch, p.targetProj, p.targetWhole].filter(v => v > 0);
+      const target = avgTarget.length > 0 ? avgTarget.reduce((a, b) => a + b, 0) / avgTarget.length : 0;
+      return { ...p, gm, gmPct, target, diff: gmPct - target };
+    });
+  }, [filteredItems]);
+
+  // ---- Aging Cuentas por Cobrar ----
+  const agingData = useMemo(() => {
+    const pending = sales.filter((s: any) => s.payment_status !== 'paid' && s.payment_status !== 'cancelled');
+    const buckets = { current: [] as any[], d30: [] as any[], d60: [] as any[], d90: [] as any[], over90: [] as any[] };
+    const today = new Date();
+    pending.forEach((s: any) => {
+      const days = Math.floor((today.getTime() - new Date(s.date).getTime()) / 86400000);
+      const entry = { ...s, daysOutstanding: days, clientName: s.crm_clients?.name || 'Sin Cliente' };
+      if (days <= 0) buckets.current.push(entry);
+      else if (days <= 30) buckets.d30.push(entry);
+      else if (days <= 60) buckets.d60.push(entry);
+      else if (days <= 90) buckets.d90.push(entry);
+      else buckets.over90.push(entry);
+    });
+    const totals = {
+      current: buckets.current.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0),
+      d30: buckets.d30.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0),
+      d60: buckets.d60.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0),
+      d90: buckets.d90.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0),
+      over90: buckets.over90.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0),
+    };
+    const total = Object.values(totals).reduce((s, v) => s + v, 0);
+    return { buckets, totals, total, items: [...buckets.over90, ...buckets.d90, ...buckets.d60, ...buckets.d30, ...buckets.current] };
+  }, [sales]);
+
+  // ---- Comparativo Mensual ----
+  const monthlyComparison = useMemo(() => {
+    const months: { month: string; label: string; revenue: number; cogs: number; directCosts: number; expenses: number; grossProfit: number; netIncome: number; gmPct: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' });
+      const mr = rateForMonth(key);
+      const rev = sales.filter((s: any) => s.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+      const cg = saleItems.filter((si: any) => si.sales?.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
+      const dc = costs.filter((c: any) => c.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+      const exp = expenses.filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0) || Number(r.amount_dop || 0) / mr, 0);
+      const gp = rev - cg - dc;
+      const ni = gp - exp;
+      months.push({ month: key, label, revenue: rev, cogs: cg, directCosts: dc, expenses: exp, grossProfit: gp, netIncome: ni, gmPct: rev > 0 ? gp / rev * 100 : 0 });
+    }
+    return months;
+  }, [sales, saleItems, expenses, costs, rateForMonth, now]);
+
+  // ---- Client/Product data (legacy) ----
   const clientData = useMemo(() => {
-    const map: Record<string, { name: string; revenue: number; cogs: number; units: number; lastDate: string; monthlyRevenue: number[] }> = {};
-    const nowDate = new Date();
+    const map: Record<string, { name: string; revenue: number; cogs: number; units: number; lastDate: string }> = {};
     filteredSales.forEach((s: any) => {
       const key = s.contact_id || 'sin_cliente';
-      const name = s.crm_clients?.name || 'Sin Cliente';
-      if (!map[key]) map[key] = { name, revenue: 0, cogs: 0, units: 0, lastDate: '', monthlyRevenue: [0, 0, 0, 0, 0, 0] };
+      if (!map[key]) map[key] = { name: s.crm_clients?.name || 'Sin Cliente', revenue: 0, cogs: 0, units: 0, lastDate: '' };
       map[key].revenue += Number(s.total_usd || 0);
       if (!map[key].lastDate || s.date > map[key].lastDate) map[key].lastDate = s.date;
-      // monthly sparkline (6 months)
-      const d = new Date(s.date);
-      const monthsAgo = (nowDate.getFullYear() - d.getFullYear()) * 12 + nowDate.getMonth() - d.getMonth();
-      if (monthsAgo >= 0 && monthsAgo < 6) map[key].monthlyRevenue[5 - monthsAgo] += Number(s.total_usd || 0);
-      const items = s.sale_items || [];
-      items.forEach((si: any) => {
+      (s.sale_items || []).forEach((si: any) => {
         map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
         map[key].units += Number(si.quantity || 0);
       });
     });
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue).map(c => {
-      const daysSince = c.lastDate ? Math.floor((Date.now() - new Date(c.lastDate).getTime()) / 86400000) : 999;
-      const recent3 = c.monthlyRevenue[5] + c.monthlyRevenue[4] + c.monthlyRevenue[3];
-      const older3 = c.monthlyRevenue[2] + c.monthlyRevenue[1] + c.monthlyRevenue[0];
-      const trendPct = older3 > 0 ? ((recent3 - older3) / older3 * 100) : (recent3 > 0 ? 100 : 0);
-      return { ...c, daysSince, trendPct };
-    });
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
   }, [filteredSales]);
 
-  const productData = useMemo(() => {
-    const map: Record<string, { name: string; sku: string; revenue: number; cogs: number; units: number; targetMargin: number; monthlyUnits: number[] }> = {};
-    const nowDate = new Date();
-    filteredItems.forEach((si: any) => {
-      const key = si.product_id || 'unknown';
-      const name = si.products?.name || 'Producto Desconocido';
-      const prod = si.products || {};
-      const avgTarget = [prod.margin_list_pct, prod.margin_architect_pct, prod.margin_project_pct, prod.margin_wholesale_pct]
-        .filter((v: any) => v != null && v > 0).reduce((a: number, b: number, _: number, arr: number[]) => a + b / arr.length, 0);
-      if (!map[key]) map[key] = { name, sku: '', revenue: 0, cogs: 0, units: 0, targetMargin: avgTarget || 0, monthlyUnits: [0, 0, 0, 0, 0, 0] };
-      map[key].revenue += Number(si.line_total_usd || 0);
-      map[key].cogs += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
-      map[key].units += Number(si.quantity || 0);
-      // monthly units for velocity
-      const saleDate = si.sales?.date;
-      if (saleDate) {
-        const d = new Date(saleDate);
-        const monthsAgo = (nowDate.getFullYear() - d.getFullYear()) * 12 + nowDate.getMonth() - d.getMonth();
-        if (monthsAgo >= 0 && monthsAgo < 6) map[key].monthlyUnits[5 - monthsAgo] += Number(si.quantity || 0);
-      }
-    });
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue).map(p => {
-      const recent3 = p.monthlyUnits[5] + p.monthlyUnits[4] + p.monthlyUnits[3];
-      const older3 = p.monthlyUnits[2] + p.monthlyUnits[1] + p.monthlyUnits[0];
-      const velocity = Math.round(recent3 / 3);
-      const trendPct = older3 > 0 ? ((recent3 - older3) / older3 * 100) : (recent3 > 0 ? 100 : 0);
-      return { ...p, velocity, trendPct };
-    });
-  }, [filteredItems]);
-
-  const data = view === 'clientes' ? clientData : productData;
-  const totalRevenue = data.reduce((s, r) => s + r.revenue, 0);
-  const totalCogs = data.reduce((s, r) => s + r.cogs, 0);
-  const totalGM = totalRevenue - totalCogs;
-  const totalGMPct = totalRevenue > 0 ? (totalGM / totalRevenue * 100) : 0;
-
   const handleExport = () => {
-    exportToExcel(data.map(r => ({
-      [view === 'clientes' ? 'Cliente' : 'Producto']: r.name,
-      'Unidades': r.units,
-      'Ingresos USD': r.revenue,
-      'COGS USD': r.cogs,
-      'GM USD': r.revenue - r.cogs,
-      'GM %': r.revenue > 0 ? `${((r.revenue - r.cogs) / r.revenue * 100).toFixed(1)}%` : '0%',
-      '% del Total': totalRevenue > 0 ? `${(r.revenue / totalRevenue * 100).toFixed(1)}%` : '0%',
-    })), `reporte_${view}`, view === 'clientes' ? 'Por Cliente' : 'Por Producto');
+    if (view === 'pl_detail') {
+      const rows = [
+        { Concepto: 'Ingresos Netos', USD: plData.revenue },
+        { Concepto: 'ITBIS Cobrado', USD: plData.itbis },
+        { Concepto: 'COGS', USD: -plData.cogs },
+        ...Object.entries(plData.costByCat).map(([k, v]) => ({ Concepto: `  Costo: ${COST_CATEGORIES[k]?.label || k}`, USD: -v })),
+        { Concepto: 'Utilidad Bruta', USD: plData.grossProfit },
+        ...Object.entries(plData.expByCat).map(([k, v]) => ({ Concepto: `  Gasto: ${EXPENSE_CATEGORIES[k]?.label || k}`, USD: -v })),
+        { Concepto: 'Utilidad Neta', USD: plData.netIncome },
+      ];
+      exportToExcel(rows, 'pl_detallado', 'P&L Detallado');
+    } else if (view === 'margin') {
+      exportToExcel(marginData.map(p => ({ SKU: p.sku, Producto: p.name, Uds: p.units, Ingresos: p.revenue, COGS: p.cogs, 'GM $': p.gm, 'GM %': `${p.gmPct.toFixed(1)}%`, 'Target %': `${p.target.toFixed(1)}%`, 'Diff pp': `${p.diff.toFixed(1)}` })), 'margen_producto', 'Margen x Producto');
+    } else if (view === 'aging') {
+      exportToExcel(agingData.items.map((s: any) => ({ Cliente: s.clientName, Fecha: s.date, Total: s.total_usd, Días: s.daysOutstanding, Estado: s.payment_status })), 'aging_ar', 'Aging CxC');
+    } else if (view === 'monthly') {
+      exportToExcel(monthlyComparison.map(m => ({ Mes: m.label, Ingresos: m.revenue, COGS: m.cogs, 'Costos Dir.': m.directCosts, Gastos: m.expenses, 'U. Bruta': m.grossProfit, 'U. Neta': m.netIncome, 'GM %': `${m.gmPct.toFixed(1)}%` })), 'comparativo_mensual', 'Comparativo Mensual');
+    } else {
+      const data = view === 'clientes' ? clientData : marginData;
+      exportToExcel(data.map((r: any) => ({ Nombre: r.name, Ingresos: r.revenue, COGS: r.cogs, 'GM $': r.revenue - r.cogs })), `reporte_${view}`, view === 'clientes' ? 'Por Cliente' : 'Por Producto');
+    }
   };
+
+  const VIEWS = [
+    { key: 'pl_detail', label: 'P&L Detallado' },
+    { key: 'margin', label: 'Margen x Producto' },
+    { key: 'aging', label: 'Aging CxC' },
+    { key: 'monthly', label: 'Comparativo Mensual' },
+    { key: 'clientes', label: 'Por Cliente' },
+    { key: 'productos', label: 'Por Producto' },
+  ] as const;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-1 rounded-lg bg-muted p-0.5">
-          {(['clientes', 'productos'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
+        <div className="flex gap-1 rounded-lg bg-muted p-0.5 flex-wrap">
+          {VIEWS.map(v => (
+            <button key={v.key} onClick={() => setView(v.key as any)}
               className={cn('rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-              {v === 'clientes' ? 'Por Cliente' : 'Por Producto'}
+                view === v.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              {v.label}
             </button>
           ))}
         </div>
-        <Select value={periodFilter} onValueChange={setPeriodFilter}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todo el Tiempo</SelectItem>
-            <SelectItem value="month">Mes Actual</SelectItem>
-            <SelectItem value="prev_month">Mes Anterior</SelectItem>
-            <SelectItem value="quarter">Último Trimestre</SelectItem>
-            <SelectItem value="ytd">YTD</SelectItem>
-            <SelectItem value="year">Año Completo</SelectItem>
-          </SelectContent>
-        </Select>
+        {view !== 'aging' && (
+          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todo el Tiempo</SelectItem>
+              <SelectItem value="month">Mes Actual</SelectItem>
+              <SelectItem value="prev_month">Mes Anterior</SelectItem>
+              <SelectItem value="quarter">Último Trimestre</SelectItem>
+              <SelectItem value="ytd">YTD</SelectItem>
+              <SelectItem value="year">Año Completo</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Ingresos', value: formatUSD(totalRevenue), color: 'text-primary' },
-          { label: 'COGS', value: formatUSD(totalCogs), color: 'text-warning' },
-          { label: 'Margen Bruto', value: formatUSD(totalGM), color: totalGM >= 0 ? 'text-success' : 'text-destructive' },
-          { label: 'GM %', value: `${totalGMPct.toFixed(1)}%`, color: totalGMPct >= 40 ? 'text-success' : 'text-warning' },
-        ].map(kpi => (
-          <div key={kpi.label} className="rounded-2xl bg-card border border-border p-4 text-center">
-            <p className={cn('text-xl font-bold', kpi.color)}>{kpi.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
+      {/* ======== P&L DETALLADO ======== */}
+      {view === 'pl_detail' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Ingresos', value: formatUSD(plData.revenue), color: 'text-primary' },
+              { label: 'Utilidad Bruta', value: formatUSD(plData.grossProfit), color: plData.grossProfit >= 0 ? 'text-success' : 'text-destructive' },
+              { label: 'Gastos Operativos', value: formatUSD(plData.totalExpenses), color: 'text-warning' },
+              { label: 'Utilidad Neta', value: formatUSD(plData.netIncome), color: plData.netIncome >= 0 ? 'text-success' : 'text-destructive' },
+            ].map(k => (
+              <div key={k.label} className="rounded-2xl bg-card border border-border p-4 text-center">
+                <p className={cn('text-xl font-bold', k.color)}>{k.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{k.label}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">{view === 'clientes' ? 'Cliente' : 'Producto'}</TableHead>
-              <TableHead className="text-xs text-right">Unidades</TableHead>
-              <TableHead className="text-xs text-right">Ingresos</TableHead>
-              <TableHead className="text-xs text-right">GM %</TableHead>
-              <TableHead className="text-xs text-right">% Total</TableHead>
-              {view === 'clientes' ? (
-                <>
-                  <TableHead className="text-xs text-right">Últ. Compra</TableHead>
-                  <TableHead className="text-xs text-right">Días</TableHead>
-                  <TableHead className="text-xs text-center">Tendencia</TableHead>
-                </>
-              ) : (
-                <>
-                  <TableHead className="text-xs text-right">Vel. uds/mes</TableHead>
-                  <TableHead className="text-xs text-center">Tendencia</TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((r: any, i: number) => {
-              const gm = r.revenue - r.cogs;
-              const gmPct = r.revenue > 0 ? (gm / r.revenue * 100) : 0;
-              const sharePct = totalRevenue > 0 ? (r.revenue / totalRevenue * 100) : 0;
-              const trendPct = r.trendPct ?? 0;
-              const isInactive = view === 'clientes' && r.daysSince > 30;
-              return (
-                <TableRow key={i} className={cn(isInactive && 'bg-destructive/5')}>
-                  <TableCell className={cn('text-xs font-medium', isInactive && 'text-destructive')}>{r.name}</TableCell>
-                  <TableCell className="text-xs text-right font-mono">{r.units.toLocaleString()}</TableCell>
-                  <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(r.revenue)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono', gmPct >= 40 ? 'text-success' : gmPct >= 20 ? 'text-warning' : 'text-destructive')}>{gmPct.toFixed(1)}%</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{sharePct.toFixed(1)}%</TableCell>
-                  {view === 'clientes' ? (
-                    <>
-                      <TableCell className="text-xs text-right font-mono text-muted-foreground">{r.lastDate || '—'}</TableCell>
-                      <TableCell className={cn('text-xs text-right font-mono', isInactive ? 'text-destructive font-semibold' : 'text-muted-foreground')}>{r.daysSince < 999 ? r.daysSince : '—'}</TableCell>
-                      <TableCell className="text-xs text-center">
-                        <span className={cn('font-mono font-semibold', trendPct >= 0 ? 'text-success' : 'text-destructive')}>
-                          {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct).toFixed(0)}%
-                        </span>
-                      </TableCell>
-                    </>
-                  ) : (
-                    <>
-                      <TableCell className="text-xs text-right font-mono">{r.velocity ?? 0}</TableCell>
-                      <TableCell className="text-xs text-center">
-                        <span className={cn('font-mono font-semibold', trendPct >= 0 ? 'text-success' : 'text-destructive')}>
-                          {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct).toFixed(0)}%
-                        </span>
-                      </TableCell>
-                    </>
-                  )}
-                </TableRow>
-              );
-            })}
-            {data.length > 0 && (
-              <TableRow className="bg-muted/30 font-bold">
-                <TableCell className="text-xs font-bold">TOTAL</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold">{data.reduce((s: number, r: any) => s + r.units, 0).toLocaleString()}</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(totalRevenue)}</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold">{totalGMPct.toFixed(1)}%</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold">100%</TableCell>
-                <TableCell colSpan={view === 'clientes' ? 3 : 2} />
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-        {data.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay datos para el período seleccionado</p>}
-      </div>
-
-      {/* Top chart */}
-      {data.length > 0 && (
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Top {view === 'clientes' ? 'Clientes' : 'Productos'} por Ingresos</h2>
-          <ResponsiveContainer width="100%" height={Math.max(200, Math.min(data.length * 40, 400))}>
-            <BarChart data={data.slice(0, 15)} layout="vertical">
-              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
-              <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={120} />
-              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
-              <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[0,6,6,0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow><TableHead className="text-xs">Concepto</TableHead><TableHead className="text-xs text-right">Monto USD</TableHead><TableHead className="text-xs text-right">% Ingresos</TableHead></TableRow></TableHeader>
+              <TableBody>
+                <TableRow className="bg-primary/5"><TableCell className="text-xs font-bold text-primary">Ingresos Netos</TableCell><TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(plData.revenue)}</TableCell><TableCell className="text-xs text-right font-mono">100.0%</TableCell></TableRow>
+                <TableRow><TableCell className="text-xs text-muted-foreground pl-6">ITBIS Cobrado</TableCell><TableCell className="text-xs text-right font-mono">{formatUSD(plData.itbis)}</TableCell><TableCell className="text-xs text-right font-mono text-muted-foreground">{plData.revenue > 0 ? (plData.itbis / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+                <TableRow className="bg-destructive/5"><TableCell className="text-xs font-semibold text-destructive">(-) COGS</TableCell><TableCell className="text-xs text-right font-mono font-semibold text-destructive">{formatUSD(plData.cogs)}</TableCell><TableCell className="text-xs text-right font-mono">{plData.revenue > 0 ? (plData.cogs / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+                {Object.entries(plData.costByCat).map(([cat, val]) => (
+                  <TableRow key={cat}><TableCell className="text-xs text-muted-foreground pl-6">(-) {COST_CATEGORIES[cat]?.icon} {COST_CATEGORIES[cat]?.label || cat}</TableCell><TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(val)}</TableCell><TableCell className="text-xs text-right font-mono text-muted-foreground">{plData.revenue > 0 ? (val / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+                ))}
+                <TableRow className="bg-success/5 border-t-2"><TableCell className="text-xs font-bold text-success">= Utilidad Bruta</TableCell><TableCell className="text-xs text-right font-mono font-bold text-success">{formatUSD(plData.grossProfit)}</TableCell><TableCell className="text-xs text-right font-mono font-bold">{plData.revenue > 0 ? (plData.grossProfit / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+                {Object.entries(plData.expByCat).sort((a, b) => b[1] - a[1]).map(([cat, val]) => (
+                  <TableRow key={cat}><TableCell className="text-xs text-muted-foreground pl-6">(-) {EXPENSE_CATEGORIES[cat]?.icon} {EXPENSE_CATEGORIES[cat]?.label || cat}</TableCell><TableCell className="text-xs text-right font-mono text-warning">{formatUSD(val)}</TableCell><TableCell className="text-xs text-right font-mono text-muted-foreground">{plData.revenue > 0 ? (val / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+                ))}
+                <TableRow className="bg-muted/30 border-t-2"><TableCell className="text-xs font-bold">= Utilidad Neta</TableCell><TableCell className={cn('text-xs text-right font-mono font-bold', plData.netIncome >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(plData.netIncome)}</TableCell><TableCell className="text-xs text-right font-mono font-bold">{plData.revenue > 0 ? (plData.netIncome / plData.revenue * 100).toFixed(1) : '0.0'}%</TableCell></TableRow>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
 
-      {/* Monthly Trend Chart */}
-      <MonthlyTrendChart sales={sales} saleItems={saleItems} view={view} />
+      {/* ======== MARGEN POR PRODUCTO ======== */}
+      {view === 'margin' && (
+        <div className="space-y-4">
+          {marginData.length > 0 && (
+            <div className="rounded-2xl bg-card border border-border p-6">
+              <h3 className="text-sm font-semibold mb-4">Margen Real vs Objetivo</h3>
+              <ResponsiveContainer width="100%" height={Math.max(200, Math.min(marginData.length * 45, 500))}>
+                <BarChart data={marginData.slice(0, 15).map(p => ({ name: p.name.length > 25 ? p.name.slice(0, 22) + '...' : p.name, real: +p.gmPct.toFixed(1), objetivo: +p.target.toFixed(1) }))} layout="vertical">
+                  <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={160} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => `${v}%`} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="real" name="Margen Real" fill="hsl(160, 84%, 39%)" radius={[0,4,4,0]} barSize={12} />
+                  <Bar dataKey="objetivo" name="Objetivo" fill="hsl(220, 12%, 40%)" radius={[0,4,4,0]} barSize={12} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="text-xs">Producto</TableHead>
+                <TableHead className="text-xs text-right">Uds</TableHead>
+                <TableHead className="text-xs text-right">Ingresos</TableHead>
+                <TableHead className="text-xs text-right">COGS</TableHead>
+                <TableHead className="text-xs text-right">GM $</TableHead>
+                <TableHead className="text-xs text-right">GM %</TableHead>
+                <TableHead className="text-xs text-right">Objetivo</TableHead>
+                <TableHead className="text-xs text-right">Δ pp</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {marginData.map((p, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-xs font-medium">{p.name}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{p.units}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-primary">{formatUSD(p.revenue)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(p.cogs)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(p.gm)}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono font-bold', p.gmPct >= 40 ? 'text-success' : p.gmPct >= 20 ? 'text-warning' : 'text-destructive')}>{p.gmPct.toFixed(1)}%</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.target > 0 ? `${p.target.toFixed(1)}%` : '—'}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono font-semibold', p.diff >= 0 ? 'text-success' : 'text-destructive')}>{p.target > 0 ? `${p.diff >= 0 ? '+' : ''}${p.diff.toFixed(1)}` : '—'}</TableCell>
+                  </TableRow>
+                ))}
+                {marginData.length > 0 && (() => {
+                  const tRev = marginData.reduce((s, p) => s + p.revenue, 0);
+                  const tCogs = marginData.reduce((s, p) => s + p.cogs, 0);
+                  const tGm = tRev - tCogs;
+                  return (
+                    <TableRow className="bg-muted/30 font-bold">
+                      <TableCell className="text-xs font-bold">TOTAL</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{marginData.reduce((s, p) => s + p.units, 0)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(tRev)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(tCogs)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(tGm)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{tRev > 0 ? (tGm / tRev * 100).toFixed(1) : '0.0'}%</TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  );
+                })()}
+              </TableBody>
+            </Table>
+            {marginData.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay ventas con productos en este período</p>}
+          </div>
+        </div>
+      )}
 
-      {/* Margin vs Target (products only) */}
-      {view === 'productos' && productData.length > 0 && (
-        <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Margen Real vs Objetivo por Producto</h2>
-          <ResponsiveContainer width="100%" height={Math.max(200, Math.min(productData.length * 50, 400))}>
-            <BarChart data={productData.slice(0, 10).map(p => ({
-              name: p.name,
-              real: p.revenue > 0 ? +((p.revenue - p.cogs) / p.revenue * 100).toFixed(1) : 0,
-              objetivo: +(p.targetMargin || 0).toFixed(1),
-            }))} layout="vertical">
-              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
-              <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={140} />
-              <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => `${v}%`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="real" name="Margen Real" fill="hsl(160, 84%, 39%)" radius={[0,4,4,0]} barSize={14} />
-              <Bar dataKey="objetivo" name="Margen Objetivo" fill="hsl(220, 12%, 40%)" radius={[0,4,4,0]} barSize={14} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5">
-            {productData.slice(0, 10).map((p, i) => {
-              const realPct = p.revenue > 0 ? (p.revenue - p.cogs) / p.revenue * 100 : 0;
-              const target = p.targetMargin || 0;
-              const diff = realPct - target;
-              const hasTarget = target > 0;
-              return (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <span className="text-foreground truncate flex-1">{p.name}</span>
-                  <span className={cn('font-mono w-16 text-right', realPct >= target ? 'text-success' : 'text-destructive')}>{realPct.toFixed(1)}%</span>
-                  {hasTarget && (
-                    <>
-                      <span className="text-muted-foreground font-mono w-16 text-right">/ {target.toFixed(1)}%</span>
-                      <span className={cn('font-mono w-16 text-right font-semibold', diff >= 0 ? 'text-success' : 'text-destructive')}>
-                        {diff >= 0 ? '+' : ''}{diff.toFixed(1)}pp
-                      </span>
-                    </>
-                  )}
-                  {!hasTarget && <span className="text-muted-foreground text-[10px] w-32 text-right">Sin objetivo configurado</span>}
-                </div>
-              );
-            })}
+      {/* ======== AGING CUENTAS POR COBRAR ======== */}
+      {view === 'aging' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'Vigente', value: agingData.totals.current, color: 'text-success', bg: 'bg-success/10' },
+              { label: '1-30 días', value: agingData.totals.d30, color: 'text-primary', bg: 'bg-primary/10' },
+              { label: '31-60 días', value: agingData.totals.d60, color: 'text-warning', bg: 'bg-warning/10' },
+              { label: '61-90 días', value: agingData.totals.d90, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+              { label: '+90 días', value: agingData.totals.over90, color: 'text-destructive', bg: 'bg-destructive/10' },
+              { label: 'Total CxC', value: agingData.total, color: 'text-foreground', bg: 'bg-muted' },
+            ].map(b => (
+              <div key={b.label} className={cn('rounded-2xl border border-border p-3 text-center', b.bg)}>
+                <p className={cn('text-lg font-bold', b.color)}>{formatUSD(b.value)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{b.label}</p>
+              </div>
+            ))}
+          </div>
+          {agingData.total > 0 && (
+            <div className="rounded-2xl bg-card border border-border p-6">
+              <h3 className="text-sm font-semibold mb-4">Distribución por Antigüedad</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={[
+                  { name: 'Vigente', value: agingData.totals.current },
+                  { name: '1-30d', value: agingData.totals.d30 },
+                  { name: '31-60d', value: agingData.totals.d60 },
+                  { name: '61-90d', value: agingData.totals.d90 },
+                  { name: '+90d', value: agingData.totals.over90 },
+                ]}>
+                  <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                  <Bar dataKey="value" name="Monto">
+                    {[
+                      'hsl(160, 84%, 39%)', 'hsl(217, 91%, 60%)', 'hsl(43, 96%, 56%)', 'hsl(27, 96%, 61%)', 'hsl(0, 84%, 60%)',
+                    ].map((c, i) => <Cell key={i} fill={c} radius={[6,6,0,0] as any} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">Fecha</TableHead>
+                <TableHead className="text-xs">Ref</TableHead>
+                <TableHead className="text-xs text-right">Total USD</TableHead>
+                <TableHead className="text-xs text-right">Días</TableHead>
+                <TableHead className="text-xs">Estado</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {agingData.items.map((s: any) => {
+                  const daysColor = s.daysOutstanding > 90 ? 'text-destructive font-bold' : s.daysOutstanding > 60 ? 'text-orange-500' : s.daysOutstanding > 30 ? 'text-warning' : 'text-muted-foreground';
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-xs font-medium">{s.clientName}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.date}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{s.invoice_ref || '—'}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(Number(s.total_usd))}</TableCell>
+                      <TableCell className={cn('text-xs text-right font-mono', daysColor)}>{s.daysOutstanding}</TableCell>
+                      <TableCell><span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium',
+                        s.payment_status === 'pending' ? 'bg-warning/15 text-warning' :
+                        s.payment_status === 'partial' ? 'bg-primary/15 text-primary' :
+                        s.payment_status === 'overdue' ? 'bg-destructive/15 text-destructive' : 'bg-muted text-muted-foreground'
+                      )}>{s.payment_status}</span></TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {agingData.items.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay cuentas por cobrar pendientes 🎉</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ======== COMPARATIVO MENSUAL ======== */}
+      {view === 'monthly' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-card border border-border p-6">
+            <h3 className="text-sm font-semibold mb-4">Tendencia 12 Meses (USD)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={monthlyComparison}>
+                <XAxis dataKey="label" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[4,4,0,0]} />
+                <Bar dataKey="cogs" name="COGS" fill="hsl(0, 84%, 60%)" radius={[4,4,0,0]} />
+                <Bar dataKey="expenses" name="Gastos" fill="hsl(43, 96%, 56%)" radius={[4,4,0,0]} />
+                <Line type="monotone" dataKey="netIncome" name="U. Neta" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="text-xs">Mes</TableHead>
+                <TableHead className="text-xs text-right">Ingresos</TableHead>
+                <TableHead className="text-xs text-right">COGS</TableHead>
+                <TableHead className="text-xs text-right">Costos Dir.</TableHead>
+                <TableHead className="text-xs text-right">U. Bruta</TableHead>
+                <TableHead className="text-xs text-right">GM %</TableHead>
+                <TableHead className="text-xs text-right">Gastos</TableHead>
+                <TableHead className="text-xs text-right">U. Neta</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {monthlyComparison.map(m => (
+                  <TableRow key={m.month} className={m.revenue === 0 ? 'opacity-40' : ''}>
+                    <TableCell className="text-xs font-medium">{m.label}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-primary">{formatUSD(m.revenue)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(m.cogs)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(m.directCosts)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono font-semibold">{formatUSD(m.grossProfit)}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono', m.gmPct >= 40 ? 'text-success' : m.gmPct >= 20 ? 'text-warning' : 'text-destructive')}>{m.gmPct.toFixed(1)}%</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-warning">{formatUSD(m.expenses)}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono font-bold', m.netIncome >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(m.netIncome)}</TableCell>
+                  </TableRow>
+                ))}
+                {(() => {
+                  const active = monthlyComparison.filter(m => m.revenue > 0);
+                  if (active.length === 0) return null;
+                  const tRev = active.reduce((s, m) => s + m.revenue, 0);
+                  const tCogs = active.reduce((s, m) => s + m.cogs, 0);
+                  const tDc = active.reduce((s, m) => s + m.directCosts, 0);
+                  const tGp = active.reduce((s, m) => s + m.grossProfit, 0);
+                  const tExp = active.reduce((s, m) => s + m.expenses, 0);
+                  const tNi = active.reduce((s, m) => s + m.netIncome, 0);
+                  return (
+                    <TableRow className="bg-muted/30 font-bold border-t-2">
+                      <TableCell className="text-xs font-bold">TOTAL</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(tRev)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatUSD(tCogs)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(tDc)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{formatUSD(tGp)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">{tRev > 0 ? (tGp / tRev * 100).toFixed(1) : '0.0'}%</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold text-warning">{formatUSD(tExp)}</TableCell>
+                      <TableCell className={cn('text-xs text-right font-mono font-bold', tNi >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(tNi)}</TableCell>
+                    </TableRow>
+                  );
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* ======== POR CLIENTE ======== */}
+      {view === 'clientes' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs text-right">Unidades</TableHead>
+                <TableHead className="text-xs text-right">Ingresos</TableHead>
+                <TableHead className="text-xs text-right">COGS</TableHead>
+                <TableHead className="text-xs text-right">GM %</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {clientData.map((c, i) => {
+                  const gm = c.revenue - c.cogs;
+                  const gmPct = c.revenue > 0 ? gm / c.revenue * 100 : 0;
+                  return (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs font-medium">{c.name}</TableCell>
+                      <TableCell className="text-xs text-right font-mono">{c.units}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-primary font-bold">{formatUSD(c.revenue)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-destructive">{formatUSD(c.cogs)}</TableCell>
+                      <TableCell className={cn('text-xs text-right font-mono', gmPct >= 40 ? 'text-success' : 'text-warning')}>{gmPct.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {clientData.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay datos</p>}
+          </div>
+        </div>
+      )}
+
+      {/* ======== POR PRODUCTO ======== */}
+      {view === 'productos' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead className="text-xs">Producto</TableHead>
+                <TableHead className="text-xs text-right">Uds</TableHead>
+                <TableHead className="text-xs text-right">Ingresos</TableHead>
+                <TableHead className="text-xs text-right">GM %</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {marginData.map((p, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-xs font-medium">{p.name}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{p.units}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-primary font-bold">{formatUSD(p.revenue)}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono', p.gmPct >= 40 ? 'text-success' : 'text-warning')}>{p.gmPct.toFixed(1)}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {marginData.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay datos</p>}
           </div>
         </div>
       )}
