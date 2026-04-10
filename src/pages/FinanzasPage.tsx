@@ -80,6 +80,9 @@ export default function FinanzasPage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [salePrefill, setSalePrefill] = useState<any>(null);
   const [expensePrefill, setExpensePrefill] = useState<any>(null);
+  const { rate } = useExchangeRate();
+  const fmt = (usd: number) => formatDOP(usd * rate);
+  const fmtDop = (dop: number) => formatDOP(dop);
   const queryClient = useQueryClient();
 
   const { data: sales = [] } = useQuery({
