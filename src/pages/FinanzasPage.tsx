@@ -1266,6 +1266,28 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
               <PLCompRow key={prod} label={`    ${prod}`} cur={current.cogsByProduct[prod] || 0} prv={prev.cogsByProduct[prod] || 0} yoy={yoy.cogsByProduct[prod] || 0} negative sub />
             ))}
 
+            {/* Direct Costs (from costs module) */}
+            {(current.directCosts > 0 || prev.directCosts > 0 || yoy.directCosts > 0) && (
+              <>
+                <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandCosts(!expandCosts)}>
+                  <TableCell className="text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-muted-foreground text-[10px]">{expandCosts ? '▼' : '▶'}</span>
+                      (-) Costos Directos
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs text-right font-mono">-{formatUSD(current.directCosts)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < prev.directCosts ? 'text-success' : current.directCosts > prev.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, prev.directCosts)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.directCosts)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < yoy.directCosts ? 'text-success' : current.directCosts > yoy.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, yoy.directCosts)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.directCosts)}</TableCell>
+                </TableRow>
+                {expandCosts && allCostCats.map(cat => (
+                  <PLCompRow key={cat} label={`    ${cat}`} cur={current.costsByCategory[cat] || 0} prv={prev.costsByCategory[cat] || 0} yoy={yoy.costsByCategory[cat] || 0} negative sub />
+                ))}
+              </>
+            )}
+
             <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
             <PLCompRow label="Utilidad Bruta" cur={current.grossProfit} prv={prev.grossProfit} yoy={yoy.grossProfit} bold />
             <PLCompRow label="Margen Bruto" cur={current.revenue > 0 ? current.grossProfit / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.grossProfit / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.grossProfit / yoy.revenue * 100 : 0} pct />
