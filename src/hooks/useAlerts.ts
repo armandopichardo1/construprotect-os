@@ -24,6 +24,7 @@ export const DEFAULT_ALERT_RULES: AlertRule[] = [
   { id: 'high_expense_month', label: 'Gasto mensual elevado', description: 'Alerta cuando los gastos del mes superan el umbral en USD', category: 'finance', enabled: true, threshold: 5000, unit: 'USD' },
   { id: 'negative_cashflow', label: 'Flujo de caja negativo', description: 'Alerta cuando el flujo neto mensual es negativo', category: 'finance', enabled: true, threshold: 0, unit: 'USD' },
   { id: 'client_declining', label: 'Cliente sin compras recientes', description: 'Alerta cuando un cliente activo no compra en X días', category: 'crm', enabled: true, threshold: 30, unit: 'days' },
+  { id: 'cashflow_projection_low', label: 'Flujo proyectado bajo umbral', description: 'Alerta cuando el flujo de caja acumulado proyectado baja del umbral en USD', category: 'finance', enabled: true, threshold: 1000, unit: 'USD' },
 ];
 
 export interface AlertItem {
