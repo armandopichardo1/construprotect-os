@@ -174,6 +174,49 @@ export function ContainerPlanner() {
     exportToExcel(data, `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
   };
 
+  const handleCreateShipment = async () => {
+    if (!shipmentSupplierId) { toast.error('Selecciona un proveedor'); return; }
+    const supplier = suppliers.find(s => s.id === shipmentSupplierId);
+    setCreatingShipment(true);
+    try {
+      const { data: shipment, error } = await supabase.from('shipments').insert({
+        supplier_id: shipmentSupplierId,
+        supplier_name: supplier?.name || '',
+        po_number: shipmentPoNumber || null,
+        status: 'ordered' as any,
+        order_date: new Date().toISOString().split('T')[0],
+        estimated_arrival: shipmentEta || null,
+        shipping_cost_usd: container.costEstimate,
+        customs_cost_usd: 0,
+        total_cost_usd: totalCost + container.costEstimate,
+        notes: shipmentNotes || `Contenedor ${CONTAINER_TYPES[containerType].label} — ${activeLines.length} SKUs`,
+      }).select().single();
+      if (error) throw error;
+
+      const shipmentItems = activeLines.map(l => ({
+        shipment_id: shipment.id,
+        product_id: l.id,
+        quantity_ordered: l.qty,
+        unit_cost_usd: l.unitCost,
+      }));
+      const { error: itemsError } = await supabase.from('shipment_items').insert(shipmentItems);
+      if (itemsError) throw itemsError;
+
+      toast.success(`Envío creado con ${activeLines.length} productos`);
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      setShowShipmentDialog(false);
+      setShipmentSupplierId('');
+      setShipmentPoNumber('');
+      setShipmentEta('');
+      setShipmentNotes('');
+      clearAll();
+    } catch (e: any) {
+      toast.error(e.message || 'Error creando envío');
+    } finally {
+      setCreatingShipment(false);
+    }
+  };
+
   const urgencyColor = (p: typeof lines[0]) => {
     if (p.currentStock === 0) return 'text-destructive';
     if (p.daysOfSupply < p.leadTime) return 'text-destructive';
