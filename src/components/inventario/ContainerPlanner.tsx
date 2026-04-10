@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
@@ -9,7 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download, Ship } from 'lucide-react';
 
 const CONTAINER_TYPES = {
   '20ft': { label: '20\' Standard', maxCbm: 33.2, maxKg: 21770, costEstimate: 3500 },
@@ -38,8 +41,15 @@ type ProductLine = {
 };
 
 export function ContainerPlanner() {
+  const queryClient = useQueryClient();
   const [containerType, setContainerType] = useState<ContainerType>('40hc');
   const [orderLines, setOrderLines] = useState<Record<string, number>>({});
+  const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [shipmentSupplierId, setShipmentSupplierId] = useState('');
+  const [shipmentPoNumber, setShipmentPoNumber] = useState('');
+  const [shipmentEta, setShipmentEta] = useState('');
+  const [shipmentNotes, setShipmentNotes] = useState('');
+  const [creatingShipment, setCreatingShipment] = useState(false);
   const container = CONTAINER_TYPES[containerType];
 
   const { data: products } = useQuery({
@@ -84,6 +94,14 @@ export function ContainerPlanner() {
           qty: 0,
         } as ProductLine;
       });
+    },
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
     },
   });
 
@@ -154,6 +172,49 @@ export function ContainerPlanner() {
       'Costo Total (USD)': Number((p.qty * p.unitCost).toFixed(2)),
     }));
     exportToExcel(data, `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
+  };
+
+  const handleCreateShipment = async () => {
+    if (!shipmentSupplierId) { toast.error('Selecciona un proveedor'); return; }
+    const supplier = suppliers.find(s => s.id === shipmentSupplierId);
+    setCreatingShipment(true);
+    try {
+      const { data: shipment, error } = await supabase.from('shipments').insert({
+        supplier_id: shipmentSupplierId,
+        supplier_name: supplier?.name || '',
+        po_number: shipmentPoNumber || null,
+        status: 'ordered' as any,
+        order_date: new Date().toISOString().split('T')[0],
+        estimated_arrival: shipmentEta || null,
+        shipping_cost_usd: container.costEstimate,
+        customs_cost_usd: 0,
+        total_cost_usd: totalCost + container.costEstimate,
+        notes: shipmentNotes || `Contenedor ${CONTAINER_TYPES[containerType].label} — ${activeLines.length} SKUs`,
+      }).select().single();
+      if (error) throw error;
+
+      const shipmentItems = activeLines.map(l => ({
+        shipment_id: shipment.id,
+        product_id: l.id,
+        quantity_ordered: l.qty,
+        unit_cost_usd: l.unitCost,
+      }));
+      const { error: itemsError } = await supabase.from('shipment_items').insert(shipmentItems);
+      if (itemsError) throw itemsError;
+
+      toast.success(`Envío creado con ${activeLines.length} productos`);
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      setShowShipmentDialog(false);
+      setShipmentSupplierId('');
+      setShipmentPoNumber('');
+      setShipmentEta('');
+      setShipmentNotes('');
+      clearAll();
+    } catch (e: any) {
+      toast.error(e.message || 'Error creando envío');
+    } finally {
+      setCreatingShipment(false);
+    }
   };
 
   const urgencyColor = (p: typeof lines[0]) => {
@@ -263,9 +324,14 @@ export function ContainerPlanner() {
         </Button>
         <Button size="sm" variant="ghost" onClick={clearAll} className="text-xs text-muted-foreground">Limpiar</Button>
         {activeLines.length > 0 && (
-          <Button size="sm" variant="outline" onClick={handleExport} className="gap-1.5 text-xs ml-auto">
-            <Download className="w-3.5 h-3.5" /> Exportar Excel
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={handleExport} className="gap-1.5 text-xs ml-auto">
+              <Download className="w-3.5 h-3.5" /> Exportar Excel
+            </Button>
+            <Button size="sm" onClick={() => setShowShipmentDialog(true)} className="gap-1.5 text-xs">
+              <Ship className="w-3.5 h-3.5" /> Crear Envío
+            </Button>
+          </>
         )}
       </div>
 
@@ -341,6 +407,51 @@ export function ContainerPlanner() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Create Shipment Dialog */}
+      <Dialog open={showShipmentDialog} onOpenChange={setShowShipmentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Ship className="w-4 h-4 text-primary" /> Crear Envío desde Contenedor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs space-y-1">
+              <p><b>{activeLines.length}</b> productos · <b>{activeLines.reduce((s, l) => s + l.qty, 0).toLocaleString()}</b> unidades</p>
+              <p>Costo producto: <b>{formatUSD(totalCost)}</b> · Flete est: <b>{formatUSD(container.costEstimate)}</b></p>
+              <p>Contenedor: <b>{CONTAINER_TYPES[containerType].label}</b> · Llenado: <b>{fillPct.toFixed(0)}%</b></p>
+            </div>
+            <div>
+              <Label className="text-xs">Proveedor *</Label>
+              <Select value={shipmentSupplierId} onValueChange={setShipmentSupplierId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">PO Number</Label>
+                <Input value={shipmentPoNumber} onChange={e => setShipmentPoNumber(e.target.value)} className="mt-1" placeholder="PO-2026-001" />
+              </div>
+              <div>
+                <Label className="text-xs">ETA</Label>
+                <Input type="date" value={shipmentEta} onChange={e => setShipmentEta(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Notas</Label>
+              <Input value={shipmentNotes} onChange={e => setShipmentNotes(e.target.value)} className="mt-1" placeholder="Opcional" />
+            </div>
+            <Button onClick={handleCreateShipment} disabled={creatingShipment} className="w-full gap-2">
+              <Ship className="w-4 h-4" />
+              {creatingShipment ? 'Creando...' : `Crear Envío (${formatUSD(totalCost + container.costEstimate)})`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
