@@ -375,7 +375,7 @@ export default function DashboardPage() {
                       {revenueData.revByCategory.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => {
-                      const total = revenueData.revByCategory.reduce((s, c) => s + c.value, 0);
+                      const total = revenueData.revByCategory.reduce((s: number, c: any) => s + c.value, 0);
                       const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '0';
                       return `${formatUSD(v)} (${pct}%)`;
                     }} />
