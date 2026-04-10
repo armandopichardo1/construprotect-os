@@ -146,7 +146,12 @@ export function CashFlowTab({ sales, expenses }: Props) {
     return { rows, monthlyReceivable, avgNewSales, monthlyRecurring, estimatedOtherExpenses, totalPending };
   }, [sales, expenses, data, projMonths, now]);
 
-  const handleExport = () => {
+  // Detect threshold breaches in projection
+  const breachMonths = useMemo(() => {
+    if (!thresholdEnabled) return [];
+    return projection.rows.filter(r => r.cumulative < thresholdValue || r.cumPesimista < thresholdValue);
+  }, [projection.rows, thresholdEnabled, thresholdValue]);
+
     exportToExcel(data.map(r => ({
       Mes: r.month, 'Entradas USD': r.inflows, 'Salidas USD': r.outflows,
       'Flujo Neto USD': r.net, 'Acumulado USD': r.cumulative,
