@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, MessageCircle } from 'lucide-react';
 
 interface ClientCardProps {
   client: any;
@@ -34,6 +34,17 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
           </span>
         </div>
         <div className="flex gap-1">
+          {client.phone && (
+            <a
+              href={`https://wa.me/${client.phone.replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-success hover:bg-success/10 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+            </a>
+          )}
           <button onClick={() => onEdit(client)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
