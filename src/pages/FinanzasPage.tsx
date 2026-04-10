@@ -1139,40 +1139,28 @@ function PLTab({ sales, saleItems, expenses }: { sales: any[]; saleItems: any[];
 
   // Waterfall chart data
   const waterfallData = useMemo(() => {
-    const items: { name: string; value: number; fill: string; isTotal?: boolean }[] = [];
-    items.push({ name: 'Ingresos', value: current.revenue, fill: 'hsl(217, 91%, 60%)', isTotal: true });
-    items.push({ name: 'COGS', value: -current.cogs, fill: 'hsl(38, 92%, 50%)' });
+    const categories = ['Ingresos', 'COGS', ...allExpCats.filter(cat => (current.expensesByCategory[cat] || 0) > 0 || (prev.expensesByCategory[cat] || 0) > 0).sort((a, b) => (current.expensesByCategory[b] || 0) - (current.expensesByCategory[a] || 0)), 'Utilidad Neta'];
 
-    // Sort expense categories by value descending
-    const sortedCats = allExpCats
-      .map(cat => ({ cat, val: current.expensesByCategory[cat] || 0 }))
-      .filter(c => c.val > 0)
-      .sort((a, b) => b.val - a.val);
+    return categories.map(name => {
+      let curVal = 0, prvVal = 0;
+      if (name === 'Ingresos') { curVal = current.revenue; prvVal = prev.revenue; }
+      else if (name === 'COGS') { curVal = current.cogs; prvVal = prev.cogs; }
+      else if (name === 'Utilidad Neta') { curVal = current.netIncome; prvVal = prev.netIncome; }
+      else { curVal = current.expensesByCategory[name] || 0; prvVal = prev.expensesByCategory[name] || 0; }
 
-    sortedCats.forEach((c, i) => {
-      items.push({ name: c.cat, value: -c.val, fill: PIE_COLORS[i % PIE_COLORS.length] });
+      const delta = curVal - prvVal;
+      const deltaPct = prvVal !== 0 ? ((delta / prvVal) * 100) : (curVal > 0 ? 100 : 0);
+
+      return {
+        name,
+        current: curVal,
+        previous: prvVal,
+        delta,
+        deltaPct: Math.round(deltaPct * 10) / 10,
+        isTotal: name === 'Ingresos' || name === 'Utilidad Neta',
+      };
     });
-
-    items.push({ name: 'Utilidad Neta', value: current.netIncome, fill: current.netIncome >= 0 ? 'hsl(160, 84%, 39%)' : 'hsl(0, 84%, 60%)', isTotal: true });
-
-    // Build waterfall bars: each non-total bar floats from running total
-    let running = 0;
-    return items.map(item => {
-      if (item.isTotal) {
-        const result = { name: item.name, base: 0, delta: item.value, fill: item.fill };
-        running = item.value;
-        if (item.name === 'Utilidad Neta') {
-          result.base = 0;
-          result.delta = item.value;
-        }
-        return result;
-      }
-      const base = running + item.value; // value is negative
-      const result = { name: item.name, base: Math.min(running, base), delta: Math.abs(item.value), fill: item.fill };
-      running = base;
-      return result;
-    });
-  }, [current, allExpCats]);
+  }, [current, prev, allExpCats]);
 
   // Pareto (80/20) analysis data
   const paretoData = useMemo(() => {
