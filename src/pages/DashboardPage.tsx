@@ -271,13 +271,23 @@ export default function DashboardPage() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {computedAlerts.map(alert => (
-                <div key={alert.ruleId} className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50" onClick={() => alert.navigateTo && navigate(alert.navigateTo)}>
-                  <p className={cn('text-lg font-bold', alert.severity === 'critical' ? 'text-destructive' : 'text-warning')}>
-                    {alert.count}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-medium">
-                    {{ inventory: '📦', finance: '💰', margin: '📊', crm: '🤝', concentration: '⚖️' }[alert.category] || '🔔'}{' '}{alert.label}
-                  </p>
+                <div key={alert.ruleId} className="rounded-xl bg-card p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => alert.navigateTo && navigate(alert.navigateTo)}>
+                  <div className="flex items-start justify-between">
+                    <p className={cn('text-lg font-bold', alert.severity === 'critical' ? 'text-destructive' : 'text-warning')}>
+                      {alert.count}
+                    </p>
+                    {(() => {
+                      const iconMap: Record<string, typeof Package> = { inventory: Package, finance: DollarSign, margin: TrendingUp, crm: Users, concentration: ShieldAlert };
+                      const colorMap: Record<string, string> = { inventory: 'text-primary', finance: 'text-warning', margin: 'text-destructive', crm: 'text-success', concentration: 'text-destructive' };
+                      const Icon = iconMap[alert.category] || Bell;
+                      return (
+                        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center bg-muted/50', colorMap[alert.category] || 'text-muted-foreground')}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-1">{alert.label}</p>
                   <p className="text-[9px] text-muted-foreground/70 mt-0.5 line-clamp-2">{alert.message}</p>
                 </div>
               ))}
