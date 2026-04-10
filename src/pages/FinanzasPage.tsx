@@ -1041,28 +1041,35 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
 }
 
 // ============ P&L TAB ============
-type PeriodTotals = { revenue: number; cogs: number; grossProfit: number; cogsByProduct: Record<string, number>; expensesByCategory: Record<string, number>; totalExpenses: number; netIncome: number };
+type PeriodTotals = { revenue: number; cogs: number; grossProfit: number; cogsByProduct: Record<string, number>; directCosts: number; costsByCategory: Record<string, number>; expensesByCategory: Record<string, number>; totalExpenses: number; netIncome: number };
 
-function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], startDate: string, endDate: string): PeriodTotals {
+function calcPeriodTotals(sales: any[], saleItems: any[], expenses: any[], startDate: string, endDate: string, costs: any[] = []): PeriodTotals {
   const filteredSales = sales.filter((s: any) => s.date >= startDate && s.date <= endDate);
   const saleIds = new Set(filteredSales.map((s: any) => s.id));
   const filteredItems = saleItems.filter((si: any) => saleIds.has(si.sale_id));
   const filteredExpenses = expenses.filter((e: any) => e.date >= startDate && e.date <= endDate);
+  const filteredCosts = costs.filter((c: any) => c.date >= startDate && c.date <= endDate);
   const revenue = filteredSales.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
   const cogs = filteredItems.reduce((s: number, r: any) => s + Number(r.unit_cost_usd || 0) * Number(r.quantity || 0), 0);
-  const grossProfit = revenue - cogs;
   const cogsByProduct: Record<string, number> = {};
   filteredItems.forEach((si: any) => {
     const name = si.products?.name || 'Otro';
     cogsByProduct[name] = (cogsByProduct[name] || 0) + Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
   });
+  const costsByCategory: Record<string, number> = {};
+  filteredCosts.forEach((c: any) => {
+    const label = COST_CATEGORIES[c.category]?.label || c.category;
+    costsByCategory[label] = (costsByCategory[label] || 0) + Number(c.amount_usd || 0);
+  });
+  const directCosts = filteredCosts.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+  const grossProfit = revenue - cogs - directCosts;
   const expensesByCategory: Record<string, number> = {};
   filteredExpenses.forEach((e: any) => {
     const label = EXPENSE_CATEGORIES[e.category]?.label || e.category;
     expensesByCategory[label] = (expensesByCategory[label] || 0) + Number(e.amount_usd || 0);
   });
   const totalExpenses = filteredExpenses.reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
-  return { revenue, cogs, grossProfit, cogsByProduct, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
+  return { revenue, cogs, grossProfit, cogsByProduct, directCosts, costsByCategory, expensesByCategory, totalExpenses, netIncome: grossProfit - totalExpenses };
 }
 
 function getDateRange(period: string, now: Date): { start: string; end: string; label: string } {
