@@ -22,7 +22,13 @@ const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
+  purchases: { label: 'Compras', icon: '🛒' },
   warehouse: { label: 'Almacén', icon: '🏭' },
+  payroll: { label: 'Nómina', icon: '👥' },
+  rent: { label: 'Alquiler', icon: '🏠' },
+  utilities: { label: 'Servicios', icon: '💡' },
+  insurance: { label: 'Seguros', icon: '🛡️' },
+  maintenance: { label: 'Mantenimiento', icon: '🔧' },
   software: { label: 'Software', icon: '💻' },
   accounting: { label: 'Contabilidad', icon: '📊' },
   marketing: { label: 'Marketing', icon: '📣' },
@@ -407,17 +413,7 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
     });
     await supabase.from('sale_items').insert(saleItemsData);
 
-    if (!isEdit) {
-      for (const item of items) {
-        const { data: inv } = await supabase.from('inventory').select('*').eq('product_id', item.product_id).limit(1).single();
-        if (inv) await supabase.from('inventory').update({ quantity_on_hand: Math.max(0, inv.quantity_on_hand - item.quantity) }).eq('id', inv.id);
-        await supabase.from('inventory_movements').insert({
-          product_id: item.product_id, movement_type: 'sale' as any, quantity: -item.quantity,
-          unit_cost_usd: Number(products.find((p: any) => p.id === item.product_id)?.unit_cost_usd || 0),
-          reference_id: saleId, reference_type: 'sale',
-        });
-      }
-    }
+    // Inventory deduction is handled automatically by the database trigger (handle_sale_item_inventory)
 
     setSaving(false);
     toast.success(isEdit ? 'Venta actualizada' : 'Venta registrada');
