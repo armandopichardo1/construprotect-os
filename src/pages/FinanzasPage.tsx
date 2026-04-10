@@ -113,7 +113,27 @@ export default function FinanzasPage() {
     },
   });
 
-  const { data: latestRate } = useQuery({
+  const { data: territoryData = [] } = useQuery({
+    queryKey: ['territory-coverage'],
+    queryFn: async () => {
+      const { data: contacts } = await supabase.from('contacts').select('territory, lifetime_revenue_usd, total_orders, is_active');
+      if (!contacts) return [];
+      const byTerritory: Record<string, { count: number; revenue: number; orders: number; active: number }> = {};
+      contacts.forEach(c => {
+        const t = c.territory || 'Sin asignar';
+        if (!byTerritory[t]) byTerritory[t] = { count: 0, revenue: 0, orders: 0, active: 0 };
+        byTerritory[t].count++;
+        byTerritory[t].revenue += Number(c.lifetime_revenue_usd || 0);
+        byTerritory[t].orders += Number(c.total_orders || 0);
+        if (c.is_active) byTerritory[t].active++;
+      });
+      return Object.entries(byTerritory)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.revenue - a.revenue);
+    },
+  });
+
+
     queryKey: ['latest-rate'],
     queryFn: async () => {
       const { data } = await supabase.from('exchange_rates').select('*').order('date', { ascending: false }).limit(1);
