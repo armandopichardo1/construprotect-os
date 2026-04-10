@@ -8,8 +8,9 @@ import { formatUSD } from '@/lib/format';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
