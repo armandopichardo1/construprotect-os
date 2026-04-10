@@ -27,7 +27,7 @@ const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = 
   declined: { label: 'Declinado', color: 'bg-destructive/15 text-destructive' },
 };
 
-type Tab = 'general' | 'requests' | 'competitors' | 'territory';
+type Tab = 'general' | 'requests' | 'competitors' | 'territory' | 'alerts';
 
 export default function MasPage() {
   const { user, signOut } = useAuth();
@@ -184,6 +184,7 @@ export default function MasPage() {
         <div className="flex gap-1 rounded-xl bg-muted p-1 w-fit">
           {([
             { key: 'general' as Tab, label: 'General' },
+            { key: 'alerts' as Tab, label: '🔔 Alertas' },
             { key: 'requests' as Tab, label: 'Solicitudes Producto' },
             { key: 'competitors' as Tab, label: 'Competencia' },
             { key: 'territory' as Tab, label: 'Territorios' },
@@ -300,6 +301,7 @@ export default function MasPage() {
           </div>
         )}
 
+        {tab === 'alerts' && <AlertsConfigSection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
         {tab === 'competitors' && <CompetitorWatchSection entries={competitors} refetch={refetchCompetitors} />}
         {tab === 'territory' && <TerritoryCoverageSection data={territoryData || []} />}
