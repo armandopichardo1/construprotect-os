@@ -12,10 +12,10 @@ export function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light');
-    } else {
+    if (theme === 'dark') {
       root.classList.remove('light');
+    } else {
+      root.classList.add('light');
     }
     localStorage.setItem('cp-theme', theme);
   }, [theme]);
