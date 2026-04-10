@@ -334,7 +334,7 @@ export function CashFlowTab({ sales, expenses }: Props) {
         </div>
 
         <p className="text-[10px] text-muted-foreground/60 italic">
-          * Proyección basada en ventas pendientes de cobro distribuidas uniformemente, ventas promedio de los últimos 3 meses, y gastos recurrentes configurados. No constituye garantía financiera.
+          * Escenarios Optimista/Pesimista aplican ±20% sobre ventas estimadas y otros gastos. Cobros pendientes y gastos recurrentes se mantienen fijos. No constituye garantía financiera.
         </p>
       </div>
     </div>
