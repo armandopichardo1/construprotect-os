@@ -1151,38 +1151,67 @@ function ReportesTab({ sales, saleItems }: { sales: any[]; saleItems: any[] }) {
               <TableHead className="text-xs">{view === 'clientes' ? 'Cliente' : 'Producto'}</TableHead>
               <TableHead className="text-xs text-right">Unidades</TableHead>
               <TableHead className="text-xs text-right">Ingresos</TableHead>
-              <TableHead className="text-xs text-right">COGS</TableHead>
-              <TableHead className="text-xs text-right">GM</TableHead>
               <TableHead className="text-xs text-right">GM %</TableHead>
               <TableHead className="text-xs text-right">% Total</TableHead>
+              {view === 'clientes' ? (
+                <>
+                  <TableHead className="text-xs text-right">Últ. Compra</TableHead>
+                  <TableHead className="text-xs text-right">Días</TableHead>
+                  <TableHead className="text-xs text-center">Tendencia</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="text-xs text-right">Vel. uds/mes</TableHead>
+                  <TableHead className="text-xs text-center">Tendencia</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((r, i) => {
+            {data.map((r: any, i: number) => {
               const gm = r.revenue - r.cogs;
               const gmPct = r.revenue > 0 ? (gm / r.revenue * 100) : 0;
               const sharePct = totalRevenue > 0 ? (r.revenue / totalRevenue * 100) : 0;
+              const trendPct = r.trendPct ?? 0;
+              const isInactive = view === 'clientes' && r.daysSince > 30;
               return (
-                <TableRow key={i}>
-                  <TableCell className="text-xs font-medium">{r.name}</TableCell>
+                <TableRow key={i} className={cn(isInactive && 'bg-destructive/5')}>
+                  <TableCell className={cn('text-xs font-medium', isInactive && 'text-destructive')}>{r.name}</TableCell>
                   <TableCell className="text-xs text-right font-mono">{r.units.toLocaleString()}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(r.revenue)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatUSD(r.cogs)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono font-semibold', gm >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(gm)}</TableCell>
                   <TableCell className={cn('text-xs text-right font-mono', gmPct >= 40 ? 'text-success' : gmPct >= 20 ? 'text-warning' : 'text-destructive')}>{gmPct.toFixed(1)}%</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{sharePct.toFixed(1)}%</TableCell>
+                  {view === 'clientes' ? (
+                    <>
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">{r.lastDate || '—'}</TableCell>
+                      <TableCell className={cn('text-xs text-right font-mono', isInactive ? 'text-destructive font-semibold' : 'text-muted-foreground')}>{r.daysSince < 999 ? r.daysSince : '—'}</TableCell>
+                      <TableCell className="text-xs text-center">
+                        <span className={cn('font-mono font-semibold', trendPct >= 0 ? 'text-success' : 'text-destructive')}>
+                          {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct).toFixed(0)}%
+                        </span>
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell className="text-xs text-right font-mono">{r.velocity ?? 0}</TableCell>
+                      <TableCell className="text-xs text-center">
+                        <span className={cn('font-mono font-semibold', trendPct >= 0 ? 'text-success' : 'text-destructive')}>
+                          {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct).toFixed(0)}%
+                        </span>
+                      </TableCell>
+                    </>
+                  )}
                 </TableRow>
               );
             })}
             {data.length > 0 && (
               <TableRow className="bg-muted/30 font-bold">
                 <TableCell className="text-xs font-bold">TOTAL</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold">{data.reduce((s, r) => s + r.units, 0).toLocaleString()}</TableCell>
+                <TableCell className="text-xs text-right font-mono font-bold">{data.reduce((s: number, r: any) => s + r.units, 0).toLocaleString()}</TableCell>
                 <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(totalRevenue)}</TableCell>
-                <TableCell className="text-xs text-right font-mono font-bold text-muted-foreground">{formatUSD(totalCogs)}</TableCell>
-                <TableCell className={cn('text-xs text-right font-mono font-bold', totalGM >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(totalGM)}</TableCell>
                 <TableCell className="text-xs text-right font-mono font-bold">{totalGMPct.toFixed(1)}%</TableCell>
                 <TableCell className="text-xs text-right font-mono font-bold">100%</TableCell>
+                <TableCell colSpan={view === 'clientes' ? 3 : 2} />
               </TableRow>
             )}
           </TableBody>
