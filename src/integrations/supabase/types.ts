@@ -74,6 +74,39 @@ export type Database = {
           },
         ]
       }
+      alert_history: {
+        Row: {
+          alert_count: number
+          category: string
+          fired_at: string
+          id: string
+          label: string
+          message: string
+          rule_id: string
+          severity: string
+        }
+        Insert: {
+          alert_count?: number
+          category: string
+          fired_at?: string
+          id?: string
+          label: string
+          message: string
+          rule_id: string
+          severity: string
+        }
+        Update: {
+          alert_count?: number
+          category?: string
+          fired_at?: string
+          id?: string
+          label?: string
+          message?: string
+          rule_id?: string
+          severity?: string
+        }
+        Relationships: []
+      }
       brands: {
         Row: {
           created_at: string

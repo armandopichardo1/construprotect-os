@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
+import { useAlertLogger } from '@/hooks/useAlertHistory';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -217,6 +218,7 @@ export default function DashboardPage() {
 
   // Dynamic alerts from configurable rules
   const { data: computedAlerts = [] } = useAlerts();
+  useAlertLogger(computedAlerts.length > 0 ? computedAlerts : undefined);
 
   // Toast notifications for critical inventory/shipment alerts
   useEffect(() => {

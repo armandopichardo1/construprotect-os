@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,9 @@ const REQUEST_STATUS_LABELS: Record<string, { label: string; color: string }> = 
   declined: { label: 'Declinado', color: 'bg-destructive/15 text-destructive' },
 };
 
-type Tab = 'general' | 'requests' | 'alerts';
+import { useAlertHistory, type AlertHistoryRow } from '@/hooks/useAlertHistory';
+
+type Tab = 'general' | 'requests' | 'alerts' | 'historial';
 
 export default function MasPage() {
   const { user, signOut } = useAuth();
@@ -156,6 +158,7 @@ export default function MasPage() {
           {([
             { key: 'general' as Tab, label: 'General' },
             { key: 'alerts' as Tab, label: '🔔 Alertas' },
+            { key: 'historial' as Tab, label: '📋 Historial' },
             { key: 'requests' as Tab, label: 'Solicitudes Producto' },
           ]).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} className={cn(
@@ -271,6 +274,7 @@ export default function MasPage() {
         )}
 
         {tab === 'alerts' && <AlertsConfigSection />}
+        {tab === 'historial' && <AlertHistorySection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
       </div>
     </AppLayout>
@@ -526,6 +530,103 @@ function AlertsConfigSection() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ========== Alert History ==========
+function AlertHistorySection() {
+  const { data: history = [], isLoading } = useAlertHistory(200);
+  const [filterCat, setFilterCat] = useState('all');
+  const [filterSeverity, setFilterSeverity] = useState('all');
+
+  const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
+    margin: { label: 'Márgenes', icon: '📊' },
+    concentration: { label: 'Concentración', icon: '⚖️' },
+    inventory: { label: 'Inventario', icon: '📦' },
+    crm: { label: 'CRM', icon: '🤝' },
+    finance: { label: 'Finanzas', icon: '💰' },
+  };
+
+  const categories = useMemo(() => [...new Set(history.map(h => h.category))], [history]);
+
+  const filtered = useMemo(() => {
+    return history.filter(h => {
+      if (filterCat !== 'all' && h.category !== filterCat) return false;
+      if (filterSeverity !== 'all' && h.severity !== filterSeverity) return false;
+      return true;
+    });
+  }, [history, filterCat, filterSeverity]);
+
+  // Group by date
+  const grouped = useMemo(() => {
+    const groups: Record<string, AlertHistoryRow[]> = {};
+    filtered.forEach(h => {
+      const day = new Date(h.fired_at).toLocaleDateString('es-DO', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+      if (!groups[day]) groups[day] = [];
+      groups[day].push(h);
+    });
+    return groups;
+  }, [filtered]);
+
+  if (isLoading) return <p className="text-xs text-muted-foreground py-8 text-center">Cargando historial...</p>;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Historial de Alertas</h2>
+          <p className="text-xs text-muted-foreground">{filtered.length} registro(s) · Solo alertas críticas se registran automáticamente</p>
+        </div>
+        <div className="flex gap-2">
+          <Select value={filterCat} onValueChange={setFilterCat}>
+            <SelectTrigger className="h-7 text-[10px] w-[120px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todas</SelectItem>
+              {categories.map(c => (
+                <SelectItem key={c} value={c} className="text-xs">{CATEGORY_LABELS[c]?.icon} {CATEGORY_LABELS[c]?.label || c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+            <SelectTrigger className="h-7 text-[10px] w-[100px]"><SelectValue placeholder="Severidad" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todas</SelectItem>
+              <SelectItem value="critical" className="text-xs">🔴 Crítica</SelectItem>
+              <SelectItem value="warning" className="text-xs">🟡 Advertencia</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {Object.keys(grouped).length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-8">Sin registros de alertas aún. Las alertas críticas se registran automáticamente cuando se detectan.</p>
+      )}
+
+      {Object.entries(grouped).map(([day, items]) => (
+        <div key={day} className="space-y-2">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{day}</p>
+          {items.map(h => (
+            <div key={h.id} className={cn(
+              'rounded-xl border px-4 py-3 flex items-start gap-3',
+              h.severity === 'critical' ? 'border-destructive/30 bg-destructive/5' : 'border-warning/30 bg-warning/5'
+            )}>
+              <span className="text-xs mt-0.5">{h.severity === 'critical' ? '🔴' : '🟡'}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-medium text-foreground">{h.label}</p>
+                  <Badge variant="outline" className="text-[9px]">{CATEGORY_LABELS[h.category]?.icon} {CATEGORY_LABELS[h.category]?.label || h.category}</Badge>
+                  {h.alert_count > 1 && <Badge variant="outline" className="text-[9px]">×{h.alert_count}</Badge>}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{h.message}</p>
+              </div>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {new Date(h.fired_at).toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
