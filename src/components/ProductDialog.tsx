@@ -54,6 +54,10 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
         margin_architect_pct: String(product.margin_architect_pct ?? ''),
         margin_project_pct: String(product.margin_project_pct ?? ''),
         margin_wholesale_pct: String(product.margin_wholesale_pct ?? ''),
+        cbm_per_unit: String(product.cbm_per_unit ?? ''),
+        weight_kg_per_unit: String(product.weight_kg_per_unit ?? ''),
+        min_order_qty: String(product.min_order_qty ?? '1'),
+        reorder_qty: String(product.reorder_qty ?? '50'),
       });
     } else {
       setForm(defaultForm);
