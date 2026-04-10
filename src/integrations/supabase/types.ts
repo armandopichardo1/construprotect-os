@@ -141,6 +141,7 @@ export type Database = {
           description: string
           id: string
           is_active: boolean
+          parent_id: string | null
           updated_at: string
         }
         Insert: {
@@ -152,6 +153,7 @@ export type Database = {
           description: string
           id?: string
           is_active?: boolean
+          parent_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -163,9 +165,18 @@ export type Database = {
           description?: string
           id?: string
           is_active?: boolean
+          parent_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_projects: {
         Row: {
