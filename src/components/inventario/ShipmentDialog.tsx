@@ -1,0 +1,167 @@
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Plus, Trash2 } from 'lucide-react';
+
+interface ShipmentDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  editShipment?: any;
+}
+
+const STATUSES = [
+  { value: 'ordered', label: 'Ordenado' },
+  { value: 'in_transit', label: 'En Tránsito' },
+  { value: 'customs', label: 'Aduanas' },
+  { value: 'warehouse', label: 'Almacén' },
+  { value: 'received', label: 'Recibido' },
+];
+
+export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDialogProps) {
+  const queryClient = useQueryClient();
+  const isEdit = !!editShipment;
+
+  const [supplierName, setSupplierName] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  const [status, setStatus] = useState('ordered');
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [estimatedArrival, setEstimatedArrival] = useState('');
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<{ product_id: string; quantity_ordered: number; unit_cost_usd: number }[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('products').select('id, name, sku, unit_cost_usd').eq('is_active', true);
+      return data || [];
+    },
+  });
+
+  useEffect(() => {
+    if (editShipment) {
+      setSupplierName(editShipment.supplier_name || '');
+      setPoNumber(editShipment.po_number || '');
+      setStatus(editShipment.status || 'ordered');
+      setOrderDate(editShipment.order_date || '');
+      setEstimatedArrival(editShipment.estimated_arrival || '');
+      setNotes(editShipment.notes || '');
+      setItems(editShipment.shipment_items?.map((si: any) => ({
+        product_id: si.product_id, quantity_ordered: si.quantity_ordered, unit_cost_usd: Number(si.unit_cost_usd),
+      })) || []);
+    } else {
+      setSupplierName(''); setPoNumber(''); setStatus('ordered');
+      setOrderDate(new Date().toISOString().split('T')[0]);
+      setEstimatedArrival(''); setNotes(''); setItems([]);
+    }
+  }, [editShipment, open]);
+
+  const addItem = () => setItems([...items, { product_id: '', quantity_ordered: 1, unit_cost_usd: 0 }]);
+  const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
+  const updateItem = (i: number, field: string, value: any) => {
+    const copy = [...items];
+    (copy[i] as any)[field] = value;
+    if (field === 'product_id') {
+      const p = products.find(pr => pr.id === value);
+      if (p) copy[i].unit_cost_usd = Number(p.unit_cost_usd);
+    }
+    setItems(copy);
+  };
+
+  const totalCost = items.reduce((s, i) => s + i.quantity_ordered * i.unit_cost_usd, 0);
+
+  const handleSave = async () => {
+    if (!supplierName.trim()) { toast.error('Ingresa el proveedor'); return; }
+    setSaving(true);
+    try {
+      if (isEdit) {
+        await supabase.from('shipments').update({
+          supplier_name: supplierName, po_number: poNumber, status: status as any,
+          order_date: orderDate, estimated_arrival: estimatedArrival || null,
+          total_cost_usd: totalCost, notes: notes || null,
+        }).eq('id', editShipment.id);
+        await supabase.from('shipment_items').delete().eq('shipment_id', editShipment.id);
+        if (items.length > 0) {
+          await supabase.from('shipment_items').insert(items.filter(i => i.product_id).map(i => ({
+            shipment_id: editShipment.id, product_id: i.product_id,
+            quantity_ordered: i.quantity_ordered, unit_cost_usd: i.unit_cost_usd,
+          })));
+        }
+      } else {
+        const { data: shipment, error } = await supabase.from('shipments').insert({
+          supplier_name: supplierName, po_number: poNumber, status: status as any,
+          order_date: orderDate, estimated_arrival: estimatedArrival || null,
+          total_cost_usd: totalCost, notes: notes || null,
+        }).select().single();
+        if (error) throw error;
+        if (items.length > 0) {
+          await supabase.from('shipment_items').insert(items.filter(i => i.product_id).map(i => ({
+            shipment_id: shipment.id, product_id: i.product_id,
+            quantity_ordered: i.quantity_ordered, unit_cost_usd: i.unit_cost_usd,
+          })));
+        }
+      }
+      toast.success(isEdit ? 'Envío actualizado' : 'Envío creado');
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e.message || 'Error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Editar Envío' : 'Nuevo Envío'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label className="text-xs">Proveedor *</Label><Input value={supplierName} onChange={e => setSupplierName(e.target.value)} /></div>
+            <div><Label className="text-xs">PO Number</Label><Input value={poNumber} onChange={e => setPoNumber(e.target.value)} /></div>
+            <div><Label className="text-xs">Estado</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs">Fecha Orden</Label><Input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} /></div>
+            <div><Label className="text-xs">ETA</Label><Input type="date" value={estimatedArrival} onChange={e => setEstimatedArrival(e.target.value)} /></div>
+            <div><Label className="text-xs">Notas</Label><Input value={notes} onChange={e => setNotes(e.target.value)} /></div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Productos</Label>
+              <Button size="sm" variant="outline" onClick={addItem}><Plus className="w-3 h-3 mr-1" /> Agregar</Button>
+            </div>
+            {items.map((item, i) => (
+              <div key={i} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
+                <Select value={item.product_id} onValueChange={v => updateItem(i, 'product_id', v)}>
+                  <SelectTrigger className="text-xs"><SelectValue placeholder="Producto" /></SelectTrigger>
+                  <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.sku} — {p.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input type="number" min={1} value={item.quantity_ordered} onChange={e => updateItem(i, 'quantity_ordered', parseInt(e.target.value) || 1)} className="text-xs" />
+                <Input type="number" step="0.01" value={item.unit_cost_usd} onChange={e => updateItem(i, 'unit_cost_usd', parseFloat(e.target.value) || 0)} className="text-xs" />
+                <Button size="icon" variant="ghost" onClick={() => removeItem(i)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+              </div>
+            ))}
+            {items.length > 0 && (
+              <p className="text-xs text-muted-foreground text-right">Total estimado: <span className="font-bold text-foreground">${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></p>
+            )}
+          </div>
+
+          <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Crear Envío'}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

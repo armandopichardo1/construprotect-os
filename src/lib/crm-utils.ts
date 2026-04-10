@@ -82,7 +82,7 @@ export interface Quote {
   contacts?: { contact_name: string; company_name: string | null } | null;
 }
 
-export type DealStage = 'prospecting' | 'initial_contact' | 'demo_sample' | 'quote_sent' | 'negotiation' | 'closing' | 'won' | 'lost';
+export type DealStage = 'prospecting' | 'initial_contact' | 'demo_sample' | 'quote_sent' | 'negotiation' | 'closing' | 'delivered' | 'won' | 'lost';
 export type ActivityType = 'call' | 'whatsapp' | 'email' | 'visit' | 'meeting' | 'demo' | 'sample_sent' | 'quote_sent' | 'follow_up' | 'note' | 'delivery';
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 
@@ -93,6 +93,7 @@ export const DEAL_STAGES: Record<DealStage, { label: string; emoji: string; colo
   quote_sent: { label: 'Cotización', emoji: '📋', color: 'bg-primary/40 text-primary' },
   negotiation: { label: 'Negociación', emoji: '🤝', color: 'bg-primary/50 text-primary' },
   closing: { label: 'Cierre', emoji: '🎯', color: 'bg-primary/60 text-primary' },
+  delivered: { label: 'Entregado', emoji: '📦', color: 'bg-success/10 text-success' },
   won: { label: 'Ganado', emoji: '✅', color: 'bg-success/20 text-success' },
   lost: { label: 'Perdido', emoji: '❌', color: 'bg-destructive/20 text-destructive' },
 };
