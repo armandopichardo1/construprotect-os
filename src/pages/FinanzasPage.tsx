@@ -18,7 +18,7 @@ import ReactMarkdown from 'react-markdown';
 import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 
-const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'AI Asesor'];
+const tabs = ['Resumen', 'Ventas', 'Gastos', 'P&L', 'Reportes', 'AI Asesor'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 const EXPENSE_CATEGORIES: Record<string, { label: string; icon: string }> = {
