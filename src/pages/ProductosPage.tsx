@@ -24,12 +24,12 @@ function calcRealMargin(cost: number, price: number): number | null {
   return ((price - cost) / price) * 100;
 }
 
-function MarginCell({ cost, price, targetPct, label }: { cost: number; price: number; targetPct: number; label: string }) {
+function MarginCell({ cost, price, targetPct, label, minMargin }: { cost: number; price: number; targetPct: number; label: string; minMargin: number }) {
   const real = calcRealMargin(cost, price);
   if (real === null) return <span className="text-muted-foreground">—</span>;
 
   const belowTarget = real < targetPct;
-  const critical = real < MIN_MARGIN_THRESHOLD;
+  const critical = real < minMargin;
 
   return (
     <TooltipProvider delayDuration={200}>
