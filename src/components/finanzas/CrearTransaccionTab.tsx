@@ -45,10 +45,11 @@ interface SessionEntry {
   timestamp: Date;
 }
 
-export function CrearTransaccionTab({ rate, onEditSale, onEditExpense }: {
+export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
   rate: any;
   onEditSale?: (data: any) => void;
   onEditExpense?: (data: any) => void;
+  onEditCost?: (data: any) => void;
 }) {
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
@@ -164,8 +165,15 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense }: {
           product_id: i.product_id || '', quantity: i.quantity, unit_price_usd: i.unit_price_usd,
         })),
       });
-    } else if ((preview.type === 'expense') && onEditExpense) {
+    } else if (preview.type === 'expense' && onEditExpense) {
       onEditExpense({
+        description: preview.data.description, category: preview.data.category,
+        vendor: preview.data.vendor || '', amount_usd: String(preview.data.amount_usd),
+        amount_dop: String(preview.data.amount_dop || 0),
+        account_id: preview.data.account_id || '',
+      });
+    } else if (preview.type === 'cost' && onEditCost) {
+      onEditCost({
         description: preview.data.description, category: preview.data.category,
         vendor: preview.data.vendor || '', amount_usd: String(preview.data.amount_usd),
         amount_dop: String(preview.data.amount_dop || 0),
@@ -273,7 +281,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense }: {
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Aprobar y Registrar
               </Button>
-              {(preview.type === 'sale' || preview.type === 'expense') && (
+              {(preview.type === 'sale' || preview.type === 'expense' || preview.type === 'cost') && (
                 <Button variant="outline" className="gap-1.5" onClick={edit}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </Button>
