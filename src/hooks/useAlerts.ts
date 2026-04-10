@@ -342,6 +342,65 @@ export function useAlerts() {
         }
       }
 
+      // 10. Cash flow projection below threshold
+      if (ruleMap['cashflow_projection_low'] && sales?.length && expenses?.length) {
+        const threshold = ruleMap['cashflow_projection_low'].threshold;
+        const now = new Date();
+        const nHist = 6;
+        const nProj = 3;
+
+        // Build last N months of actuals
+        let cumulative = 0;
+        const monthlyIn: number[] = [];
+        const monthlyOut: number[] = [];
+        for (let i = nHist - 1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const inflows = sales.filter((s: any) => s.date?.startsWith(key) && s.payment_status === 'paid')
+            .reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+          const outflows = expenses.filter((e: any) => e.date?.startsWith(key))
+            .reduce((s: number, e: any) => s + Number(e.amount_usd || 0), 0);
+          cumulative += inflows - outflows;
+          monthlyIn.push(inflows);
+          monthlyOut.push(outflows);
+        }
+
+        // Averages from last 3 months
+        const last3In = monthlyIn.slice(-3);
+        const last3Out = monthlyOut.slice(-3);
+        const avgIn = last3In.reduce((a, b) => a + b, 0) / (last3In.length || 1);
+        const avgOut = last3Out.reduce((a, b) => a + b, 0) / (last3Out.length || 1);
+
+        // Pending receivables
+        const totalPending = sales
+          .filter((s: any) => s.payment_status !== 'paid' && s.payment_status !== 'cancelled')
+          .reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+        const monthlyRecv = nProj > 0 ? totalPending / nProj : 0;
+
+        // Project forward and check threshold
+        let cum = cumulative;
+        const breachMonths: string[] = [];
+        for (let i = 1; i <= nProj; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+          cum += (monthlyRecv + avgIn) - avgOut;
+          if (cum < threshold) {
+            breachMonths.push(d.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' }));
+          }
+        }
+
+        if (breachMonths.length > 0) {
+          alerts.push({
+            ruleId: 'cashflow_projection_low',
+            label: 'Flujo proyectado bajo',
+            category: 'finance',
+            severity: breachMonths.length >= 2 ? 'critical' : 'warning',
+            count: breachMonths.length,
+            message: `El flujo acumulado proyectado baja de $${threshold.toLocaleString()} en ${breachMonths.join(', ')}`,
+            navigateTo: '/finanzas',
+          });
+        }
+      }
+
       alerts.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1));
       return alerts;
     },
