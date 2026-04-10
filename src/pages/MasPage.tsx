@@ -159,8 +159,6 @@ export default function MasPage() {
             { key: 'general' as Tab, label: 'General' },
             { key: 'alerts' as Tab, label: '🔔 Alertas' },
             { key: 'requests' as Tab, label: 'Solicitudes Producto' },
-            { key: 'competitors' as Tab, label: 'Competencia' },
-            { key: 'territory' as Tab, label: 'Territorios' },
           ]).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} className={cn(
               'rounded-lg px-4 py-1.5 text-xs font-medium transition-colors',
