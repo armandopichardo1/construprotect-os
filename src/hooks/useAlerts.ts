@@ -337,7 +337,7 @@ export function useAlerts() {
             severity: 'warning',
             count: inactive.length,
             message: `${inactive.length} cliente(s) sin compras en ${threshold}+ días: ${sorted.slice(0, 3).map(c => c.name).join(', ')}`,
-            navigateTo: '/finanzas',
+            navigateTo: '/crm',
           });
         }
       }
