@@ -50,6 +50,14 @@ export default function DashboardPage() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const alertsNotifiedRef = useRef(false);
 
+  const { data: targetMargin } = useQuery({
+    queryKey: ['target-margin'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margin').maybeSingle();
+      return (data?.value as { value: number })?.value ?? 30;
+    },
+  });
+
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
     queryFn: async () => {
