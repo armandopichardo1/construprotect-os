@@ -49,6 +49,22 @@ export default function CrmPage() {
     },
   });
 
+  // Auto-open contact detail from URL params (e.g., from global search)
+  useEffect(() => {
+    const viewId = searchParams.get('viewContact');
+    if (viewId && contacts.length > 0) {
+      const found = contacts.find(c => c.id === viewId);
+      if (found) {
+        setViewContact(found);
+        setTab('contacts');
+      }
+      // Clean URL params after opening
+      searchParams.delete('viewContact');
+      searchParams.delete('tab');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [contacts, searchParams]);
+
   const { data: deals = [] } = useQuery({
     queryKey: ['crm-deals'],
     queryFn: async () => {
