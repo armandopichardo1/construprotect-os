@@ -15,7 +15,7 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { toast } from 'sonner';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import ReactMarkdown from 'react-markdown';
-import { Bot, Send, X, Check, Pencil, Trash2, Download } from 'lucide-react';
+import { Bot, Send, X, Check, Pencil, Trash2, Download, RefreshCw } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
 import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from '@/components/finanzas/ResumenAnalytics';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
@@ -1247,6 +1247,25 @@ function AIAssistantDialog({ open, onOpenChange, queryClient, rate }: any) {
               {preview.explanation && <p className="text-xs text-muted-foreground italic">{preview.explanation}</p>}
               <div className="flex gap-2">
                 <Button size="sm" className="flex-1 gap-1" onClick={approveTransaction} disabled={loading}><Check className="w-3 h-3" /> Aprobar</Button>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => {
+                  if (preview.type === 'sale') {
+                    onEditPrefill?.({
+                      contact_id: preview.data.contact_id,
+                      invoice_ref: '',
+                      items: preview.data.items?.map((i: any) => ({
+                        product_id: i.product_id || '', quantity: i.quantity, unit_price_usd: i.unit_price_usd,
+                      })),
+                    });
+                  } else if (preview.type === 'expense') {
+                    onEditExpensePrefill?.({
+                      description: preview.data.description, category: preview.data.category,
+                      vendor: preview.data.vendor || '', amount_usd: String(preview.data.amount_usd),
+                      amount_dop: String(preview.data.amount_dop || 0),
+                    });
+                  }
+                  setPreview(null);
+                  onOpenChange(false);
+                }}><Pencil className="w-3 h-3" /> Editar</Button>
                 <Button size="sm" variant="destructive" className="gap-1" onClick={() => setPreview(null)}><X className="w-3 h-3" /> Rechazar</Button>
               </div>
             </div>
