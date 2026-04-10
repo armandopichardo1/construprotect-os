@@ -172,8 +172,9 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                     <TableRow key={deal.id} className="group hover:bg-muted/30">
                       <TableCell className="py-1.5">
                         <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{deal.title}</p>
+                        <p className="text-[9px] text-muted-foreground truncate sm:hidden">{deal.contacts?.contact_name || ''}</p>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden sm:table-cell">
                         <div>
                           <p className="text-[11px] text-foreground truncate">{deal.contacts?.contact_name || '—'}</p>
                           <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.company_name || ''}</p>
