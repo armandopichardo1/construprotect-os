@@ -133,13 +133,13 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
           return matchesStage && matchesSearch;
         });
         return (<>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-[260px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[140px] max-w-[260px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input placeholder="Buscar deal, contacto, empresa..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
+            <Input placeholder="Buscar deal, contacto..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
           </div>
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-8 text-[11px] w-auto min-w-[130px] rounded-lg">
+            <SelectTrigger className="h-8 text-[11px] w-auto min-w-[120px] rounded-lg">
               <Filter className="w-3 h-3 mr-1.5" /><SelectValue placeholder="Etapa" />
             </SelectTrigger>
             <SelectContent>
@@ -147,20 +147,19 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
               {PIPELINE_STAGES.map(s => (<SelectItem key={s} value={s} className="text-[11px]">{DEAL_STAGES[s].emoji} {DEAL_STAGES[s].label}</SelectItem>))}
             </SelectContent>
           </Select>
-          <span className="text-[10px] text-muted-foreground">{filteredDeals.length} de {deals.length}</span>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{filteredDeals.length} de {deals.length}</span>
         </div>
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
+        <div className="rounded-xl border border-border overflow-x-auto">
+            <table className="w-full caption-bottom text-sm min-w-[480px]">
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-[10px] font-semibold">Deal</TableHead>
-                  <TableHead className="text-[10px] font-semibold">Contacto</TableHead>
-                  <TableHead className="text-[10px] font-semibold">Etapa</TableHead>
+                  <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Contacto</TableHead>
+                  <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Etapa</TableHead>
                   <TableHead className="text-[10px] font-semibold text-right">Valor</TableHead>
-                  <TableHead className="text-[10px] font-semibold text-center">Prob.</TableHead>
+                  <TableHead className="text-[10px] font-semibold text-center hidden md:table-cell">Prob.</TableHead>
                   <TableHead className="text-[10px] font-semibold text-center">Días</TableHead>
-                  <TableHead className="text-[10px] font-semibold">Proyecto</TableHead>
+                  <TableHead className="text-[10px] font-semibold hidden lg:table-cell">Proyecto</TableHead>
                   <TableHead className="text-[10px] font-semibold text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -173,14 +172,15 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                     <TableRow key={deal.id} className="group hover:bg-muted/30">
                       <TableCell className="py-1.5">
                         <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{deal.title}</p>
+                        <p className="text-[9px] text-muted-foreground truncate sm:hidden">{deal.contacts?.contact_name || ''}</p>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden sm:table-cell">
                         <div>
                           <p className="text-[11px] text-foreground truncate">{deal.contacts?.contact_name || '—'}</p>
                           <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.company_name || ''}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden sm:table-cell">
                         <Select value={deal.stage} onValueChange={(v) => updateStage(deal.id, v as DealStage)}>
                           <SelectTrigger className="h-6 text-[10px] w-auto min-w-[110px] rounded-lg border-0 bg-muted px-2">
                             <SelectValue />
@@ -195,17 +195,17 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                       <TableCell className="py-1.5 text-right">
                         <span className="text-xs font-bold text-foreground">${Number(deal.value_usd || 0).toLocaleString()}</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-center">
+                      <TableCell className="py-1.5 text-center hidden md:table-cell">
                         <span className="text-[11px] text-muted-foreground">{deal.probability}%</span>
                       </TableCell>
-                      <TableCell className="py-1.5 text-center">
+                      <TableCell className="py-1.5 text-center hidden md:table-cell">
                         <span className={cn('text-[11px] font-medium', dayColor)}>{days}d</span>
                       </TableCell>
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-1.5 hidden lg:table-cell">
                         <span className="text-[11px] text-muted-foreground truncate">{deal.project_name || '—'}</span>
                       </TableCell>
                       <TableCell className="py-1.5">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => onEdit(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
                           <button onClick={() => onDelete(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
                         </div>
@@ -219,8 +219,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
-          </div>
+            </table>
         </div>
         </>);
       })()}
