@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Download } from 'lucide-react';
 import { type Contact, type Deal, type Activity, type Quote } from '@/lib/crm-utils';
 import { PipelineTab } from '@/components/crm/PipelineTab';
 import { ContactsTab, ContactDialog } from '@/components/crm/ContactsTab';
@@ -13,8 +13,11 @@ import { QuotesTab } from '@/components/crm/QuotesTab';
 import { DealDialog } from '@/components/crm/DealDialog';
 import { ActivityDialog } from '@/components/crm/ActivityDialog';
 import { CrmDeleteDialog } from '@/components/crm/CrmDeleteDialog';
+import { ContactDetailDialog } from '@/components/crm/ContactDetailDialog';
+import { ClientProjectsTab } from '@/components/crm/ClientProjectsTab';
+import { exportToExcel } from '@/lib/export-utils';
 
-type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes';
+type Tab = 'pipeline' | 'contacts' | 'agenda' | 'quotes' | 'projects';
 
 export default function CrmPage() {
   const [tab, setTab] = useState<Tab>('pipeline');
@@ -22,6 +25,7 @@ export default function CrmPage() {
 
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [viewContact, setViewContact] = useState<Contact | null>(null);
   const [showDealDialog, setShowDealDialog] = useState(false);
   const [editDeal, setEditDeal] = useState<Deal | null>(null);
   const [showActivityDialog, setShowActivityDialog] = useState(false);
@@ -70,7 +74,23 @@ export default function CrmPage() {
     else if (tab === 'agenda') { setEditActivity(null); setShowActivityDialog(true); }
   };
 
-  const NEW_LABELS: Record<Tab, string> = { pipeline: 'Deal', contacts: 'Contacto', agenda: 'Actividad', quotes: 'Cotización' };
+  const handleExport = () => {
+    if (tab === 'contacts') {
+      exportToExcel(contacts.map(c => ({
+        Nombre: c.contact_name, Empresa: c.company_name, RNC: c.rnc, Email: c.email,
+        Teléfono: c.phone, WhatsApp: c.whatsapp, Segmento: c.segment, Territorio: c.territory,
+        'Revenue USD': c.lifetime_revenue_usd, Pedidos: c.total_orders,
+      })), 'contactos_crm', 'Contactos');
+    } else if (tab === 'pipeline') {
+      exportToExcel(deals.map(d => ({
+        Título: d.title, Contacto: d.contacts?.contact_name, Empresa: d.contacts?.company_name,
+        Etapa: d.stage, 'Valor USD': d.value_usd, Probabilidad: d.probability,
+        'Cierre Esperado': d.expected_close_date, Proyecto: d.project_name,
+      })), 'deals_pipeline', 'Pipeline');
+    }
+  };
+
+  const NEW_LABELS: Record<Tab, string> = { pipeline: 'Deal', contacts: 'Contacto', agenda: 'Actividad', quotes: 'Cotización', projects: 'Proyecto' };
 
   return (
     <AppLayout>
@@ -82,6 +102,7 @@ export default function CrmPage() {
               { key: 'contacts' as Tab, label: 'Contactos' },
               { key: 'agenda' as Tab, label: 'Agenda' },
               { key: 'quotes' as Tab, label: 'Cotizaciones' },
+              { key: 'projects' as Tab, label: 'Proyectos' },
             ]).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)} className={cn(
                 'rounded-lg px-4 py-1.5 text-xs font-medium transition-colors',
@@ -91,9 +112,16 @@ export default function CrmPage() {
               </button>
             ))}
           </div>
-          <Button size="sm" onClick={handleNewForTab}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> {NEW_LABELS[tab]}
-          </Button>
+          {tab !== 'projects' && (
+            <Button size="sm" onClick={handleNewForTab}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> {NEW_LABELS[tab]}
+            </Button>
+          )}
+          {(tab === 'contacts' || tab === 'pipeline') && (
+            <Button size="sm" variant="outline" onClick={handleExport}>
+              <Download className="w-3.5 h-3.5 mr-1" /> Excel
+            </Button>
+          )}
         </div>
 
         {tab === 'pipeline' && (
@@ -110,6 +138,7 @@ export default function CrmPage() {
             onEdit={(c) => { setEditContact(c); setShowContactDialog(true); }}
             onDelete={(c) => setDeleteItem({ type: 'contact', item: c })}
             onNew={() => { setEditContact(null); setShowContactDialog(true); }}
+            onView={(c) => setViewContact(c)}
           />
         )}
 
@@ -123,12 +152,15 @@ export default function CrmPage() {
             onDelete={(q) => setDeleteItem({ type: 'quote', item: q })}
           />
         )}
+
+        {tab === 'projects' && <ClientProjectsTab contacts={contacts} />}
       </div>
 
       <ContactDialog open={showContactDialog} onOpenChange={(v) => { setShowContactDialog(v); if (!v) setEditContact(null); }} queryClient={queryClient} editContact={editContact} />
       <DealDialog open={showDealDialog} onOpenChange={(v) => { setShowDealDialog(v); if (!v) setEditDeal(null); }} contacts={contacts} queryClient={queryClient} editDeal={editDeal} />
       <ActivityDialog open={showActivityDialog} onOpenChange={(v) => { setShowActivityDialog(v); if (!v) setEditActivity(null); }} contacts={contacts} deals={deals} queryClient={queryClient} editActivity={editActivity} />
       <CrmDeleteDialog open={!!deleteItem} onOpenChange={(v) => { if (!v) setDeleteItem(null); }} type={deleteItem?.type || 'contact'} item={deleteItem?.item} queryClient={queryClient} />
+      <ContactDetailDialog open={!!viewContact} onOpenChange={(v) => { if (!v) setViewContact(null); }} contact={viewContact} />
     </AppLayout>
   );
 }
