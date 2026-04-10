@@ -90,7 +90,7 @@ export function ConcentrationAnalysis({ sales }: { sales: any[] }) {
 
     const topClientPct = sorted.length > 0 ? (sorted[0].revenue / totalRevenue) * 100 : 0;
     const top3Pct = sorted.slice(0, 3).reduce((s, r) => s + r.revenue, 0) / totalRevenue * 100;
-    const riskLevel = topClientPct > 40 ? 'alto' : topClientPct > 25 ? 'medio' : 'bajo';
+    const riskLevel = topClientPct > 30 ? 'alto' : topClientPct > 20 ? 'medio' : 'bajo';
 
     return { top, totalRevenue, topClientPct, top3Pct, riskLevel, totalClients: sorted.length };
   }, [sales]);
@@ -159,11 +159,11 @@ export function ProductMarginBreakdown({ saleItems }: { saleItems: any[] }) {
           <div key={i} className="flex items-center gap-2">
             <span className="text-xs text-foreground flex-1 truncate">{p.name}</span>
             <div className="w-[60px] h-1.5 bg-muted rounded-full shrink-0">
-              <div className={cn('h-full rounded-full', p.gmPct >= 40 ? 'bg-success' : p.gmPct >= 20 ? 'bg-warning' : 'bg-destructive')}
+              <div className={cn('h-full rounded-full', p.gmPct >= 55 ? 'bg-success' : p.gmPct >= 45 ? 'bg-warning' : 'bg-destructive')}
                 style={{ width: `${Math.min(p.gmPct, 100)}%` }} />
             </div>
             <span className={cn('text-xs font-mono w-[44px] text-right shrink-0',
-              p.gmPct >= 40 ? 'text-success' : p.gmPct >= 20 ? 'text-warning' : 'text-destructive')}>
+              p.gmPct >= 55 ? 'text-success' : p.gmPct >= 45 ? 'text-warning' : 'text-destructive')}>
               {p.gmPct.toFixed(0)}%
             </span>
             <span className="text-xs font-mono text-muted-foreground w-[65px] text-right shrink-0">{formatUSD(p.revenue)}</span>

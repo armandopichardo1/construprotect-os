@@ -142,7 +142,7 @@ export default function FinanzasPage() {
 
         {tab === 'Resumen' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
                 { label: 'Ingresos MTD', value: formatUSD(revenueMTD), color: 'text-primary' },
                 { label: 'Margen Bruto', value: `${grossMargin.toFixed(1)}%`, color: grossMargin > 40 ? 'text-success' : 'text-warning' },
@@ -154,6 +154,7 @@ export default function FinanzasPage() {
                   <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
                 </div>
               ))}
+              <ExchangeRateKpi rate={latestRate} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -355,17 +356,53 @@ function SaleStatusSelect({ sale, queryClient }: { sale: any; queryClient: any }
   );
 }
 
-function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any) {
+function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefill }: any) {
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
+  const [priceTier, setPriceTier] = useState('list');
   const [items, setItems] = useState([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
   const [saving, setSaving] = useState(false);
   const isEdit = !!editSale;
 
   const { data: clients = [] } = useQuery({ queryKey: ['crm-clients'], queryFn: async () => { const { data } = await supabase.from('crm_clients').select('*'); return data || []; } });
+  const { data: contacts = [] } = useQuery({ queryKey: ['contacts-tiers'], queryFn: async () => { const { data } = await supabase.from('contacts').select('id, contact_name, price_tier'); return data || []; } });
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true); return data || []; } });
 
+  const getPriceForTier = (prod: any, tier: string) => {
+    switch (tier) {
+      case 'architect': return Number(prod?.price_architect_usd || prod?.price_list_usd || 0);
+      case 'project': return Number(prod?.price_project_usd || prod?.price_list_usd || 0);
+      case 'wholesale': return Number(prod?.price_wholesale_usd || prod?.price_list_usd || 0);
+      default: return Number(prod?.price_list_usd || 0);
+    }
+  };
+
+  const handleClientChange = (clientId: string) => {
+    setContactId(clientId);
+    // Find contact with matching name to get price tier
+    const client = clients.find((c: any) => c.id === clientId);
+    const contact = contacts.find((c: any) => c.contact_name === client?.name);
+    const tier = contact?.price_tier || 'list';
+    setPriceTier(tier);
+    // Update all items prices with new tier
+    setItems(prev => prev.map(item => {
+      if (!item.product_id) return item;
+      const prod = products.find((p: any) => p.id === item.product_id);
+      return { ...item, unit_price_usd: getPriceForTier(prod, tier) };
+    }));
+  };
+
   useEffect(() => {
+    if (prefill) {
+      setContactId(prefill.contact_id || '');
+      setInvoiceRef(prefill.invoice_ref || '');
+      if (prefill.items?.length) {
+        setItems(prefill.items.map((i: any) => ({
+          product_id: i.product_id || '', quantity: i.quantity || 1, unit_price_usd: Number(i.unit_price_usd || 0),
+        })));
+      }
+      return;
+    }
     if (editSale) {
       setContactId(editSale.contact_id || '');
       setInvoiceRef(editSale.invoice_ref || '');
@@ -375,15 +412,20 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
         })));
       }
     } else {
-      setContactId(''); setInvoiceRef('');
+      setContactId(''); setInvoiceRef(''); setPriceTier('list');
       setItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
     }
-  }, [editSale, open]);
+  }, [editSale, open, prefill]);
 
   const subtotal = items.reduce((s, i) => s + i.unit_price_usd * i.quantity, 0);
   const itbis = subtotal * 0.18;
   const total = subtotal + itbis;
   const xr = Number(rate?.usd_sell) || 60.76;
+  const totalCogs = items.reduce((s, i) => {
+    const prod = products.find((p: any) => p.id === i.product_id);
+    return s + Number(prod?.unit_cost_usd || 0) * i.quantity;
+  }, 0);
+  const marginPct = subtotal > 0 ? ((subtotal - totalCogs) / subtotal * 100) : 0;
 
   const handleSave = async () => {
     if (!contactId) { toast.error('Selecciona un cliente'); return; }
@@ -402,7 +444,6 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
       const { error } = await supabase.from('sales').update(salePayload).eq('id', editSale.id);
       if (error) { toast.error('Error al actualizar'); setSaving(false); return; }
       saleId = editSale.id;
-      // Delete old items and re-insert
       await supabase.from('sale_items').delete().eq('sale_id', saleId);
     } else {
       const { data: sale, error } = await supabase.from('sales').insert(salePayload).select().single();
@@ -422,8 +463,6 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
     });
     await supabase.from('sale_items').insert(saleItemsData);
 
-    // Inventory deduction is handled automatically by the database trigger (handle_sale_item_inventory)
-
     setSaving(false);
     toast.success(isEdit ? 'Venta actualizada' : 'Venta registrada');
     queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -440,33 +479,48 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-xs">Cliente *</Label>
-              <Select value={contactId} onValueChange={setContactId}>
+              <Select value={contactId} onValueChange={handleClientChange}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
+              {priceTier !== 'list' && (
+                <p className="text-[10px] text-primary mt-0.5">Tier: {priceTier === 'architect' ? 'Arquitecto' : priceTier === 'project' ? 'Proyecto' : priceTier === 'wholesale' ? 'Mayoreo' : 'Lista'}</p>
+              )}
             </div>
             <div><Label className="text-xs">Ref. Factura</Label><Input value={invoiceRef} onChange={e => setInvoiceRef(e.target.value)} className="mt-1" /></div>
           </div>
           <div className="space-y-2">
             <Label className="text-xs">Productos</Label>
-            {items.map((item, idx) => (
-              <div key={idx} className="flex gap-2 items-end">
-                <Select value={item.product_id} onValueChange={v => {
-                  const prod = products.find((p: any) => p.id === v);
-                  setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v, unit_price_usd: Number(prod?.price_list_usd || 0) } : it));
-                }}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Producto" /></SelectTrigger>
-                  <SelectContent>{products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input type="number" value={item.quantity} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" placeholder="Cant." />
-                <Input type="number" value={item.unit_price_usd} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price_usd: Number(e.target.value) } : it))} className="w-24" step="0.01" placeholder="Precio" />
-                {items.length > 1 && (
-                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
+            {items.map((item, idx) => {
+              const prod = products.find((p: any) => p.id === item.product_id);
+              const costUsd = Number(prod?.unit_cost_usd || 0);
+              const lineMargin = item.unit_price_usd > 0 ? ((item.unit_price_usd - costUsd) / item.unit_price_usd * 100) : 0;
+              return (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex gap-2 items-end">
+                    <Select value={item.product_id} onValueChange={v => {
+                      const p = products.find((p: any) => p.id === v);
+                      setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v, unit_price_usd: getPriceForTier(p, priceTier) } : it));
+                    }}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Producto" /></SelectTrigger>
+                      <SelectContent>{products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Input type="number" value={item.quantity} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" placeholder="Cant." />
+                    <Input type="number" value={item.unit_price_usd} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price_usd: Number(e.target.value) } : it))} className="w-24" step="0.01" placeholder="Precio" />
+                    {items.length > 1 && (
+                      <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  {item.product_id && (
+                    <p className={cn('text-[9px] font-mono pl-1', lineMargin >= 40 ? 'text-success' : lineMargin >= 20 ? 'text-warning' : 'text-destructive')}>
+                      Margen: {lineMargin.toFixed(0)}% · Costo: ${costUsd.toFixed(2)} · Línea: {formatUSD(item.unit_price_usd * item.quantity)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
             <Button variant="ghost" size="sm" onClick={() => setItems(prev => [...prev, { product_id: '', quantity: 1, unit_price_usd: 0 }])}>+ Línea</Button>
           </div>
           <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
@@ -474,6 +528,9 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale }: any
             <div className="flex justify-between"><span>ITBIS (18%)</span><span>{formatUSD(itbis)}</span></div>
             <div className="flex justify-between font-bold"><span>Total USD</span><span>{formatUSD(total)}</span></div>
             <div className="flex justify-between text-muted-foreground"><span>Total DOP</span><span>RD${(total * xr).toLocaleString('es-DO', { minimumFractionDigits: 0 })}</span></div>
+            <div className={cn('flex justify-between text-xs', marginPct >= 40 ? 'text-success' : marginPct >= 20 ? 'text-warning' : 'text-destructive')}>
+              <span>Margen Total</span><span>{marginPct.toFixed(1)}% ({formatUSD(subtotal - totalCogs)})</span>
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Venta'}</Button>
         </div>
