@@ -274,8 +274,6 @@ export default function MasPage() {
 
         {tab === 'alerts' && <AlertsConfigSection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
-        {tab === 'competitors' && <CompetitorWatchSection entries={competitors} refetch={refetchCompetitors} />}
-        {tab === 'territory' && <TerritoryCoverageSection data={territoryData || []} />}
       </div>
     </AppLayout>
   );
