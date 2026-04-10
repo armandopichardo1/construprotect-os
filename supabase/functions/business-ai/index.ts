@@ -283,6 +283,91 @@ TASA: ${rates?.[0]?.usd_sell || 60.76} DOP/USD
 
 Genera la orden de compra recomendada.`;
 
+    } else if (action === "pitch") {
+      const deal = payload?.deal;
+      const contact = payload?.contact;
+      
+      const [{ data: products }] = await Promise.all([
+        supabase.from("products").select("name, sku, category, price_list_usd").eq("is_active", true),
+      ]);
+
+      systemPrompt = `Eres un experto en ventas B2B de materiales de construcción premium en República Dominicana. Genera un pitch de venta personalizado en español dominicano profesional.
+
+Estructura:
+## 🎤 Pitch de Venta
+
+### Apertura (30 seg)
+Frase de apertura personalizada al cliente y su proyecto.
+
+### Propuesta de Valor (1 min)
+Beneficios específicos de los productos Ram Board para su proyecto.
+
+### Diferenciadores
+Por qué Ram Board vs la competencia.
+
+### Números que Importan
+ROI, ahorro en tiempo, protección garantizada.
+
+### Cierre
+Call-to-action específico con próximo paso concreto.
+
+### Objeciones Frecuentes
+Respuestas preparadas para las 3 objeciones más comunes.
+
+Sé persuasivo pero auténtico. Usa datos reales del deal.`;
+
+      userPrompt = `DEAL: ${deal?.title || "Sin título"} — $${Number(deal?.value_usd || 0).toLocaleString()}
+ETAPA: ${deal?.stage} | PROB: ${deal?.probability}%
+PROYECTO: ${deal?.project_name || "?"} (${deal?.project_size_m2 || "?"} m²)
+CLIENTE: ${contact?.contact_name || "?"} — ${contact?.company_name || "?"}
+SEGMENTO: ${contact?.segment || "?"} | TIER: ${contact?.price_tier || "list"}
+PRODUCTOS DISPONIBLES: ${(products || []).slice(0, 15).map((p: any) => `${p.name} ($${p.price_list_usd})`).join(", ")}
+
+Genera el pitch personalizado.`;
+
+    } else if (action === "cross-sell") {
+      const contact = payload?.contact;
+      const purchaseHistory = payload?.purchaseHistory;
+      
+      const [{ data: products }] = await Promise.all([
+        supabase.from("products").select("name, sku, category, price_list_usd, unit_cost_usd").eq("is_active", true),
+      ]);
+
+      systemPrompt = `Eres un asesor de ventas experto en cross-selling de materiales de construcción premium. Analiza el historial de compras del cliente y recomienda productos complementarios.
+
+Estructura:
+## 🛒 Recomendaciones de Cross-sell
+
+### Productos Recomendados
+Para cada producto recomendado:
+- **Nombre** — Por qué le conviene al cliente
+- Precio y margen estimado
+- Frecuencia de recompra sugerida
+
+### Bundles Sugeridos
+Combinaciones de productos que funcionan juntos.
+
+### Estrategia de Upsell
+Cómo mover al cliente al siguiente tier de precio.
+
+### Timing
+Cuándo hacer la próxima oferta basado en su ciclo de compra.
+
+Usa datos reales del historial. Máximo 5 recomendaciones priorizadas.`;
+
+      userPrompt = `CLIENTE: ${contact?.contact_name || "?"} — ${contact?.company_name || "?"}
+SEGMENTO: ${contact?.segment || "?"} | TIER: ${contact?.price_tier || "list"}
+INGRESOS HISTÓRICOS: $${Number(contact?.lifetime_revenue_usd || 0).toLocaleString()}
+TOTAL PEDIDOS: ${contact?.total_orders || 0}
+
+HISTORIAL DE COMPRAS:
+${purchaseHistory || "Sin historial disponible"}
+
+CATÁLOGO COMPLETO:
+${(products || []).map((p: any) => `${p.name} (SKU:${p.sku}, Cat:${p.category}, $${p.price_list_usd})`).join("\n")}
+
+Genera las recomendaciones de cross-sell.`;
+
     } else {
       return new Response(JSON.stringify({ error: "Acción no válida" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
