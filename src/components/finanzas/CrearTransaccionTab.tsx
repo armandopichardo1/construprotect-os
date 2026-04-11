@@ -464,6 +464,19 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               />
             </div>
 
+            {/* Account */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cuenta Contable *</Label>
+              <Select value={manual.accountId} onValueChange={v => updateManual('accountId', v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
+                <SelectContent>
+                  {leafAccounts.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Amounts side by side */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
