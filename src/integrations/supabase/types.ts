@@ -1193,7 +1193,7 @@ export type Database = {
             foreignKeyName: "sales_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
-            referencedRelation: "crm_clients"
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
           {
