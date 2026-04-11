@@ -256,18 +256,34 @@ export function useAlerts() {
         }
       }
 
-      // 6. Overdue payments
+      // 6. Overdue payments — includes pending payments older than 30 days
       if (ruleMap['overdue_payments'] && sales?.length) {
-        const overdue = sales.filter((s: any) => s.payment_status === 'overdue');
-        if (overdue.length > 0) {
-          const total = overdue.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+        const now = Date.now();
+        const overdueOrStale = sales.filter((s: any) => {
+          if (s.payment_status === 'overdue') return true;
+          if (s.payment_status === 'pending') {
+            const daysOld = Math.floor((now - new Date(s.date).getTime()) / 86400000);
+            return daysOld >= 30;
+          }
+          return false;
+        });
+        if (overdueOrStale.length > 0) {
+          const total = overdueOrStale.reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+          const details = overdueOrStale
+            .map((s: any) => {
+              const days = Math.floor((now - new Date(s.date).getTime()) / 86400000);
+              return { name: s.contacts?.contact_name || '?', amount: Number(s.total_usd || 0), days };
+            })
+            .sort((a, b) => b.days - a.days);
+          const hasRed = details.some(d => d.days > 60);
+          const detailStr = details.slice(0, 3).map(d => `💸 ${d.name}: $${d.amount.toLocaleString('en-US', { minimumFractionDigits: 0 })} pendiente (${d.days}d)`).join('; ');
           alerts.push({
             ruleId: 'overdue_payments',
             label: 'Pagos vencidos',
             category: 'finance',
-            severity: 'critical',
-            count: overdue.length,
-            message: `${overdue.length} factura(s) vencida(s) por $${total.toLocaleString('en-US', { minimumFractionDigits: 0 })}`,
+            severity: hasRed ? 'critical' : 'warning',
+            count: overdueOrStale.length,
+            message: `${overdueOrStale.length} factura(s) por $${total.toLocaleString('en-US', { minimumFractionDigits: 0 })}: ${detailStr}`,
             navigateTo: '/finanzas?tab=Ventas',
           });
         }
