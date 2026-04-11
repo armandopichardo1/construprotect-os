@@ -114,6 +114,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const saveManual = async () => {
     if (!manual.description.trim()) { toast.error('Descripción requerida'); return; }
     if (!manual.category) { toast.error('Selecciona una categoría'); return; }
+    if (!manual.accountId) { toast.error('Selecciona una cuenta contable'); return; }
     if (manualUsd <= 0 && manualDop <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
