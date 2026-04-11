@@ -112,7 +112,7 @@ export default function FinanzasPage() {
   const { data: sales = [] } = useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*, crm_clients(name, company), sale_items(*, products(name, sku))').order('date', { ascending: false });
+      const { data, error } = await supabase.from('sales').select('*, contacts(contact_name, company_name), sale_items(*, products(name, sku))').order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -320,7 +320,7 @@ export default function FinanzasPage() {
           <div className="space-y-6">
             <VentasTab sales={sales} queryClient={queryClient} rate={latestRate} prefill={salePrefill} clearPrefill={() => setSalePrefill(null)} onExport={() => {
               exportToExcel(sales.map((s: any) => ({
-                Fecha: s.date, Ref: s.invoice_ref, Cliente: s.crm_clients?.name,
+                Fecha: s.date, Ref: s.invoice_ref, Cliente: s.contacts?.contact_name,
                 'Subtotal USD': s.subtotal_usd, 'ITBIS USD': s.itbis_usd, 'Total USD': s.total_usd,
                 Estado: s.payment_status,
               })), 'ventas', 'Ventas');
@@ -406,7 +406,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
             {filteredSales.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="text-xs">{s.date}</TableCell>
-                <TableCell className="text-xs font-medium">{s.crm_clients?.name || '—'}</TableCell>
+                <TableCell className="text-xs font-medium">{s.contacts?.contact_name || '—'}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.invoice_ref || '—'}</TableCell>
                 <TableCell className="text-xs text-right font-mono">{formatDOP(Number(s.subtotal_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
                 <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(Number(s.itbis_usd) * (Number(s.exchange_rate) || rate))}</TableCell>
@@ -488,8 +488,7 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
   const [saving, setSaving] = useState(false);
   const isEdit = !!editSale;
 
-  const { data: clients = [] } = useQuery({ queryKey: ['crm-clients'], queryFn: async () => { const { data } = await supabase.from('crm_clients').select('*'); return data || []; } });
-  const { data: contacts = [] } = useQuery({ queryKey: ['contacts-tiers'], queryFn: async () => { const { data } = await supabase.from('contacts').select('id, contact_name, price_tier'); return data || []; } });
+  const { data: contacts = [] } = useQuery({ queryKey: ['sale-contacts'], queryFn: async () => { const { data } = await supabase.from('contacts').select('id, contact_name, company_name, price_tier'); return data || []; } });
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: async () => { const { data } = await supabase.from('products').select('*').eq('is_active', true); return data || []; } });
 
   const getPriceForTier = (prod: any, tier: string) => {
@@ -501,14 +500,11 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
     }
   };
 
-  const handleClientChange = (clientId: string) => {
-    setContactId(clientId);
-    // Find contact with matching name to get price tier
-    const client = clients.find((c: any) => c.id === clientId);
-    const contact = contacts.find((c: any) => c.contact_name === client?.name);
+  const handleClientChange = (contactId: string) => {
+    setContactId(contactId);
+    const contact = contacts.find((c: any) => c.id === contactId);
     const tier = contact?.price_tier || 'list';
     setPriceTier(tier);
-    // Update all items prices with new tier
     setItems(prev => prev.map(item => {
       if (!item.product_id) return item;
       const prod = products.find((p: any) => p.id === item.product_id);
@@ -605,7 +601,7 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
               <Label className="text-xs">Cliente *</Label>
               <Select value={contactId} onValueChange={handleClientChange}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{contacts.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.contact_name}{c.company_name ? ` — ${c.company_name}` : ''}</SelectItem>)}</SelectContent>
               </Select>
               {priceTier !== 'list' && (
                 <p className="text-[10px] text-primary mt-0.5">Tier: {priceTier === 'architect' ? 'Arquitecto' : priceTier === 'project' ? 'Proyecto' : priceTier === 'wholesale' ? 'Mayoreo' : 'Lista'}</p>
@@ -1557,7 +1553,7 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
       sales.forEach((s: any) => {
         const cid = s.contact_id || 'sin_cliente';
         saleContactMap[s.id] = cid;
-        clientNames[cid] = s.crm_clients?.name || 'Sin Cliente';
+        clientNames[cid] = s.contacts?.contact_name || 'Sin Cliente';
       });
 
       // Revenue matrix from sales (for ingresos view)
@@ -1772,7 +1768,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
     const today = new Date();
     pending.forEach((s: any) => {
       const days = Math.floor((today.getTime() - new Date(s.date).getTime()) / 86400000);
-      const entry = { ...s, daysOutstanding: days, clientName: s.crm_clients?.name || 'Sin Cliente' };
+      const entry = { ...s, daysOutstanding: days, clientName: s.contacts?.contact_name || 'Sin Cliente' };
       if (days <= 0) buckets.current.push(entry);
       else if (days <= 30) buckets.d30.push(entry);
       else if (days <= 60) buckets.d60.push(entry);

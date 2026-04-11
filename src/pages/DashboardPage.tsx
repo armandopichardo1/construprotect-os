@@ -220,14 +220,14 @@ export default function DashboardPage() {
   const { data: clientTrends } = useQuery({
     queryKey: ['dashboard-client-trends'],
     queryFn: async () => {
-      const { data: sales } = await supabase.from('sales').select('contact_id, total_usd, date, crm_clients(name)').order('date');
+      const { data: sales } = await supabase.from('sales').select('contact_id, total_usd, date, contacts(contact_name)').order('date');
       if (!sales) return [];
       const now = new Date();
       const byClient: Record<string, { name: string; months: number[]; lastDate: string }> = {};
       sales.forEach((s: any) => {
         const cid = s.contact_id;
         if (!cid) return;
-        if (!byClient[cid]) byClient[cid] = { name: s.crm_clients?.name || '?', months: [0, 0, 0, 0, 0, 0], lastDate: '' };
+        if (!byClient[cid]) byClient[cid] = { name: s.contacts?.contact_name || '?', months: [0, 0, 0, 0, 0, 0], lastDate: '' };
         if (!byClient[cid].lastDate || s.date > byClient[cid].lastDate) byClient[cid].lastDate = s.date;
         const d = new Date(s.date);
         const monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
