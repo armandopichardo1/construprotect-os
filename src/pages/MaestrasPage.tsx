@@ -708,6 +708,7 @@ function CuentasMaestra() {
             <TableHead className="text-xs">Clasificación</TableHead>
             <TableHead className="text-xs">Tipo</TableHead>
             <TableHead className="text-xs">Moneda</TableHead>
+            <TableHead className="text-xs text-right">Saldo (USD)</TableHead>
             <TableHead className="text-xs w-20"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
