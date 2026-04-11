@@ -422,20 +422,25 @@ export function ReorderTab() {
               const prod = products?.find(p => p.sku === r.sku);
               return s + (prod ? (Number(prod.unit_cost_usd) || 0) * r.suggested_reorder_qty : 0);
             }, 0);
-            const estimatedCash = cashFlow.paidRevenue - cashFlow.totalExpenses;
+            const totalOutflows = cashFlow.totalExpenses + cashFlow.totalCosts;
+            const estimatedCash = cashFlow.paidRevenue - totalOutflows;
             const hasCash = estimatedCash >= poCost;
             const gap = poCost - estimatedCash;
             return (
               <div className={cn('rounded-xl border p-4 space-y-2', hasCash ? 'bg-success/5 border-success/20' : 'bg-warning/5 border-warning/20')}>
                 <p className="text-xs font-semibold text-foreground">📊 Verificación de Cash Flow — Mes Actual</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div className="space-y-0.5">
                     <p className="text-[10px] text-muted-foreground">Ventas cobradas</p>
                     <p className="text-sm font-bold text-success">{formatUSD(cashFlow.paidRevenue)}</p>
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-[10px] text-muted-foreground">Gastos del mes</p>
+                    <p className="text-[10px] text-muted-foreground">Gastos operativos</p>
                     <p className="text-sm font-bold text-destructive">{formatUSD(cashFlow.totalExpenses)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">Costos (flete, aduana…)</p>
+                    <p className="text-sm font-bold text-destructive">{formatUSD(cashFlow.totalCosts)}</p>
                   </div>
                   <div className="space-y-0.5">
                     <p className="text-[10px] text-muted-foreground">💰 Cash disponible estimado</p>
