@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download } from 'lucide-react';
+import { Bot, RefreshCw, Check, AlertTriangle, TrendingUp, TrendingDown, Minus, Settings2, Sparkles, Save, Clock, ShieldAlert, Download, ShoppingCart } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
@@ -45,6 +46,7 @@ export function ReorderTab() {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingRows, setEditingRows] = useState<Record<string, EditingRow>>({});
   const [showConfigAll, setShowConfigAll] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
@@ -189,6 +191,27 @@ export function ReorderTab() {
   const needsAttention = items.filter(p => p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point);
   const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(items.map(p => p.id)));
+  };
+  const selectNeedsAttention = () => {
+    setSelectedIds(new Set(needsAttention.map(p => p.id)));
+  };
+  const selectCritical = () => {
+    setSelectedIds(new Set(criticalItems.map(p => p.id)));
+  };
+  const selectedItems = items.filter(p => selectedIds.has(p.id));
+  const selectedTotalCost = selectedItems.reduce((s, p) => s + (Number(p.unit_cost_usd) || 0) * p.reorder_qty, 0);
+  const selectedTotalUnits = selectedItems.reduce((s, p) => s + p.reorder_qty, 0);
 
   const urgencyStyle = (urgency: string) => {
     if (urgency === 'high') return 'bg-destructive/15 text-destructive';
@@ -375,10 +398,47 @@ export function ReorderTab() {
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Settings2 className="w-4 h-4" /> Configuración Actual de Puntos de Reorden
         </h2>
+
+        {/* Selection action bar */}
+        {selectedIds.size > 0 && (
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 flex items-center gap-3 flex-wrap">
+            <ShoppingCart className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-foreground">{selectedIds.size} producto(s) seleccionado(s)</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">{selectedTotalUnits.toLocaleString()} unidades</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs font-medium text-primary">{formatUSD(selectedTotalCost)} costo estimado</span>
+            <Button size="sm" variant="ghost" className="text-xs ml-auto" onClick={() => setSelectedIds(new Set())}>Limpiar</Button>
+          </div>
+        )}
+
+        {/* Quick selection buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] text-muted-foreground">Seleccionar:</span>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={toggleSelectAll}>
+            {selectedIds.size === items.length ? 'Deseleccionar todos' : 'Todos'}
+          </Button>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={selectNeedsAttention}>
+            ⚠️ Requieren atención ({needsAttention.length})
+          </Button>
+          {criticalItems.length > 0 && (
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 border-destructive/30 text-destructive" onClick={selectCritical}>
+              🔴 Críticos ({criticalItems.length})
+            </Button>
+          )}
+        </div>
+
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={items.length > 0 && selectedIds.size === items.length}
+                    onCheckedChange={toggleSelectAll}
+                    className="h-3.5 w-3.5"
+                  />
+                </TableHead>
                 <TableHead className="text-xs">SKU</TableHead>
                 <TableHead className="text-xs">Producto</TableHead>
                 <TableHead className="text-xs text-right">Stock</TableHead>
@@ -399,8 +459,20 @@ export function ReorderTab() {
                 const editing = editingRows[p.id];
                 const isWarning = p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point;
                 const isCritical = p.arrivalDay < 0 && p.avgMonthly > 0;
+                const isSelected = selectedIds.has(p.id);
                 return (
-                  <TableRow key={p.id} className={cn(isCritical ? 'bg-destructive/10' : isWarning && 'bg-destructive/5')}>
+                  <TableRow key={p.id} className={cn(
+                    isSelected && 'bg-primary/5',
+                    !isSelected && isCritical && 'bg-destructive/10',
+                    !isSelected && !isCritical && isWarning && 'bg-destructive/5',
+                  )}>
+                    <TableCell className="py-1.5">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(p.id)}
+                        className="h-3.5 w-3.5"
+                      />
+                    </TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-bold">{p.qty}</TableCell>
