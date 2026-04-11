@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download, Ship, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download, Ship, BarChart3, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 
 const CONTAINER_TYPES = {
   '20ft': { label: '20\' Standard', maxCbm: 33.2, maxKg: 21770, costEstimate: 3500 },
@@ -27,6 +27,7 @@ type ProductLine = {
   sku: string;
   name: string;
   category: string;
+  brand: string;
   unitCost: number;
   cbmPerUnit: number;
   weightPerUnit: number;
@@ -46,6 +47,7 @@ export function ContainerPlanner() {
   const [orderLines, setOrderLines] = useState<Record<string, number>>({});
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [shipmentSupplierId, setShipmentSupplierId] = useState('');
   const [shipmentPoNumber, setShipmentPoNumber] = useState('');
   const [shipmentEta, setShipmentEta] = useState('');
@@ -58,7 +60,7 @@ export function ContainerPlanner() {
     queryFn: async () => {
       const [{ data: inv }, { data: prods }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
-        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, cbm_per_unit, weight_kg_per_unit, min_order_qty').eq('is_active', true),
+        supabase.from('products').select('id, sku, name, brand, category, unit_cost_usd, reorder_point, reorder_qty, lead_time_days, cbm_per_unit, weight_kg_per_unit, min_order_qty').eq('is_active', true),
         supabase.from('inventory_movements').select('product_id, quantity, movement_type, created_at').eq('movement_type', 'sale').order('created_at'),
       ]);
       if (!prods) return [];
@@ -82,6 +84,7 @@ export function ContainerPlanner() {
           sku: p.sku,
           name: p.name,
           category: p.category || 'Otros',
+          brand: p.brand || 'Sin marca',
           unitCost: Number(p.unit_cost_usd) || 0,
           cbmPerUnit: Number((p as any).cbm_per_unit) || 0,
           weightPerUnit: Number((p as any).weight_kg_per_unit) || 0,
@@ -108,9 +111,21 @@ export function ContainerPlanner() {
 
   const items = products || [];
 
+  // Available brands for filter
+  const availableBrands = useMemo(() => {
+    const brands = new Set(items.map(p => p.brand));
+    return Array.from(brands).sort();
+  }, [items]);
+
+  // Filter items by supplier/brand
+  const filteredItems = useMemo(() => {
+    if (supplierFilter === 'all') return items;
+    return items.filter(p => p.brand === supplierFilter);
+  }, [items, supplierFilter]);
+
   // Compute suggested quantities based on rotation + safety stock
   const suggestedLines = useMemo(() => {
-    return items.map(p => {
+    return filteredItems.map(p => {
       const dailyVelocity = p.avgMonthly / 30;
       const safetyStock = Math.ceil(dailyVelocity * p.leadTime * 1.5);
       const targetStock = safetyStock + Math.ceil(dailyVelocity * 30); // safety + 1 month
@@ -119,7 +134,7 @@ export function ContainerPlanner() {
       const suggested = needed > 0 ? Math.max(p.minOrderQty, Math.ceil(needed / Math.max(p.minOrderQty, 1)) * p.minOrderQty) : 0;
       return { ...p, suggestedQty: suggested, safetyStock, targetStock };
     });
-  }, [items]);
+  }, [filteredItems]);
 
   // Merge order lines
   const lines = useMemo(() => {
@@ -254,7 +269,21 @@ export function ContainerPlanner() {
   return (
     <div className="space-y-5">
       {/* Container selector + KPIs */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
+        {/* Supplier/Brand filter */}
+        <div className="rounded-xl bg-card border border-border p-4 space-y-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Filter className="w-3 h-3" /> Proveedor / Marca</p>
+          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todos ({items.length} SKUs)</SelectItem>
+              {availableBrands.map(b => (
+                <SelectItem key={b} value={b} className="text-xs">{b} ({items.filter(i => i.brand === b).length})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground">{filteredItems.length} productos</p>
+        </div>
         <div className="rounded-xl bg-card border border-border p-4 space-y-2">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Contenedor</p>
           <Select value={containerType} onValueChange={v => setContainerType(v as ContainerType)}>
