@@ -78,6 +78,17 @@ export default function ProductosPage() {
     },
   });
 
+  const { data: targetMargins } = useQuery({
+    queryKey: ['target-margins'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margins').maybeSingle();
+      return (data?.value as { list: number; architect: number; project: number; wholesale: number }) ?? null;
+    },
+  });
+  const defaultList = targetMargins?.list ?? 30;
+  const defaultArchitect = targetMargins?.architect ?? 25;
+  const defaultProject = targetMargins?.project ?? 20;
+
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
