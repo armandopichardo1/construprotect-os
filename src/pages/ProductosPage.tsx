@@ -122,6 +122,9 @@ export default function ProductosPage() {
             ))}
           </div>
           <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)} className="gap-1.5">
+              <Box className="w-3.5 h-3.5" /> CBM & Peso
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>📥 Importar Excel</Button>
             <Button size="sm" onClick={() => { setEditProduct(null); setDialogOpen(true); }}>+ Nuevo Producto</Button>
           </div>
