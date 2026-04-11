@@ -412,6 +412,52 @@ export function ReorderTab() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Cash Flow vs PO Cost comparison */}
+          {cashFlow && (() => {
+            const poRecs = aiData!.recommendations.filter(r => r.suggested_reorder_point !== r.current_reorder_point || r.suggested_reorder_qty !== r.current_reorder_qty);
+            const poCost = poRecs.reduce((s, r) => {
+              const prod = products?.find(p => p.sku === r.sku);
+              return s + (prod ? (Number(prod.unit_cost_usd) || 0) * r.suggested_reorder_qty : 0);
+            }, 0);
+            const estimatedCash = cashFlow.paidRevenue - cashFlow.totalExpenses;
+            const hasCash = estimatedCash >= poCost;
+            const gap = poCost - estimatedCash;
+            return (
+              <div className={cn('rounded-xl border p-4 space-y-2', hasCash ? 'bg-success/5 border-success/20' : 'bg-warning/5 border-warning/20')}>
+                <p className="text-xs font-semibold text-foreground">📊 Verificación de Cash Flow — Mes Actual</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">Ventas cobradas</p>
+                    <p className="text-sm font-bold text-success">{formatUSD(cashFlow.paidRevenue)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">Gastos del mes</p>
+                    <p className="text-sm font-bold text-destructive">{formatUSD(cashFlow.totalExpenses)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">💰 Cash disponible estimado</p>
+                    <p className={cn('text-sm font-bold', estimatedCash >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(estimatedCash)}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">📦 Costo PO recomendado</p>
+                    <p className="text-sm font-bold text-foreground">{formatUSD(poCost)}</p>
+                  </div>
+                </div>
+                <div className="pt-1">
+                  {hasCash ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-success/15 text-success">
+                      ✅ Cash suficiente
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-warning/15 text-warning">
+                      ⚠️ Gap de {formatUSD(gap)} — planifica financiamiento
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
