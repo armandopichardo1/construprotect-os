@@ -252,6 +252,12 @@ export default function ProductosPage() {
           product={deleteProduct}
           onSuccess={refresh}
         />
+        <BulkLogisticsDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          products={products}
+          onSuccess={refresh}
+        />
       </div>
     </AppLayout>
   );
