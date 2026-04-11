@@ -601,7 +601,32 @@ function CuentasMaestra() {
 
   const expandAll = () => setCollapsed({});
 
+  // Get all descendant IDs of a given account to prevent circular references
+  const getDescendantIds = (accountId: string): Set<string> => {
+    const descendants = new Set<string>();
+    const queue = [accountId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const children = accounts.filter((a: any) => a.parent_id === current);
+      for (const child of children) {
+        if (!descendants.has(child.id)) {
+          descendants.add(child.id);
+          queue.push(child.id);
+        }
+      }
+    }
+    return descendants;
+  };
+
   const handleSave = async (formData: any) => {
+    // Circular reference validation
+    if (formData.id && formData.parent_id) {
+      const descendants = getDescendantIds(formData.id);
+      if (descendants.has(formData.parent_id) || formData.parent_id === formData.id) {
+        toast.error('No se puede asignar como madre una cuenta que es subcuenta de esta cuenta (referencia circular)');
+        return;
+      }
+    }
     const payload = { 
       code: formData.code || null, 
       description: formData.description, 
