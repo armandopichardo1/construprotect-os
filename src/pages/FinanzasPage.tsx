@@ -309,8 +309,8 @@ export default function FinanzasPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <ClientSparklines sales={sales} />
               <ConcentrationAnalysis sales={sales} />
-              <ProductMarginBreakdown saleItems={saleItems} />
             </div>
+            <ProductMarginBreakdown saleItems={saleItems} />
           </div>
         )}
 
