@@ -1810,7 +1810,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
     const map: Record<string, { name: string; revenue: number; cogs: number; units: number; lastDate: string }> = {};
     filteredSales.forEach((s: any) => {
       const key = s.contact_id || 'sin_cliente';
-      if (!map[key]) map[key] = { name: s.crm_clients?.name || 'Sin Cliente', revenue: 0, cogs: 0, units: 0, lastDate: '' };
+      if (!map[key]) map[key] = { name: s.contacts?.contact_name || 'Sin Cliente', revenue: 0, cogs: 0, units: 0, lastDate: '' };
       map[key].revenue += Number(s.total_usd || 0);
       if (!map[key].lastDate || s.date > map[key].lastDate) map[key].lastDate = s.date;
       (s.sale_items || []).forEach((si: any) => {
