@@ -71,7 +71,30 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: Conta
               </TableHeader>
               <TableBody>
                 {filtered.map(c => (
-                  <TableRow key={c.id} className="group hover:bg-muted/30">
+                  <SwipeableRow
+                    key={c.id}
+                    leftActions={onView ? [{
+                      icon: <Eye className="w-4 h-4" />,
+                      label: 'Ver',
+                      color: 'bg-primary',
+                      onClick: () => onView(c),
+                    }] : []}
+                    rightActions={[
+                      {
+                        icon: <Pencil className="w-4 h-4" />,
+                        label: 'Editar',
+                        color: 'bg-warning',
+                        onClick: () => onEdit(c),
+                      },
+                      {
+                        icon: <Trash2 className="w-4 h-4" />,
+                        label: 'Eliminar',
+                        color: 'bg-destructive',
+                        onClick: () => onDelete(c),
+                      },
+                    ]}
+                  >
+                  <TableRow className="group hover:bg-muted/30">
                     <TableCell className="py-1.5">
                       <p className="text-xs font-medium text-foreground truncate">{c.contact_name}</p>
                     </TableCell>
@@ -128,6 +151,7 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: Conta
                       </div>
                     </TableCell>
                   </TableRow>
+                  </SwipeableRow>
                 ))}
               </TableBody>
             </Table>
