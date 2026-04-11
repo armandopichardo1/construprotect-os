@@ -198,6 +198,18 @@ export default function MasPage() {
     queryClient.invalidateQueries({ queryKey: ['margin-threshold'] });
   };
 
+  const handleSaveTargetMargins = async () => {
+    const vals = { list: Number(targetForm.list), architect: Number(targetForm.architect), project: Number(targetForm.project), wholesale: Number(targetForm.wholesale) };
+    if (Object.values(vals).some(v => isNaN(v) || v < 0 || v > 100)) { toast.error('Todos los márgenes deben estar entre 0 y 100'); return; }
+    setSavingTargets(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'target_margins', value: vals as any }, { onConflict: 'key' });
+    setSavingTargets(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success('Márgenes objetivo actualizados');
+    refetchTargetMargins();
+    queryClient.invalidateQueries({ queryKey: ['target-margins'] });
+  };
+
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
 
   return (
