@@ -551,6 +551,8 @@ function CuentasMaestra() {
   const [editing, setEditing] = useState<any>(null);
   const [deleting, setDeleting] = useState<any>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [creatingParent, setCreatingParent] = useState(false);
+  const [newParent, setNewParent] = useState({ code: '', description: '', account_type: 'Activo' });
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
