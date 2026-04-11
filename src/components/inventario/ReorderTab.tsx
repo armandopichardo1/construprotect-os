@@ -38,6 +38,8 @@ type EditingRow = {
   productId: string;
   reorderPoint: number;
   reorderQty: number;
+  minOrderQty: number;
+  leadTimeDays: number;
 };
 
 export function ReorderTab() {
@@ -107,8 +109,8 @@ export function ReorderTab() {
   });
 
   const updateProduct = useMutation({
-    mutationFn: async ({ id, reorder_point, reorder_qty }: { id: string; reorder_point: number; reorder_qty: number }) => {
-      const { error } = await supabase.from('products').update({ reorder_point, reorder_qty }).eq('id', id);
+    mutationFn: async ({ id, reorder_point, reorder_qty, min_order_qty, lead_time_days }: { id: string; reorder_point: number; reorder_qty: number; min_order_qty: number; lead_time_days: number }) => {
+      const { error } = await supabase.from('products').update({ reorder_point, reorder_qty, min_order_qty, lead_time_days }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -126,6 +128,8 @@ export function ReorderTab() {
       id: product.id,
       reorder_point: rec.suggested_reorder_point,
       reorder_qty: rec.suggested_reorder_qty,
+      min_order_qty: product.min_order_qty,
+      lead_time_days: product.lead_time_days,
     });
   };
 
@@ -172,14 +176,14 @@ export function ReorderTab() {
   const startEdit = (p: any) => {
     setEditingRows(prev => ({
       ...prev,
-      [p.id]: { productId: p.id, reorderPoint: p.reorder_point, reorderQty: p.reorder_qty },
+      [p.id]: { productId: p.id, reorderPoint: p.reorder_point, reorderQty: p.reorder_qty, minOrderQty: p.min_order_qty, leadTimeDays: p.lead_time_days },
     }));
   };
 
   const saveEdit = (id: string) => {
     const row = editingRows[id];
     if (!row) return;
-    updateProduct.mutate({ id, reorder_point: row.reorderPoint, reorder_qty: row.reorderQty });
+    updateProduct.mutate({ id, reorder_point: row.reorderPoint, reorder_qty: row.reorderQty, min_order_qty: row.minOrderQty, lead_time_days: row.leadTimeDays });
     setEditingRows(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
@@ -492,9 +496,23 @@ export function ReorderTab() {
                       {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
                       {isCritical && <span className="text-[8px] block text-destructive">⚠️ -{Math.abs(p.arrivalDay)}d</span>}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.lead_time_days}d</TableCell>
+                    <TableCell className="text-xs text-right">
+                      {editing ? (
+                        <Input type="number" className="w-14 h-6 text-xs p-1 text-right" value={editing.leadTimeDays}
+                          onChange={e => setEditingRows(prev => ({ ...prev, [p.id]: { ...prev[p.id], leadTimeDays: Number(e.target.value) } }))} />
+                      ) : (
+                        <span className="font-mono text-muted-foreground">{p.lead_time_days}d</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.safetyStock}</TableCell>
-                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.min_order_qty}</TableCell>
+                    <TableCell className="text-xs text-right">
+                      {editing ? (
+                        <Input type="number" className="w-14 h-6 text-xs p-1 text-right" value={editing.minOrderQty}
+                          onChange={e => setEditingRows(prev => ({ ...prev, [p.id]: { ...prev[p.id], minOrderQty: Number(e.target.value) } }))} />
+                      ) : (
+                        <span className="font-mono text-muted-foreground">{p.min_order_qty}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-right">
                       {editing ? (
                         <Input type="number" className="w-16 h-6 text-xs p-1 text-right" value={editing.reorderPoint}
