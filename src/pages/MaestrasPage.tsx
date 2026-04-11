@@ -558,6 +558,10 @@ function CuentasMaestra() {
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
+  useEffect(() => {
+    if (inlineEdit && inlineCodeRef.current) inlineCodeRef.current.focus();
+  }, [inlineEdit]);
+
   // Build hierarchy: parent accounts (no parent_id) and their children
   const { parentAccounts, childrenMap, parentMap } = useMemo(() => {
     const parents: any[] = [];
