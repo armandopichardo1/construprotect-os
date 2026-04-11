@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment, useRef, useEffect } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -553,8 +553,14 @@ function CuentasMaestra() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [creatingParent, setCreatingParent] = useState(false);
   const [newParent, setNewParent] = useState({ code: '', description: '', account_type: 'Activo' });
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; code: string; description: string } | null>(null);
+  const inlineCodeRef = useRef<HTMLInputElement>(null);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
+
+  useEffect(() => {
+    if (inlineEdit && inlineCodeRef.current) inlineCodeRef.current.focus();
+  }, [inlineEdit]);
 
   // Build hierarchy: parent accounts (no parent_id) and their children
   const { parentAccounts, childrenMap, parentMap } = useMemo(() => {
@@ -674,10 +680,27 @@ function CuentasMaestra() {
     return roots.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
   }, [accounts, editing]);
 
+  const handleInlineSave = async () => {
+    if (!inlineEdit) return;
+    if (!inlineEdit.description.trim()) { toast.error('Descripción requerida'); return; }
+    const { error } = await supabase.from('chart_of_accounts').update({ code: inlineEdit.code.trim() || null, description: inlineEdit.description.trim() }).eq('id', inlineEdit.id);
+    if (error) { toast.error('Error al actualizar'); return; }
+    toast.success('Cuenta actualizada');
+    queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+    setInlineEdit(null);
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleInlineSave(); }
+    if (e.key === 'Escape') setInlineEdit(null);
+  };
+
   const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
+    const isInline = inlineEdit?.id === a.id;
+    const isParentRow = !isChild && hasChildren;
     return (
-    <TableRow key={a.id} className={cn(!isChild && hasChildren && 'bg-muted/40 font-semibold')}>
+    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold')}>
       <TableCell className="text-xs font-mono font-medium">
         <div className="flex items-center gap-1">
           {!isChild && hasChildren ? (
@@ -688,23 +711,50 @@ function CuentasMaestra() {
             <span className="w-5" />
           )}
           {isChild && <span className="w-4 border-l-2 border-b-2 border-border h-3 ml-2 mr-1 rounded-bl-sm" />}
-          {a.code || '—'}
-        </div>
-      </TableCell>
-      <TableCell className={cn('text-xs', !isChild && hasChildren ? 'font-semibold' : '')}>
-        <span className="inline-flex items-center gap-1.5">
-          {a.description}
-          {!isChild && hasChildren && (
-            <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
-              {(childrenMap[a.id] || []).length}
+          {isInline ? (
+            <Input
+              ref={inlineCodeRef}
+              value={inlineEdit.code}
+              onChange={e => setInlineEdit(prev => prev ? { ...prev, code: e.target.value } : prev)}
+              onKeyDown={handleInlineKeyDown}
+              className="h-7 w-24 text-xs font-mono px-1.5"
+              placeholder="Código"
+            />
+          ) : (
+            <span onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })} className={cn(isParentRow && 'cursor-text')}>
+              {a.code || '—'}
             </span>
           )}
-        </span>
+        </div>
+      </TableCell>
+      <TableCell className={cn('text-xs', isParentRow ? 'font-semibold' : '')}>
+        {isInline ? (
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={inlineEdit.description}
+              onChange={e => setInlineEdit(prev => prev ? { ...prev, description: e.target.value } : prev)}
+              onKeyDown={handleInlineKeyDown}
+              className="h-7 text-xs px-1.5 flex-1"
+              placeholder="Descripción *"
+            />
+            <Button size="sm" className="h-7 text-[10px] px-2" onClick={handleInlineSave}>✓</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2" onClick={() => setInlineEdit(null)}>✕</Button>
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1.5" onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
+            {a.description}
+            {isParentRow && (
+              <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
+                {(childrenMap[a.id] || []).length}
+              </span>
+            )}
+          </span>
+        )}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
-      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (!isChild && hasChildren ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
+      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (isParentRow ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
         {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
       </TableCell>
       <TableCell>
