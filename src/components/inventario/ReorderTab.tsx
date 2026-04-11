@@ -13,6 +13,7 @@ import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
+import { POCartDialog } from './POCartDialog';
 
 type Recommendation = {
   sku: string;
