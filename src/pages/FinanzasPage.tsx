@@ -29,9 +29,10 @@ import { CrearTransaccionTab } from '@/components/finanzas/CrearTransaccionTab';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/DatePeriodFilter';
+import { LibroDiarioTab } from '@/components/finanzas/LibroDiarioTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Crear Transacción', 'Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Resumen', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
@@ -312,6 +313,8 @@ export default function FinanzasPage() {
             </div>
           </div>
         )}
+
+        {tab === 'Libro Diario' && <LibroDiarioTab sales={sales} expenses={expenses} costs={costs} rate={Number(latestRate?.usd_sell || 60)} />}
 
         {tab === 'Ventas' && (
           <div className="space-y-6">
