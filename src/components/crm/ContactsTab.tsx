@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pencil, Trash2, Star, Search, Eye, Phone, MessageCircle, Mail } from 'lucide-react';
+import { SwipeableRow } from '@/components/ui/swipeable-row';
 
 interface ContactsTabProps {
   contacts: Contact[];
