@@ -913,10 +913,53 @@ function CuentasMaestra() {
                 </Fragment>
               );
             })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <span className="text-xs font-medium text-foreground">{selected.size} cuenta(s) seleccionada(s)</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => { setBulkTargetParent('none'); setBulkMoveOpen(true); }}>
+            <FolderInput className="w-3.5 h-3.5" />Mover a otra madre
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>Deseleccionar</Button>
+        </div>
+      )}
+
+      {bulkMoveOpen && (
+        <Dialog open onOpenChange={() => setBulkMoveOpen(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="text-base">Mover {selected.size} cuenta(s)</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Cuenta madre destino</Label>
+                <Select value={bulkTargetParent} onValueChange={setBulkTargetParent}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin cuenta madre (raíz)</SelectItem>
+                    {bulkMoveTargets.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.code ? `${p.code} · ` : ''}{p.description}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-2.5 max-h-32 overflow-y-auto">
+                <p className="text-[10px] font-medium text-muted-foreground mb-1">Cuentas a mover:</p>
+                {Array.from(selected).map(id => {
+                  const acc = accountById[id];
+                  return acc ? <p key={id} className="text-xs text-muted-foreground">{acc.code ? `${acc.code} · ` : ''}{acc.description}</p> : null;
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button onClick={handleBulkMove} disabled={bulkMoving} className="flex-1 text-xs">{bulkMoving ? 'Moviendo...' : 'Mover'}</Button>
+                <Button variant="outline" onClick={() => setBulkMoveOpen(false)} className="text-xs">Cancelar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {editing && (
         <Dialog open onOpenChange={() => setEditing(null)}>
