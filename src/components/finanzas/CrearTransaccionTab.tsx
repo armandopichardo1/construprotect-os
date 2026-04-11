@@ -130,6 +130,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         amount_usd: finalUsd,
         amount_dop: finalDop,
         exchange_rate: xr,
+        account_id: manual.accountId || null,
       };
       if (dateStr) row.date = dateStr;
 
