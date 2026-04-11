@@ -786,15 +786,53 @@ function CuentasMaestra() {
               </div>
               <div><Label className="text-xs">Descripción *</Label><Input value={editing.description} onChange={e => setEditing((p: any) => ({ ...p, description: e.target.value }))} className="mt-1" /></div>
               <div><Label className="text-xs">Cuenta Madre</Label>
-                <Select value={editing.parent_id || 'none'} onValueChange={v => setEditing((p: any) => ({ ...p, parent_id: v === 'none' ? '' : v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin cuenta madre</SelectItem>
-                    {possibleParents.filter((p: any) => p.id !== editing.id).map((p: any) => (
-                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.code} · {p.description}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {!creatingParent ? (
+                  <div className="flex gap-1.5 mt-1">
+                    <Select value={editing.parent_id || 'none'} onValueChange={v => setEditing((p: any) => ({ ...p, parent_id: v === 'none' ? '' : v }))}>
+                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin cuenta madre</SelectItem>
+                        {possibleParents.filter((p: any) => p.id !== editing.id).map((p: any) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">{p.code} · {p.description}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="sm" className="h-9 px-2 shrink-0" onClick={() => { setCreatingParent(true); setNewParent({ code: '', description: '', account_type: editing.account_type || 'Activo' }); }}>
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-1 rounded-lg border border-border bg-muted/30 p-2.5 space-y-2">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Nueva cuenta madre</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="Código (ej: 14000)" value={newParent.code} onChange={e => setNewParent(p => ({ ...p, code: e.target.value }))} className="h-8 text-xs" />
+                      <Select value={newParent.account_type} onValueChange={v => setNewParent(p => ({ ...p, account_type: v }))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {['Activo','Pasivo','Capital','Ingreso','Costo','Gasto','Ingresos No Operacionales','Gastos No Operacionales'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Input placeholder="Descripción *" value={newParent.description} onChange={e => setNewParent(p => ({ ...p, description: e.target.value }))} className="h-8 text-xs" />
+                    <div className="flex gap-1.5">
+                      <Button type="button" size="sm" className="h-7 text-xs flex-1" onClick={async () => {
+                        if (!newParent.description.trim()) { toast.error('Descripción requerida'); return; }
+                        const { data, error } = await supabase.from('chart_of_accounts').insert({
+                          code: newParent.code || null,
+                          description: newParent.description,
+                          account_type: newParent.account_type,
+                          parent_id: null,
+                        }).select('id').single();
+                        if (error) { toast.error('Error al crear cuenta madre'); return; }
+                        toast.success('Cuenta madre creada');
+                        queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+                        setEditing((p: any) => ({ ...p, parent_id: data.id }));
+                        setCreatingParent(false);
+                      }}>Crear y asignar</Button>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setCreatingParent(false)}>Cancelar</Button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-xs">Clasificación</Label><Input value={editing.classification || ''} onChange={e => setEditing((p: any) => ({ ...p, classification: e.target.value }))} className="mt-1" /></div>
