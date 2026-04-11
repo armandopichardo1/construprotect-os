@@ -45,6 +45,7 @@ export function ContainerPlanner() {
   const [containerType, setContainerType] = useState<ContainerType>('40hc');
   const [orderLines, setOrderLines] = useState<Record<string, number>>({});
   const [showShipmentDialog, setShowShipmentDialog] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
   const [shipmentSupplierId, setShipmentSupplierId] = useState('');
   const [shipmentPoNumber, setShipmentPoNumber] = useState('');
   const [shipmentEta, setShipmentEta] = useState('');
