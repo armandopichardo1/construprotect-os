@@ -496,9 +496,23 @@ export function ReorderTab() {
                       {p.daysToStockout >= 999 ? '∞' : `${p.daysToStockout}d`}
                       {isCritical && <span className="text-[8px] block text-destructive">⚠️ -{Math.abs(p.arrivalDay)}d</span>}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.lead_time_days}d</TableCell>
+                    <TableCell className="text-xs text-right">
+                      {editing ? (
+                        <Input type="number" className="w-14 h-6 text-xs p-1 text-right" value={editing.leadTimeDays}
+                          onChange={e => setEditingRows(prev => ({ ...prev, [p.id]: { ...prev[p.id], leadTimeDays: Number(e.target.value) } }))} />
+                      ) : (
+                        <span className="font-mono text-muted-foreground">{p.lead_time_days}d</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.safetyStock}</TableCell>
-                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{p.min_order_qty}</TableCell>
+                    <TableCell className="text-xs text-right">
+                      {editing ? (
+                        <Input type="number" className="w-14 h-6 text-xs p-1 text-right" value={editing.minOrderQty}
+                          onChange={e => setEditingRows(prev => ({ ...prev, [p.id]: { ...prev[p.id], minOrderQty: Number(e.target.value) } }))} />
+                      ) : (
+                        <span className="font-mono text-muted-foreground">{p.min_order_qty}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-right">
                       {editing ? (
                         <Input type="number" className="w-16 h-6 text-xs p-1 text-right" value={editing.reorderPoint}
