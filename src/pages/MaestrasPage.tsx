@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, FolderInput } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -600,11 +601,11 @@ function CuentasMaestra() {
     return map;
   }, [accounts]);
 
-  const getBreadcrumb = (account: any): string[] => {
-    const path: string[] = [];
+  const getBreadcrumb = (account: any): { code: string; description: string }[] => {
+    const path: { code: string; description: string }[] = [];
     let current = account.parent_id ? accountById[account.parent_id] : null;
     while (current) {
-      path.unshift(current.code ? `${current.code}` : current.description);
+      path.unshift({ code: current.code || '', description: current.description });
       current = current.parent_id ? accountById[current.parent_id] : null;
     }
     return path;
@@ -832,17 +833,29 @@ function CuentasMaestra() {
             </span>
             {isChild && (() => {
               const crumbs = getBreadcrumb(a);
+              const tooltipText = crumbs.length > 0
+                ? [...crumbs.map(c => `${c.code ? c.code + ' · ' : ''}${c.description}`), `${a.code ? a.code + ' · ' : ''}${a.description}`].join(' → ')
+                : '';
               return crumbs.length > 0 ? (
-                <span className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-0.5">
-                  {crumbs.map((c, i) => (
-                    <Fragment key={i}>
-                      {i > 0 && <span className="text-muted-foreground/40">›</span>}
-                      <span>{c}</span>
-                    </Fragment>
-                  ))}
-                  <span className="text-muted-foreground/40">›</span>
-                  <span className="text-muted-foreground/80">{a.code || a.description}</span>
-                </span>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-0.5 cursor-help">
+                        {crumbs.map((c, i) => (
+                          <Fragment key={i}>
+                            {i > 0 && <span className="text-muted-foreground/40">›</span>}
+                            <span>{c.code || c.description}</span>
+                          </Fragment>
+                        ))}
+                        <span className="text-muted-foreground/40">›</span>
+                        <span className="text-muted-foreground/80">{a.code || a.description}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
+                      {tooltipText}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               ) : null;
             })()}
           </div>
