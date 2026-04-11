@@ -528,6 +528,22 @@ function CuentasMaestra() {
     queryKey: ['maestras-accounts'],
     queryFn: async () => { const { data } = await supabase.from('chart_of_accounts').select('*').order('code'); return data || []; },
   });
+
+  // Fetch balances from expenses, costs, and sales linked to accounts
+  const { data: accountBalances = {} } = useQuery({
+    queryKey: ['account-balances'],
+    queryFn: async () => {
+      const [{ data: expenses }, { data: costs }, { data: sales }] = await Promise.all([
+        supabase.from('expenses').select('account_id, amount_usd').not('account_id', 'is', null),
+        supabase.from('costs').select('account_id, amount_usd').not('account_id', 'is', null),
+        supabase.from('sales').select('id, subtotal_usd'),
+      ]);
+      const balances: Record<string, number> = {};
+      (expenses || []).forEach(e => { balances[e.account_id!] = (balances[e.account_id!] || 0) + Number(e.amount_usd); });
+      (costs || []).forEach(c => { balances[c.account_id!] = (balances[c.account_id!] || 0) + Number(c.amount_usd); });
+      return balances;
+    },
+  });
   const [typeFilter, setTypeFilter] = useState('all');
   const { search, setSearch, filtered: searched } = useSearch(accounts, ['code', 'description', 'classification']);
   const filtered = useMemo(() => typeFilter === 'all' ? searched : searched.filter((a: any) => a.account_type === typeFilter), [searched, typeFilter]);
@@ -562,6 +578,15 @@ function CuentasMaestra() {
     
     return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
   }, [filtered]);
+
+  // Compute balances: own + accumulated for parents
+  const getAccountBalance = (id: string): number => accountBalances[id] || 0;
+  const getParentBalance = (parentId: string): number => {
+    const children = childrenMap[parentId] || [];
+    const ownBalance = getAccountBalance(parentId);
+    const childrenTotal = children.reduce((sum: number, child: any) => sum + getAccountBalance(child.id), 0);
+    return ownBalance + childrenTotal;
+  };
 
   const toggleCollapse = (id: string) => {
     setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
@@ -616,7 +641,9 @@ function CuentasMaestra() {
   // Possible parents for the dropdown (only accounts that have no parent themselves)
   const possibleParents = useMemo(() => accounts.filter((a: any) => !a.parent_id), [accounts]);
 
-  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => (
+  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
+    const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
+    return (
     <TableRow key={a.id} className={cn(!isChild && hasChildren && 'bg-muted/40 font-semibold')}>
       <TableCell className="text-xs font-mono font-medium">
         <div className="flex items-center gap-1">
@@ -637,6 +664,9 @@ function CuentasMaestra() {
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
+      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (!isChild && hasChildren ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
+        {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+      </TableCell>
       <TableCell>
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing({ ...a, parent_id: a.parent_id || '' })}><Pencil className="w-3 h-3" /></Button>
@@ -644,7 +674,8 @@ function CuentasMaestra() {
         </div>
       </TableCell>
     </TableRow>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -677,6 +708,7 @@ function CuentasMaestra() {
             <TableHead className="text-xs">Clasificación</TableHead>
             <TableHead className="text-xs">Tipo</TableHead>
             <TableHead className="text-xs">Moneda</TableHead>
+            <TableHead className="text-xs text-right">Saldo (USD)</TableHead>
             <TableHead className="text-xs w-20"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
@@ -691,7 +723,7 @@ function CuentasMaestra() {
                 </Fragment>
               );
             })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
