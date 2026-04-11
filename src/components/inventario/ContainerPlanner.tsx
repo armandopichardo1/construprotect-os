@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download, Ship } from 'lucide-react';
+import { Container, Plus, Minus, Truck, Weight, Box, AlertTriangle, CheckCircle2, Download, Ship, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 
 const CONTAINER_TYPES = {
   '20ft': { label: '20\' Standard', maxCbm: 33.2, maxKg: 21770, costEstimate: 3500 },
