@@ -723,7 +723,7 @@ function CuentasMaestra() {
                 </Fragment>
               );
             })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
