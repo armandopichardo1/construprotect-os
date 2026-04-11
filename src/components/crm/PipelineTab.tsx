@@ -91,6 +91,61 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
       {/* Board view (drag & drop) */}
       {view === 'board' && (
         <DragDropContext onDragEnd={onDragEnd}>
+        {isMobile ? (
+          /* Mobile: vertical stacked accordion */
+          <div className="space-y-2">
+            {activeStages.map(stage => {
+              const cfg = DEAL_STAGES[stage];
+              const stageDeals = deals.filter(d => d.stage === stage);
+              const stageValue = stageDeals.reduce((s, d) => s + Number(d.value_usd || 0), 0);
+              const isExpanded = expandedStages[stage] !== false; // default expanded for stages with deals
+              const hasDeals = stageDeals.length > 0;
+              
+              return (
+                <Droppable droppableId={stage} key={stage}>
+                  {(provided, snapshot) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}
+                      className={cn('rounded-xl bg-muted/50 border border-border overflow-hidden transition-colors',
+                        snapshot.isDraggingOver && 'bg-primary/10 ring-1 ring-primary/30')}>
+                      <button
+                        onClick={() => toggleStage(stage)}
+                        className="flex items-center justify-between w-full px-3 py-2.5 hover:bg-muted/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                          <span className="text-xs font-semibold text-foreground">{cfg.emoji} {cfg.label}</span>
+                          <span className="bg-primary/10 text-primary text-[10px] font-medium px-1.5 py-0.5 rounded-full">{stageDeals.length}</span>
+                        </div>
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          ${stageValue >= 1000 ? (stageValue / 1000).toFixed(0) + 'K' : stageValue}
+                        </span>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-2.5 pb-2.5 space-y-1.5">
+                          {stageDeals.map((deal, index) => (
+                            <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                              {(dragProvided, dragSnapshot) => (
+                                <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps} style={{ ...dragProvided.draggableProps.style, touchAction: 'none' }}>
+                                  <DealCard deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} isDragging={dragSnapshot.isDragging} />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {!hasDeals && (
+                            <div className="rounded-lg border border-dashed border-border p-3 text-center text-[10px] text-muted-foreground">Sin deals</div>
+                          )}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                      {!isExpanded && <div className="hidden">{provided.placeholder}</div>}
+                    </div>
+                  )}
+                </Droppable>
+              );
+            })}
+          </div>
+        ) : (
+          /* Desktop: horizontal columns */
           <div className="overflow-x-auto -mx-4 px-4 pb-2">
             <div className="flex gap-2.5" style={{ minWidth: `${activeStages.length * 220}px` }}>
               {activeStages.map(stage => {
@@ -129,6 +184,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
               })}
             </div>
           </div>
+        )}
         </DragDropContext>
       )}
 
