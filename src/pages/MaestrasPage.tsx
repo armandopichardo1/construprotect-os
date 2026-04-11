@@ -16,10 +16,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
-const tabs = ['Clientes', 'Proveedores', 'Productos', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Proveedores', 'Productos', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
 export default function MaestrasPage() {
-  const [tab, setTab] = useState('Clientes');
+  const [tab, setTab] = useState('Proveedores');
 
   return (
     <AppLayout>
@@ -39,8 +39,8 @@ export default function MaestrasPage() {
           ))}
         </div>
 
-        {tab === 'Clientes' && <ClientesMaestra />}
         {tab === 'Proveedores' && <ProveedoresMaestra />}
+        {tab === 'Productos' && <ProductosMaestra />}
         {tab === 'Productos' && <ProductosMaestra />}
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}

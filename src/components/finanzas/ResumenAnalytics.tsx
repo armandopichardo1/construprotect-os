@@ -21,7 +21,7 @@ export function ClientSparklines({ sales }: { sales: any[] }) {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       sales.filter((s: any) => s.date?.startsWith(key)).forEach((s: any) => {
         const cid = s.contact_id || 'sin_cliente';
-        const name = s.crm_clients?.name || 'Sin Cliente';
+        const name = s.contacts?.contact_name || 'Sin Cliente';
         if (!clients[cid]) clients[cid] = { name, months: Array(6).fill(0) };
         clients[cid].months[5 - i] += Number(s.total_usd || 0);
       });
@@ -73,7 +73,7 @@ export function ConcentrationAnalysis({ sales }: { sales: any[] }) {
     const clientRevenue: Record<string, { name: string; revenue: number }> = {};
     sales.forEach((s: any) => {
       const cid = s.contact_id || 'sin_cliente';
-      const name = s.crm_clients?.name || 'Sin Cliente';
+      const name = s.contacts?.contact_name || 'Sin Cliente';
       if (!clientRevenue[cid]) clientRevenue[cid] = { name, revenue: 0 };
       clientRevenue[cid].revenue += Number(s.total_usd || 0);
     });
