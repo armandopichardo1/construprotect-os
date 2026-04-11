@@ -311,25 +311,51 @@ export default function MasPage() {
               </div>
             </div>
 
-            {/* Margin Threshold */}
-            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Umbral Mínimo de Margen</h2>
-              <p className="text-xs text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <Label className="text-xs">Margen mínimo (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={marginInput}
-                    onChange={e => setMarginInput(e.target.value)}
-                    className="h-8 text-xs mt-1 max-w-[120px]"
-                  />
+            {/* Margin Settings */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-5 lg:col-span-2">
+              <h2 className="text-sm font-semibold text-foreground">Configuración de Márgenes</h2>
+
+              {/* Min threshold */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">Umbral Mínimo de Margen</p>
+                <p className="text-[10px] text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo.</p>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <Label className="text-xs">Margen mínimo (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={marginInput} onChange={e => setMarginInput(e.target.value)} className="h-8 text-xs mt-1 w-[100px]" />
+                  </div>
+                  <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+                  </Button>
                 </div>
-                <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
-                  <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+              </div>
+
+              <div className="border-t border-border" />
+
+              {/* Target margins */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">Márgenes Objetivo por Defecto</p>
+                <p className="text-[10px] text-muted-foreground">Estos valores se usarán como objetivo cuando un producto no tiene margen individual configurado.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <Label className="text-xs">Lista (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.list} onChange={e => setTargetForm(f => ({ ...f, list: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Arquitecto (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.architect} onChange={e => setTargetForm(f => ({ ...f, architect: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Proyecto (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.project} onChange={e => setTargetForm(f => ({ ...f, project: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mayoreo (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.wholesale} onChange={e => setTargetForm(f => ({ ...f, wholesale: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleSaveTargetMargins} disabled={savingTargets}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingTargets ? 'Guardando...' : 'Guardar Márgenes Objetivo'}
                 </Button>
               </div>
             </div>
