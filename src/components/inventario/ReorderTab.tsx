@@ -172,14 +172,14 @@ export function ReorderTab() {
   const startEdit = (p: any) => {
     setEditingRows(prev => ({
       ...prev,
-      [p.id]: { productId: p.id, reorderPoint: p.reorder_point, reorderQty: p.reorder_qty },
+      [p.id]: { productId: p.id, reorderPoint: p.reorder_point, reorderQty: p.reorder_qty, minOrderQty: p.min_order_qty, leadTimeDays: p.lead_time_days },
     }));
   };
 
   const saveEdit = (id: string) => {
     const row = editingRows[id];
     if (!row) return;
-    updateProduct.mutate({ id, reorder_point: row.reorderPoint, reorder_qty: row.reorderQty });
+    updateProduct.mutate({ id, reorder_point: row.reorderPoint, reorder_qty: row.reorderQty, min_order_qty: row.minOrderQty, lead_time_days: row.leadTimeDays });
     setEditingRows(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
