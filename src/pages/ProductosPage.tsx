@@ -78,6 +78,17 @@ export default function ProductosPage() {
     },
   });
 
+  const { data: targetMargins } = useQuery({
+    queryKey: ['target-margins'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margins').maybeSingle();
+      return (data?.value as { list: number; architect: number; project: number; wholesale: number }) ?? null;
+    },
+  });
+  const defaultList = targetMargins?.list ?? 30;
+  const defaultArchitect = targetMargins?.architect ?? 25;
+  const defaultProject = targetMargins?.project ?? 20;
+
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
@@ -182,13 +193,13 @@ export default function ProductosPage() {
                     <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.unit_cost_usd))}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-medium text-primary">{formatUSD(Number(p.price_list_usd))}</TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || 30)} label="Margen Lista" minMargin={minMargin} />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || defaultList)} label="Margen Lista" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || 25)} label="Margen Arquitecto" minMargin={minMargin} />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || defaultArchitect)} label="Margen Arquitecto" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || 20)} label="Margen Proyecto" minMargin={minMargin} />
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>

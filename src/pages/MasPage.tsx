@@ -75,6 +75,28 @@ export default function MasPage() {
   const [marginInput, setMarginInput] = useState('');
   const [savingMargin, setSavingMargin] = useState(false);
 
+  // Target margins
+  const { data: targetMargins, refetch: refetchTargetMargins } = useQuery({
+    queryKey: ['target-margins'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margins').maybeSingle();
+      return (data?.value as { list: number; architect: number; project: number; wholesale: number }) ?? { list: 30, architect: 25, project: 20, wholesale: 15 };
+    },
+  });
+  const [targetForm, setTargetForm] = useState({ list: '30', architect: '25', project: '20', wholesale: '15' });
+  const [savingTargets, setSavingTargets] = useState(false);
+
+  useEffect(() => {
+    if (targetMargins) {
+      setTargetForm({
+        list: String(targetMargins.list),
+        architect: String(targetMargins.architect),
+        project: String(targetMargins.project),
+        wholesale: String(targetMargins.wholesale),
+      });
+    }
+  }, [targetMargins]);
+
   useEffect(() => {
     if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
   }, [marginThreshold]);
@@ -174,6 +196,18 @@ export default function MasPage() {
     toast.success(`Umbral de margen actualizado a ${val}%`);
     refetchMargin();
     queryClient.invalidateQueries({ queryKey: ['margin-threshold'] });
+  };
+
+  const handleSaveTargetMargins = async () => {
+    const vals = { list: Number(targetForm.list), architect: Number(targetForm.architect), project: Number(targetForm.project), wholesale: Number(targetForm.wholesale) };
+    if (Object.values(vals).some(v => isNaN(v) || v < 0 || v > 100)) { toast.error('Todos los márgenes deben estar entre 0 y 100'); return; }
+    setSavingTargets(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'target_margins', value: vals as any }, { onConflict: 'key' });
+    setSavingTargets(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success('Márgenes objetivo actualizados');
+    refetchTargetMargins();
+    queryClient.invalidateQueries({ queryKey: ['target-margins'] });
   };
 
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
@@ -277,25 +311,51 @@ export default function MasPage() {
               </div>
             </div>
 
-            {/* Margin Threshold */}
-            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Umbral Mínimo de Margen</h2>
-              <p className="text-xs text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo en la tabla de productos.</p>
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <Label className="text-xs">Margen mínimo (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={marginInput}
-                    onChange={e => setMarginInput(e.target.value)}
-                    className="h-8 text-xs mt-1 max-w-[120px]"
-                  />
+            {/* Margin Settings */}
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-5 lg:col-span-2">
+              <h2 className="text-sm font-semibold text-foreground">Configuración de Márgenes</h2>
+
+              {/* Min threshold */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">Umbral Mínimo de Margen</p>
+                <p className="text-[10px] text-muted-foreground">Productos con margen real por debajo de este % se marcarán en rojo.</p>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <Label className="text-xs">Margen mínimo (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={marginInput} onChange={e => setMarginInput(e.target.value)} className="h-8 text-xs mt-1 w-[100px]" />
+                  </div>
+                  <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
+                    <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+                  </Button>
                 </div>
-                <Button size="sm" onClick={handleSaveMargin} disabled={savingMargin || marginInput === String(marginThreshold)}>
-                  <Save className="w-3.5 h-3.5 mr-1" /> {savingMargin ? 'Guardando...' : 'Guardar'}
+              </div>
+
+              <div className="border-t border-border" />
+
+              {/* Target margins */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">Márgenes Objetivo por Defecto</p>
+                <p className="text-[10px] text-muted-foreground">Estos valores se usarán como objetivo cuando un producto no tiene margen individual configurado.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <Label className="text-xs">Lista (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.list} onChange={e => setTargetForm(f => ({ ...f, list: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Arquitecto (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.architect} onChange={e => setTargetForm(f => ({ ...f, architect: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Proyecto (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.project} onChange={e => setTargetForm(f => ({ ...f, project: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mayoreo (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={targetForm.wholesale} onChange={e => setTargetForm(f => ({ ...f, wholesale: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleSaveTargetMargins} disabled={savingTargets}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingTargets ? 'Guardando...' : 'Guardar Márgenes Objetivo'}
                 </Button>
               </div>
             </div>
