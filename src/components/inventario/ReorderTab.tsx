@@ -13,6 +13,7 @@ import { formatUSD } from '@/lib/format';
 import { streamBusinessAI } from '@/lib/business-ai';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
+import { POCartDialog } from './POCartDialog';
 
 type Recommendation = {
   sku: string;
@@ -49,7 +50,7 @@ export function ReorderTab() {
   const [editingRows, setEditingRows] = useState<Record<string, EditingRow>>({});
   const [showConfigAll, setShowConfigAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
+  const [showCart, setShowCart] = useState(false);
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
     queryFn: async () => {
@@ -412,7 +413,10 @@ export function ReorderTab() {
             <span className="text-xs text-muted-foreground">{selectedTotalUnits.toLocaleString()} unidades</span>
             <span className="text-xs text-muted-foreground">·</span>
             <span className="text-xs font-medium text-primary">{formatUSD(selectedTotalCost)} costo estimado</span>
-            <Button size="sm" variant="ghost" className="text-xs ml-auto" onClick={() => setSelectedIds(new Set())}>Limpiar</Button>
+            <Button size="sm" className="gap-1.5 text-xs rounded-xl ml-auto" onClick={() => setShowCart(true)}>
+              <ShoppingCart className="w-3.5 h-3.5" /> Generar PO ({selectedIds.size})
+            </Button>
+            <Button size="sm" variant="ghost" className="text-xs" onClick={() => setSelectedIds(new Set())}>Limpiar</Button>
           </div>
         )}
 
@@ -546,6 +550,25 @@ export function ReorderTab() {
           </Table>
         </div>
       </div>
+
+      <POCartDialog
+        open={showCart}
+        onOpenChange={setShowCart}
+        products={selectedItems.map(p => ({
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          brand: p.brand || null,
+          category: p.category || null,
+          unit_cost_usd: Number(p.unit_cost_usd) || 0,
+          reorder_qty: p.reorder_qty,
+          qty: p.qty,
+        }))}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          queryClient.invalidateQueries({ queryKey: ['reorder-products'] });
+        }}
+      />
     </div>
   );
 }
