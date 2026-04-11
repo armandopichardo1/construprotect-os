@@ -561,6 +561,8 @@ function CuentasMaestra() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkTargetParent, setBulkTargetParent] = useState<string>('none');
   const [bulkMoving, setBulkMoving] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
@@ -776,6 +778,31 @@ function CuentasMaestra() {
     setBulkMoveOpen(false);
   };
 
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selected);
+    // Check if any selected account has children that are NOT also selected
+    for (const id of ids) {
+      const children = childrenMap[id] || [];
+      const unselectedChildren = children.filter((c: any) => !selected.has(c.id));
+      if (unselectedChildren.length > 0) {
+        const acc = accountById[id];
+        toast.error(`"${acc?.code || ''} ${acc?.description}" tiene subcuentas no seleccionadas. Elimina o mueve las subcuentas primero.`);
+        setBulkDeleting(false);
+        return;
+      }
+    }
+    const { error } = await supabase.from('chart_of_accounts').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) { toast.error('Error al eliminar cuentas'); return; }
+    toast.success(`${ids.length} cuenta(s) eliminada(s)`);
+    queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+    setSelected(new Set());
+    setBulkDeleteOpen(false);
+  };
+
+
   const renderRow = (a: any, depth: number, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = hasChildren ? getSubtreeBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
@@ -944,6 +971,9 @@ function CuentasMaestra() {
           <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => { setBulkTargetParent('none'); setBulkMoveOpen(true); }}>
             <FolderInput className="w-3.5 h-3.5" />Mover a otra madre
           </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setBulkDeleteOpen(true)}>
+            <Trash2 className="w-3.5 h-3.5" />Eliminar
+          </Button>
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>Deseleccionar</Button>
         </div>
       )}
@@ -1069,6 +1099,27 @@ function CuentasMaestra() {
         </Dialog>
       )}
       <DeleteConfirmDialog open={!!deleting} onOpenChange={() => setDeleting(null)} onConfirm={handleDelete} title="Eliminar Cuenta" description={`¿Eliminar "${deleting?.code} - ${deleting?.description}"?`} />
+
+      {bulkDeleteOpen && (
+        <Dialog open onOpenChange={() => setBulkDeleteOpen(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="text-base text-destructive">Eliminar {selected.size} cuenta(s)</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Esta acción es irreversible. Las siguientes cuentas serán eliminadas permanentemente:</p>
+              <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-2.5 max-h-40 overflow-y-auto">
+                {Array.from(selected).map(id => {
+                  const acc = accountById[id];
+                  return acc ? <p key={id} className="text-xs text-muted-foreground">{acc.code ? `${acc.code} · ` : ''}{acc.description}</p> : null;
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 text-xs">{bulkDeleting ? 'Eliminando...' : 'Eliminar'}</Button>
+                <Button variant="outline" onClick={() => setBulkDeleteOpen(false)} className="text-xs">Cancelar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
