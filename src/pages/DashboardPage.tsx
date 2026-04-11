@@ -191,6 +191,14 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: chartMarginTargets } = useQuery({
+    queryKey: ['chart-margin-targets'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'chart_margin_targets').maybeSingle();
+      return (data?.value as { gross: number; net: number }) ?? { gross: 40, net: 15 };
+    },
+  });
+
   const { data: pipelineData } = useQuery({
     queryKey: ['dashboard-pipeline'],
     queryFn: async () => {
