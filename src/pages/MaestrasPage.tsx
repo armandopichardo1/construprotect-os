@@ -778,7 +778,31 @@ function CuentasMaestra() {
     setBulkMoveOpen(false);
   };
 
-  const renderRow = (a: any, depth: number, hasChildren: boolean, isCollapsed: boolean) => {
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selected);
+    // Check if any selected account has children that are NOT also selected
+    for (const id of ids) {
+      const children = childrenMap[id] || [];
+      const unselectedChildren = children.filter((c: any) => !selected.has(c.id));
+      if (unselectedChildren.length > 0) {
+        const acc = accountById[id];
+        toast.error(`"${acc?.code || ''} ${acc?.description}" tiene subcuentas no seleccionadas. Elimina o mueve las subcuentas primero.`);
+        setBulkDeleting(false);
+        return;
+      }
+    }
+    const { error } = await supabase.from('chart_of_accounts').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) { toast.error('Error al eliminar cuentas'); return; }
+    toast.success(`${ids.length} cuenta(s) eliminada(s)`);
+    queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+    setSelected(new Set());
+    setBulkDeleteOpen(false);
+  };
+
+
     const balance = hasChildren ? getSubtreeBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
     const hasKids = hasChildren;
