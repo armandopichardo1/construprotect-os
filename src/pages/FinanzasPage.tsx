@@ -28,6 +28,7 @@ import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from 
 import { CrearTransaccionTab } from '@/components/finanzas/CrearTransaccionTab';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
+import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/DatePeriodFilter';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
 const tabs = ['Crear Transacción', 'Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
@@ -352,6 +353,8 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
   const [editSale, setEditSale] = useState<any>(null);
   const [deleteSale, setDeleteSale] = useState<any>(null);
   const [activePrefill, setActivePrefill] = useState<any>(null);
+  const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
+  const filteredSales = filterByDate(sales);
 
   useEffect(() => {
     if (prefill) {
@@ -376,9 +379,10 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" onClick={() => { setEditSale(null); setShowForm(true); }}>+ Nueva Venta</Button>
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
@@ -396,7 +400,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sales.map((s: any) => (
+            {filteredSales.map((s: any) => (
               <TableRow key={s.id}>
                 <TableCell className="text-xs">{s.date}</TableCell>
                 <TableCell className="text-xs font-medium">{s.crm_clients?.name || '—'}</TableCell>
@@ -426,7 +430,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
             ))}
           </TableBody>
         </Table>
-        {sales.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay ventas registradas</p>}
+        {filteredSales.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay ventas registradas</p>}
       </div>
       <SaleFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) { setEditSale(null); setActivePrefill(null); } }} queryClient={queryClient} rate={rate} editSale={editSale} prefill={activePrefill} />
       <DeleteConfirmDialog
@@ -661,6 +665,8 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
   const [showForm, setShowForm] = useState(false);
   const [editExpense, setEditExpense] = useState<any>(null);
   const [deleteExpense, setDeleteExpense] = useState<any>(null);
+  const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
+  const filteredExpenses = filterByDate(expenses);
 
   useEffect(() => {
     if (prefill) {
@@ -680,9 +686,10 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" onClick={() => { setEditExpense(null); setShowForm(true); }}>+ Nuevo Gasto</Button>
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
@@ -699,7 +706,7 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
             </TableRow>
           </TableHeader>
           <TableBody>
-            {expenses.map((e: any) => {
+            {filteredExpenses.map((e: any) => {
               const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.other;
               const amountDop = Number(e.amount_dop) || Number(e.amount_usd || 0) * rate;
               return (
@@ -869,6 +876,8 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
   const [showForm, setShowForm] = useState(false);
   const [editCost, setEditCost] = useState<any>(null);
   const [deleteCost, setDeleteCost] = useState<any>(null);
+  const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
+  const filteredCosts = filterByDate(costs);
 
   useEffect(() => {
     if (prefill) {
@@ -888,9 +897,10 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" onClick={() => { setEditCost(null); setShowForm(true); }}>+ Nuevo Costo</Button>
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
@@ -907,7 +917,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
             </TableRow>
           </TableHeader>
           <TableBody>
-            {costs.map((c: any) => {
+            {filteredCosts.map((c: any) => {
               const cat = COST_CATEGORIES[c.category] || COST_CATEGORIES.other;
               const amountDop = Number(c.amount_dop) || Number(c.amount_usd || 0) * (Number(rate?.usd_sell) || 60.76);
               return (
