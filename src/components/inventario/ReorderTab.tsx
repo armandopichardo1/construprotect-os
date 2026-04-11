@@ -550,6 +550,25 @@ export function ReorderTab() {
           </Table>
         </div>
       </div>
+
+      <POCartDialog
+        open={showCart}
+        onOpenChange={setShowCart}
+        products={selectedItems.map(p => ({
+          id: p.id,
+          sku: p.sku,
+          name: p.name,
+          brand: p.brand || null,
+          category: p.category || null,
+          unit_cost_usd: Number(p.unit_cost_usd) || 0,
+          reorder_qty: p.reorder_qty,
+          qty: p.qty,
+        }))}
+        onSuccess={() => {
+          setSelectedIds(new Set());
+          queryClient.invalidateQueries({ queryKey: ['reorder-products'] });
+        }}
+      />
     </div>
   );
 }
