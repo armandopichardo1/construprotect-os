@@ -75,6 +75,28 @@ export default function MasPage() {
   const [marginInput, setMarginInput] = useState('');
   const [savingMargin, setSavingMargin] = useState(false);
 
+  // Target margins
+  const { data: targetMargins, refetch: refetchTargetMargins } = useQuery({
+    queryKey: ['target-margins'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'target_margins').maybeSingle();
+      return (data?.value as { list: number; architect: number; project: number; wholesale: number }) ?? { list: 30, architect: 25, project: 20, wholesale: 15 };
+    },
+  });
+  const [targetForm, setTargetForm] = useState({ list: '30', architect: '25', project: '20', wholesale: '15' });
+  const [savingTargets, setSavingTargets] = useState(false);
+
+  useEffect(() => {
+    if (targetMargins) {
+      setTargetForm({
+        list: String(targetMargins.list),
+        architect: String(targetMargins.architect),
+        project: String(targetMargins.project),
+        wholesale: String(targetMargins.wholesale),
+      });
+    }
+  }, [targetMargins]);
+
   useEffect(() => {
     if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
   }, [marginThreshold]);
