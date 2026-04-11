@@ -528,6 +528,22 @@ function CuentasMaestra() {
     queryKey: ['maestras-accounts'],
     queryFn: async () => { const { data } = await supabase.from('chart_of_accounts').select('*').order('code'); return data || []; },
   });
+
+  // Fetch balances from expenses, costs, and sales linked to accounts
+  const { data: accountBalances = {} } = useQuery({
+    queryKey: ['account-balances'],
+    queryFn: async () => {
+      const [{ data: expenses }, { data: costs }, { data: sales }] = await Promise.all([
+        supabase.from('expenses').select('account_id, amount_usd').not('account_id', 'is', null),
+        supabase.from('costs').select('account_id, amount_usd').not('account_id', 'is', null),
+        supabase.from('sales').select('id, subtotal_usd'),
+      ]);
+      const balances: Record<string, number> = {};
+      (expenses || []).forEach(e => { balances[e.account_id!] = (balances[e.account_id!] || 0) + Number(e.amount_usd); });
+      (costs || []).forEach(c => { balances[c.account_id!] = (balances[c.account_id!] || 0) + Number(c.amount_usd); });
+      return balances;
+    },
+  });
   const [typeFilter, setTypeFilter] = useState('all');
   const { search, setSearch, filtered: searched } = useSearch(accounts, ['code', 'description', 'classification']);
   const filtered = useMemo(() => typeFilter === 'all' ? searched : searched.filter((a: any) => a.account_type === typeFilter), [searched, typeFilter]);
