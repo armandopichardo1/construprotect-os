@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
-const tabs = ['Proveedores', 'Productos', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
 export default function MaestrasPage() {
   const [tab, setTab] = useState('Proveedores');
@@ -40,7 +40,7 @@ export default function MaestrasPage() {
         </div>
 
         {tab === 'Proveedores' && <ProveedoresMaestra />}
-        {tab === 'Productos' && <ProductosMaestra />}
+        
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
@@ -187,18 +187,6 @@ function SupplierForm({ initial, onSave, onCancel }: any) {
   );
 }
 
-// ============ PRODUCTOS (redirect to existing page info) ============
-
-function ProductosMaestra() {
-  return (
-    <div className="rounded-2xl bg-card border border-border p-8 text-center space-y-3">
-      <p className="text-4xl">📦</p>
-      <h2 className="text-lg font-semibold text-foreground">Catálogo de Productos</h2>
-      <p className="text-sm text-muted-foreground">Los productos se gestionan desde la página de Productos con todas las funciones de costos, precios y márgenes.</p>
-      <Button variant="outline" onClick={() => window.location.href = '/productos'}>Ir a Productos →</Button>
-    </div>
-  );
-}
 
 // ============ MARCAS ============
 
