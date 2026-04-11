@@ -553,6 +553,8 @@ function CuentasMaestra() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [creatingParent, setCreatingParent] = useState(false);
   const [newParent, setNewParent] = useState({ code: '', description: '', account_type: 'Activo' });
+  const [inlineEdit, setInlineEdit] = useState<{ id: string; code: string; description: string } | null>(null);
+  const inlineCodeRef = useRef<HTMLInputElement>(null);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
