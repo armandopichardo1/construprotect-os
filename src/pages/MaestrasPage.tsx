@@ -777,7 +777,10 @@ function CuentasMaestra() {
     const isInline = inlineEdit?.id === a.id;
     const isParentRow = !isChild && hasChildren;
     return (
-    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold')}>
+    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
+      <TableCell className="w-8 px-2">
+        <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} className="h-3.5 w-3.5" />
+      </TableCell>
       <TableCell className="text-xs font-mono font-medium">
         <div className="flex items-center gap-1">
           {!isChild && hasChildren ? (
