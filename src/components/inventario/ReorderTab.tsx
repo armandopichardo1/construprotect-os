@@ -107,8 +107,8 @@ export function ReorderTab() {
   });
 
   const updateProduct = useMutation({
-    mutationFn: async ({ id, reorder_point, reorder_qty }: { id: string; reorder_point: number; reorder_qty: number }) => {
-      const { error } = await supabase.from('products').update({ reorder_point, reorder_qty }).eq('id', id);
+    mutationFn: async ({ id, reorder_point, reorder_qty, min_order_qty, lead_time_days }: { id: string; reorder_point: number; reorder_qty: number; min_order_qty: number; lead_time_days: number }) => {
+      const { error } = await supabase.from('products').update({ reorder_point, reorder_qty, min_order_qty, lead_time_days }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
