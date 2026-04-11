@@ -568,18 +568,11 @@ function CuentasMaestra() {
     if (inlineEdit && inlineCodeRef.current) inlineCodeRef.current.focus();
   }, [inlineEdit]);
 
-  // Build hierarchy: parent accounts (no parent_id) and their children
-  const { parentAccounts, childrenMap, parentMap } = useMemo(() => {
-    const parents: any[] = [];
+  // Build hierarchy: recursive tree from parent_id relationships
+  const { rootAccounts, childrenMap } = useMemo(() => {
     const children: Record<string, any[]> = {};
-    const pMap: Record<string, any> = {};
-    
-    filtered.forEach((a: any) => {
-      if (!a.parent_id) {
-        parents.push(a);
-        pMap[a.id] = a;
-      }
-    });
+    const roots: any[] = [];
+    const allIds = new Set(filtered.map((a: any) => a.id));
     
     filtered.forEach((a: any) => {
       if (a.parent_id) {
@@ -587,11 +580,15 @@ function CuentasMaestra() {
         children[a.parent_id].push(a);
       }
     });
-
-    // Accounts whose parent is filtered out → show as standalone
-    const orphans = filtered.filter((a: any) => a.parent_id && !pMap[a.parent_id] && !parents.find(p => p.id === a.parent_id));
     
-    return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
+    filtered.forEach((a: any) => {
+      // Root if no parent, or parent is not in filtered set
+      if (!a.parent_id || !allIds.has(a.parent_id)) {
+        roots.push(a);
+      }
+    });
+    
+    return { rootAccounts: roots, childrenMap: children };
   }, [filtered]);
 
   // Build ancestor breadcrumb path for any account
