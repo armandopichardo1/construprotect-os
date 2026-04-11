@@ -8,7 +8,8 @@ import { formatUSD } from '@/lib/format';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
-import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle, Box } from 'lucide-react';
+import { BulkLogisticsDialog } from '@/components/BulkLogisticsDialog';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Tables } from '@/integrations/supabase/types';
@@ -65,6 +66,7 @@ export default function ProductosPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: minMargin = DEFAULT_MIN_MARGIN } = useQuery({
@@ -120,6 +122,9 @@ export default function ProductosPage() {
             ))}
           </div>
           <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)} className="gap-1.5">
+              <Box className="w-3.5 h-3.5" /> CBM & Peso
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>📥 Importar Excel</Button>
             <Button size="sm" onClick={() => { setEditProduct(null); setDialogOpen(true); }}>+ Nuevo Producto</Button>
           </div>
@@ -245,6 +250,12 @@ export default function ProductosPage() {
           open={!!deleteProduct}
           onOpenChange={(v) => { if (!v) setDeleteProduct(null); }}
           product={deleteProduct}
+          onSuccess={refresh}
+        />
+        <BulkLogisticsDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          products={products}
           onSuccess={refresh}
         />
       </div>
