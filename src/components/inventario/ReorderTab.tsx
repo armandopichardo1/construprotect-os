@@ -50,7 +50,7 @@ export function ReorderTab() {
   const [editingRows, setEditingRows] = useState<Record<string, EditingRow>>({});
   const [showConfigAll, setShowConfigAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
+  const [showCart, setShowCart] = useState(false);
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
     queryFn: async () => {
