@@ -269,7 +269,21 @@ export function ContainerPlanner() {
   return (
     <div className="space-y-5">
       {/* Container selector + KPIs */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
+        {/* Supplier/Brand filter */}
+        <div className="rounded-xl bg-card border border-border p-4 space-y-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Filter className="w-3 h-3" /> Proveedor / Marca</p>
+          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todos ({items.length} SKUs)</SelectItem>
+              {availableBrands.map(b => (
+                <SelectItem key={b} value={b} className="text-xs">{b} ({items.filter(i => i.brand === b).length})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground">{filteredItems.length} productos</p>
+        </div>
         <div className="rounded-xl bg-card border border-border p-4 space-y-2">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Contenedor</p>
           <Select value={containerType} onValueChange={v => setContainerType(v as ContainerType)}>
