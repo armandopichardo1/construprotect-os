@@ -1554,7 +1554,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   );
 }
 
-function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }: { label: string; cur: number; prv: number; yoy: number; bold?: boolean; negative?: boolean; pct?: boolean; highlight?: boolean; sub?: boolean }) {
+function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub, mode = 'both' }: { label: string; cur: number; prv: number; yoy: number; bold?: boolean; negative?: boolean; pct?: boolean; highlight?: boolean; sub?: boolean; mode?: 'both' | 'prev' | 'yoy' }) {
   const fmtVal = (v: number) => pct ? `${v.toFixed(1)}%` : (negative ? (v > 0 ? `-${formatUSD(v)}` : formatUSD(Math.abs(v))) : formatUSD(v));
   const deltaColor = (c: number, p: number) => {
     if (p === 0 && c === 0) return 'text-muted-foreground';
@@ -1563,6 +1563,22 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }
   };
   const dPrev = pct ? `${(cur - prv).toFixed(1)}pp` : deltaStr(cur, prv);
   const dYoy = pct ? `${(cur - yoy).toFixed(1)}pp` : deltaStr(cur, yoy);
+
+  if (mode !== 'both') {
+    const comp = mode === 'prev' ? prv : yoy;
+    const pctChange = pct
+      ? `${(cur - comp).toFixed(1)}pp`
+      : (comp !== 0 ? `${((cur - comp) / comp * 100) > 0 ? '+' : ''}${((cur - comp) / comp * 100).toFixed(1)}%` : (cur > 0 ? '+100.0%' : '0.0%'));
+    return (
+      <TableRow className={cn(highlight ? 'bg-muted/30' : '', sub && 'bg-muted/10')}>
+        <TableCell className={cn('text-xs', bold && 'font-bold', sub && 'text-muted-foreground pl-6')}>{label}</TableCell>
+        <TableCell className={cn('text-xs text-right font-mono', bold && 'font-bold', highlight && (cur >= 0 ? 'text-success' : 'text-destructive'), sub && 'text-muted-foreground')}>{fmtVal(cur)}</TableCell>
+        <TableCell className="text-xs text-right font-mono text-muted-foreground">{fmtVal(comp)}</TableCell>
+        <TableCell className={cn('text-xs text-right font-mono font-semibold', deltaColor(cur, comp))}>{pctChange}</TableCell>
+      </TableRow>
+    );
+  }
+
   return (
     <TableRow className={cn(highlight ? 'bg-muted/30' : '', sub && 'bg-muted/10')}>
       <TableCell className={cn('text-xs', bold && 'font-bold', sub && 'text-muted-foreground pl-6')}>{label}</TableCell>
