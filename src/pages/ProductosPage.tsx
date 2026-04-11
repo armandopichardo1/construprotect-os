@@ -155,7 +155,24 @@ export default function ProductosPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
-                  <TableRow key={p.id}>
+                  <SwipeableRow
+                    key={p.id}
+                    rightActions={[
+                      {
+                        icon: <Pencil className="w-4 h-4" />,
+                        label: 'Editar',
+                        color: 'bg-warning',
+                        onClick: () => { setEditProduct(p); setDialogOpen(true); },
+                      },
+                      {
+                        icon: <Trash2 className="w-4 h-4" />,
+                        label: 'Eliminar',
+                        color: 'bg-destructive',
+                        onClick: () => setDeleteProduct(p),
+                      },
+                    ]}
+                  >
+                  <TableRow>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.brand || '—'}</TableCell>
@@ -191,6 +208,7 @@ export default function ProductosPage() {
                       </div>
                     </TableCell>
                   </TableRow>
+                  </SwipeableRow>
                 ))}
               </TableBody>
               {(() => {
