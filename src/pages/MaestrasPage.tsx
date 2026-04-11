@@ -890,6 +890,9 @@ function CuentasMaestra() {
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8 px-2">
+              <Checkbox checked={allChildIds.length > 0 && selected.size === allChildIds.length} onCheckedChange={toggleSelectAll} className="h-3.5 w-3.5" />
+            </TableHead>
             <TableHead className="text-xs w-28">Código</TableHead>
             <TableHead className="text-xs">Descripción</TableHead>
             <TableHead className="text-xs">Clasificación</TableHead>
