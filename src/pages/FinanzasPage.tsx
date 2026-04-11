@@ -1151,6 +1151,7 @@ function deltaStr(cur: number, prev: number): string {
 
 function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[] }) {
   const [period, setPeriod] = useState('current_month');
+  const [compareMode, setCompareMode] = useState<'both' | 'prev' | 'yoy'>('both');
   const [expandCogs, setExpandCogs] = useState(false);
   const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
@@ -1315,6 +1316,17 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         )}
         <span className="text-xs text-muted-foreground">{range.start} → {range.end}</span>
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+      </div>
+
+      {/* Comparison mode toggle */}
+      <div className="flex items-center gap-1 rounded-xl bg-muted p-1 w-fit">
+        {([['both', 'Completo'], ['prev', 'vs Mes Anterior'], ['yoy', 'vs Año Anterior']] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setCompareMode(key)}
+            className={cn('rounded-lg px-3 py-1 text-[11px] font-medium transition-colors',
+              compareMode === key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="rounded-2xl bg-card border border-border overflow-hidden">
