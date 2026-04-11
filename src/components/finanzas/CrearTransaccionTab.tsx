@@ -62,6 +62,7 @@ const defaultManual = {
   amountUsd: '',
   amountDop: '',
   date: undefined as Date | undefined,
+  accountId: '',
 };
 
 export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
