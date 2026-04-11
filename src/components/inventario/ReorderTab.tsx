@@ -128,6 +128,8 @@ export function ReorderTab() {
       id: product.id,
       reorder_point: rec.suggested_reorder_point,
       reorder_qty: rec.suggested_reorder_qty,
+      min_order_qty: product.min_order_qty,
+      lead_time_days: product.lead_time_days,
     });
   };
 
