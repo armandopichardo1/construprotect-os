@@ -1122,5 +1122,4 @@ function CuentasMaestra() {
       )}
     </div>
   );
-  );
 }
