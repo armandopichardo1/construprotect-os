@@ -332,13 +332,17 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
   const days = daysInStage(deal.updated_at);
   const dayColor = stageColor(days);
 
-  const rottingBorder = days >= 21
-    ? 'border-destructive/60 bg-destructive/5'
-    : days >= 14
-    ? 'border-warning/60 bg-warning/5'
+  const staleBorder = days > 14
+    ? 'border-l-4 border-l-destructive border-t border-r border-b border-border bg-destructive/5'
     : days >= 7
-    ? 'border-yellow-500/30'
-    : 'border-border';
+    ? 'border-l-4 border-l-warning border-t border-r border-b border-border bg-warning/5'
+    : 'border-l-4 border-l-success border-t border-r border-b border-border';
+
+  const staleBadgeClass = days > 14
+    ? 'bg-destructive/15 text-destructive'
+    : days >= 7
+    ? 'bg-warning/15 text-warning'
+    : 'bg-success/15 text-success';
 
   const { data: contact } = useQuery({
     queryKey: ['contact-for-deal', deal.contact_id],
@@ -365,7 +369,7 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
 
   return (
     <>
-      <div className={cn('group/card rounded-lg bg-card border p-2.5 space-y-1.5 shadow-sm transition-all', rottingBorder, isDragging && 'shadow-lg ring-2 ring-primary/40')}>
+      <div className={cn('group/card rounded-lg bg-card p-2.5 space-y-1.5 shadow-sm transition-all', staleBorder, isDragging && 'shadow-lg ring-2 ring-primary/40')}>
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-foreground truncate">{deal.title}</p>
@@ -378,7 +382,7 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-foreground">${Number(deal.value_usd).toLocaleString()}</span>
-          <span className={cn('text-[9px] font-medium', dayColor)}>{days}d</span>
+          <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded-full', staleBadgeClass)}>{days}d</span>
         </div>
         {/* Contact + AI actions — visible on hover */}
         <div className="flex items-center justify-between opacity-0 group-hover/card:opacity-100 transition-opacity h-0 group-hover/card:h-auto overflow-hidden group-hover/card:pt-1 border-t border-transparent group-hover/card:border-border/50">
