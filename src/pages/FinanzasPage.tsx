@@ -665,6 +665,8 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
   const [showForm, setShowForm] = useState(false);
   const [editExpense, setEditExpense] = useState<any>(null);
   const [deleteExpense, setDeleteExpense] = useState<any>(null);
+  const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
+  const filteredExpenses = filterByDate(expenses);
 
   useEffect(() => {
     if (prefill) {
@@ -684,9 +686,10 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" onClick={() => { setEditExpense(null); setShowForm(true); }}>+ Nuevo Gasto</Button>
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
+        <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
@@ -703,7 +706,7 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
             </TableRow>
           </TableHeader>
           <TableBody>
-            {expenses.map((e: any) => {
+            {filteredExpenses.map((e: any) => {
               const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.other;
               const amountDop = Number(e.amount_dop) || Number(e.amount_usd || 0) * rate;
               return (
