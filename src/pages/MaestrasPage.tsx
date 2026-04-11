@@ -665,7 +665,12 @@ function CuentasMaestra() {
   };
 
   // Possible parents for the dropdown (only accounts that have no parent themselves)
-  const possibleParents = useMemo(() => accounts.filter((a: any) => !a.parent_id), [accounts]);
+  const possibleParents = useMemo(() => {
+    const roots = accounts.filter((a: any) => !a.parent_id);
+    if (!editing?.id) return roots;
+    const descendants = getDescendantIds(editing.id);
+    return roots.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
+  }, [accounts, editing]);
 
   const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
