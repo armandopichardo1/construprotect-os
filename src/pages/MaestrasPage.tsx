@@ -699,12 +699,11 @@ function CuentasMaestra() {
     'Gasto': 'bg-destructive/10 text-destructive',
   };
 
-  // Possible parents for the dropdown (only accounts that have no parent themselves)
+  // Possible parents for the dropdown (any account except self and descendants)
   const possibleParents = useMemo(() => {
-    const roots = accounts.filter((a: any) => !a.parent_id);
-    if (!editing?.id) return roots;
+    if (!editing?.id) return accounts;
     const descendants = getDescendantIds(editing.id);
-    return roots.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
+    return accounts.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
   }, [accounts, editing]);
 
   const handleInlineSave = async () => {
