@@ -556,6 +556,10 @@ function CuentasMaestra() {
   const [newParent, setNewParent] = useState({ code: '', description: '', account_type: 'Activo' });
   const [inlineEdit, setInlineEdit] = useState<{ id: string; code: string; description: string } | null>(null);
   const inlineCodeRef = useRef<HTMLInputElement>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkTargetParent, setBulkTargetParent] = useState<string>('none');
+  const [bulkMoving, setBulkMoving] = useState(false);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
