@@ -337,6 +337,114 @@ export function ContainerPlanner() {
         </div>
       )}
 
+      {/* Container Comparison */}
+      {activeLines.length > 0 && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowComparison(!showComparison)}
+            className="flex items-center gap-2 text-xs font-medium text-primary hover:underline"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Comparar contenedores
+            {showComparison ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          {showComparison && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(Object.entries(CONTAINER_TYPES) as [ContainerType, typeof CONTAINER_TYPES[ContainerType]][]).map(([key, ct]) => {
+                const volPct = ct.maxCbm > 0 ? (totalCbm / ct.maxCbm) * 100 : 0;
+                const wgtPct = ct.maxKg > 0 ? (totalWeight / ct.maxKg) * 100 : 0;
+                const maxPct = Math.max(volPct, wgtPct);
+                const isSelected = key === containerType;
+                const isOverloaded = maxPct > 100;
+                const totalWithFreight = totalCost + ct.costEstimate;
+                const costPerCbm = totalCbm > 0 ? ct.costEstimate / totalCbm : 0;
+                const totalUnits = activeLines.reduce((s, l) => s + l.qty, 0);
+                const costPerUnit = totalUnits > 0 ? ct.costEstimate / totalUnits : 0;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setContainerType(key)}
+                    className={cn(
+                      'rounded-xl border p-4 space-y-3 cursor-pointer transition-all',
+                      isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border bg-card hover:border-primary/40',
+                      isOverloaded && !isSelected && 'opacity-60'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{ct.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{ct.maxCbm} m³ · {ct.maxKg.toLocaleString()} kg</p>
+                      </div>
+                      {isSelected && <Badge variant="default" className="text-[9px] h-5">Seleccionado</Badge>}
+                      {isOverloaded && <Badge variant="destructive" className="text-[9px] h-5">Excede</Badge>}
+                    </div>
+
+                    {/* Volume bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Volumen</span>
+                        <span className={cn('font-mono font-medium', volPct > 100 ? 'text-destructive' : volPct > 70 ? 'text-success' : 'text-warning')}>
+                          {volPct.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                        <div className={cn('h-full rounded-full transition-all', volPct > 100 ? 'bg-destructive' : volPct > 70 ? 'bg-success' : 'bg-warning')}
+                          style={{ width: `${Math.min(volPct, 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Weight bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Peso</span>
+                        <span className={cn('font-mono font-medium', wgtPct > 100 ? 'text-destructive' : wgtPct > 70 ? 'text-success' : 'text-warning')}>
+                          {wgtPct.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                        <div className={cn('h-full rounded-full transition-all', wgtPct > 100 ? 'bg-destructive' : wgtPct > 70 ? 'bg-success' : 'bg-warning')}
+                          style={{ width: `${Math.min(wgtPct, 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Cost breakdown */}
+                    <div className="border-t border-border pt-2 space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Flete</span>
+                        <span className="font-mono text-foreground">{formatUSD(ct.costEstimate)}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Costo total</span>
+                        <span className="font-mono font-semibold text-foreground">{formatUSD(totalWithFreight)}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Flete/m³</span>
+                        <span className="font-mono text-muted-foreground">{costPerCbm > 0 ? formatUSD(costPerCbm) : '—'}</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Flete/unid</span>
+                        <span className="font-mono text-muted-foreground">{costPerUnit > 0 ? formatUSD(costPerUnit) : '—'}</span>
+                      </div>
+                    </div>
+
+                    {/* Recommendation */}
+                    <div className={cn('text-[10px] font-medium text-center rounded-lg py-1',
+                      isOverloaded ? 'bg-destructive/10 text-destructive' :
+                      maxPct >= 70 && maxPct <= 95 ? 'bg-success/10 text-success' :
+                      maxPct < 70 ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'
+                    )}>
+                      {isOverloaded ? '❌ No cabe' :
+                       maxPct >= 70 && maxPct <= 95 ? '✅ Óptimo' :
+                       maxPct >= 50 ? '⚠️ Espacio libre' : '📦 Muy grande'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={autoFillSuggested} className="gap-1.5 text-xs">
