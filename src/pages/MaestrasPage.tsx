@@ -641,7 +641,9 @@ function CuentasMaestra() {
   // Possible parents for the dropdown (only accounts that have no parent themselves)
   const possibleParents = useMemo(() => accounts.filter((a: any) => !a.parent_id), [accounts]);
 
-  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => (
+  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
+    const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
+    return (
     <TableRow key={a.id} className={cn(!isChild && hasChildren && 'bg-muted/40 font-semibold')}>
       <TableCell className="text-xs font-mono font-medium">
         <div className="flex items-center gap-1">
@@ -662,6 +664,9 @@ function CuentasMaestra() {
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
+      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (!isChild && hasChildren ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
+        {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+      </TableCell>
       <TableCell>
         <div className="flex gap-1">
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing({ ...a, parent_id: a.parent_id || '' })}><Pencil className="w-3 h-3" /></Button>
@@ -669,7 +674,8 @@ function CuentasMaestra() {
         </div>
       </TableCell>
     </TableRow>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4">
