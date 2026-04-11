@@ -192,6 +192,27 @@ export function ReorderTab() {
   const criticalItems = items.filter(p => p.arrivalDay < 0 && p.avgMonthly > 0);
   const highVelocity = items.filter(p => p.trendPct > 30);
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(items.map(p => p.id)));
+  };
+  const selectNeedsAttention = () => {
+    setSelectedIds(new Set(needsAttention.map(p => p.id)));
+  };
+  const selectCritical = () => {
+    setSelectedIds(new Set(criticalItems.map(p => p.id)));
+  };
+  const selectedItems = items.filter(p => selectedIds.has(p.id));
+  const selectedTotalCost = selectedItems.reduce((s, p) => s + (Number(p.unit_cost_usd) || 0) * p.reorder_qty, 0);
+  const selectedTotalUnits = selectedItems.reduce((s, p) => s + p.reorder_qty, 0);
+
   const urgencyStyle = (urgency: string) => {
     if (urgency === 'high') return 'bg-destructive/15 text-destructive';
     if (urgency === 'medium') return 'bg-warning/15 text-warning';
