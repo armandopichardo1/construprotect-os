@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import { formatUSD, formatDOP } from '@/lib/format';
@@ -62,6 +62,7 @@ const defaultManual = {
   amountUsd: '',
   amountDop: '',
   date: undefined as Date | undefined,
+  accountId: '',
 };
 
 export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
@@ -73,6 +74,17 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('ai');
+
+  // Fetch chart of accounts for selector
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+  // Only leaf accounts (no children) for selection
+  const leafAccounts = accounts.filter(a => !accounts.some(b => b.parent_id === a.id));
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
@@ -102,6 +114,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const saveManual = async () => {
     if (!manual.description.trim()) { toast.error('Descripción requerida'); return; }
     if (!manual.category) { toast.error('Selecciona una categoría'); return; }
+    if (!manual.accountId) { toast.error('Selecciona una cuenta contable'); return; }
     if (manualUsd <= 0 && manualDop <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
@@ -118,6 +131,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         amount_usd: finalUsd,
         amount_dop: finalDop,
         exchange_rate: xr,
+        account_id: manual.accountId || null,
       };
       if (dateStr) row.date = dateStr;
 
@@ -449,6 +463,19 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                 placeholder="Ej: DHL, Aduanas, etc."
                 maxLength={100}
               />
+            </div>
+
+            {/* Account */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cuenta Contable *</Label>
+              <Select value={manual.accountId} onValueChange={v => updateManual('accountId', v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
+                <SelectContent>
+                  {leafAccounts.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Amounts side by side */}

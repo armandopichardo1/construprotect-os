@@ -1128,6 +1128,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          account_id: string | null
           contact_id: string | null
           created_at: string
           created_by: string | null
@@ -1145,6 +1146,7 @@ export type Database = {
           total_usd: number
         }
         Insert: {
+          account_id?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1162,6 +1164,7 @@ export type Database = {
           total_usd?: number
         }
         Update: {
+          account_id?: string | null
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1179,6 +1182,13 @@ export type Database = {
           total_usd?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_contact_id_fkey"
             columns: ["contact_id"]
