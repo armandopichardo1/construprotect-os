@@ -38,6 +38,8 @@ type EditingRow = {
   productId: string;
   reorderPoint: number;
   reorderQty: number;
+  minOrderQty: number;
+  leadTimeDays: number;
 };
 
 export function ReorderTab() {
