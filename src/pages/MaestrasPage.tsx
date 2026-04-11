@@ -595,11 +595,11 @@ function CuentasMaestra() {
     return map;
   }, [accounts]);
 
-  const getBreadcrumb = (account: any): string[] => {
-    const path: string[] = [];
+  const getBreadcrumb = (account: any): { code: string; description: string }[] => {
+    const path: { code: string; description: string }[] = [];
     let current = account.parent_id ? accountById[account.parent_id] : null;
     while (current) {
-      path.unshift(current.code ? `${current.code}` : current.description);
+      path.unshift({ code: current.code || '', description: current.description });
       current = current.parent_id ? accountById[current.parent_id] : null;
     }
     return path;
