@@ -103,8 +103,8 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                             {stageDeals.map((deal, index) => (
                               <Draggable key={deal.id} draggableId={deal.id} index={index}>
                                 {(dragProvided, dragSnapshot) => (
-                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}>
-                                    <DealCard deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} isDragging={dragSnapshot.isDragging} />
+                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps} style={{ ...dragProvided.draggableProps.style, touchAction: 'none' }}>
+                                     <DealCard deal={deal} onEdit={onEdit} onDelete={onDelete} onStageChange={updateStage} isDragging={dragSnapshot.isDragging} />
                                   </div>
                                 )}
                               </Draggable>
