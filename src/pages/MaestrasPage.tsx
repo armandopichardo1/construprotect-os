@@ -1099,6 +1099,28 @@ function CuentasMaestra() {
         </Dialog>
       )}
       <DeleteConfirmDialog open={!!deleting} onOpenChange={() => setDeleting(null)} onConfirm={handleDelete} title="Eliminar Cuenta" description={`¿Eliminar "${deleting?.code} - ${deleting?.description}"?`} />
+
+      {bulkDeleteOpen && (
+        <Dialog open onOpenChange={() => setBulkDeleteOpen(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="text-base text-destructive">Eliminar {selected.size} cuenta(s)</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Esta acción es irreversible. Las siguientes cuentas serán eliminadas permanentemente:</p>
+              <div className="rounded-lg bg-destructive/5 border border-destructive/20 p-2.5 max-h-40 overflow-y-auto">
+                {Array.from(selected).map(id => {
+                  const acc = accountById[id];
+                  return acc ? <p key={id} className="text-xs text-muted-foreground">{acc.code ? `${acc.code} · ` : ''}{acc.description}</p> : null;
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 text-xs">{bulkDeleting ? 'Eliminando...' : 'Eliminar'}</Button>
+                <Button variant="outline" onClick={() => setBulkDeleteOpen(false)} className="text-xs">Cancelar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
+  );
   );
 }
