@@ -1,0 +1,1 @@
+ALTER TABLE public.sales ADD COLUMN account_id uuid REFERENCES public.chart_of_accounts(id) DEFAULT NULL;
