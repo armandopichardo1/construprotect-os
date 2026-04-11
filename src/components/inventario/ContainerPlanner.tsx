@@ -111,9 +111,21 @@ export function ContainerPlanner() {
 
   const items = products || [];
 
+  // Available brands for filter
+  const availableBrands = useMemo(() => {
+    const brands = new Set(items.map(p => p.brand));
+    return Array.from(brands).sort();
+  }, [items]);
+
+  // Filter items by supplier/brand
+  const filteredItems = useMemo(() => {
+    if (supplierFilter === 'all') return items;
+    return items.filter(p => p.brand === supplierFilter);
+  }, [items, supplierFilter]);
+
   // Compute suggested quantities based on rotation + safety stock
   const suggestedLines = useMemo(() => {
-    return items.map(p => {
+    return filteredItems.map(p => {
       const dailyVelocity = p.avgMonthly / 30;
       const safetyStock = Math.ceil(dailyVelocity * p.leadTime * 1.5);
       const targetStock = safetyStock + Math.ceil(dailyVelocity * 30); // safety + 1 month
@@ -122,7 +134,7 @@ export function ContainerPlanner() {
       const suggested = needed > 0 ? Math.max(p.minOrderQty, Math.ceil(needed / Math.max(p.minOrderQty, 1)) * p.minOrderQty) : 0;
       return { ...p, suggestedQty: suggested, safetyStock, targetStock };
     });
-  }, [items]);
+  }, [filteredItems]);
 
   // Merge order lines
   const lines = useMemo(() => {
