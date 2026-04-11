@@ -660,7 +660,14 @@ function CuentasMaestra() {
         </div>
       </TableCell>
       <TableCell className={cn('text-xs', !isChild && hasChildren ? 'font-semibold' : '')}>
-        {a.description}
+        <span className="inline-flex items-center gap-1.5">
+          {a.description}
+          {!isChild && hasChildren && (
+            <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
+              {(childrenMap[a.id] || []).length}
+            </span>
+          )}
+        </span>
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
