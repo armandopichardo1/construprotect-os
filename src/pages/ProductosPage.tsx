@@ -66,6 +66,7 @@ export default function ProductosPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: minMargin = DEFAULT_MIN_MARGIN } = useQuery({
