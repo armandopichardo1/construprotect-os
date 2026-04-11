@@ -918,18 +918,22 @@ function CuentasMaestra() {
             <TableHead className="text-xs w-20"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {parentAccounts.map((a: any) => {
-              const children = childrenMap[a.id] || [];
-              const hasChildren = children.length > 0;
-              const isCollapsed = !!collapsed[a.id];
-              return (
-                <Fragment key={a.id}>
-                  {renderRow(a, false, hasChildren, isCollapsed)}
-                  {!isCollapsed && children.map((child: any) => renderRow(child, true, false, false))}
-                </Fragment>
-              );
-            })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+             {(() => {
+               const renderTree = (items: any[], depth: number): React.ReactNode[] => {
+                 return items.flatMap((a: any) => {
+                   const children = childrenMap[a.id] || [];
+                   const hasChildren = children.length > 0;
+                   const isCollapsed = !!collapsed[a.id];
+                   const rows: React.ReactNode[] = [renderRow(a, depth, hasChildren, isCollapsed)];
+                   if (hasChildren && !isCollapsed) {
+                     rows.push(...renderTree(children, depth + 1));
+                   }
+                   return rows;
+                 });
+               };
+               return renderTree(rootAccounts, 0);
+             })()}
+             {rootAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
