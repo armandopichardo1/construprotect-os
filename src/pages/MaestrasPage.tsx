@@ -772,6 +772,7 @@ function CuentasMaestra() {
     setBulkMoveOpen(false);
   };
 
+  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
     const isParentRow = !isChild && hasChildren;
