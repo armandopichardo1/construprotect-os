@@ -72,7 +72,7 @@ export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
         debit_dop: 0,
         credit_dop: Number(s.total_dop) || Number(s.total_usd || 0) * exRate,
         exchange_rate: exRate,
-        vendor_client: s.crm_clients?.name || '—',
+        vendor_client: s.contacts?.contact_name || '—',
         ref: s.invoice_ref || '',
         raw: s,
       });

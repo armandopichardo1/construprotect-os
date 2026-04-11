@@ -21,14 +21,14 @@ Deno.serve(async (req) => {
     // Fetch context data for the AI
     const [{ data: products }, { data: clients }, { data: rates }, { data: accounts }] = await Promise.all([
       supabase.from("products").select("id, sku, name, unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd, category").eq("is_active", true),
-      supabase.from("crm_clients").select("id, name, company"),
+      supabase.from("contacts").select("id, contact_name, company_name"),
       supabase.from("exchange_rates").select("*").order("date", { ascending: false }).limit(1),
       supabase.from("chart_of_accounts").select("id, code, description, account_type, classification").eq("is_active", true),
     ]);
 
     const rate = rates?.[0];
     const productList = (products || []).map(p => `${p.name} (SKU:${p.sku}, costo:$${p.unit_cost_usd}, lista:$${p.price_list_usd}, arq:$${p.price_architect_usd})`).join("\n");
-    const clientList = (clients || []).map(c => `${c.name} - ${c.company || 'Sin empresa'} (ID:${c.id})`).join("\n");
+    const clientList = (clients || []).map(c => `${c.contact_name} - ${c.company_name || 'Sin empresa'} (ID:${c.id})`).join("\n");
     const accountList = (accounts || []).map(a => `${a.code} - ${a.description} [${a.account_type}/${a.classification || ''}] (ID:${a.id})`).join("\n");
 
     const systemPrompt = action === "classify" ? `Eres un asistente financiero para ConstruProtect OS, una empresa de distribución de materiales de construcción en República Dominicana.

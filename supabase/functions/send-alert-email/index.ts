@@ -74,8 +74,8 @@ async function computeAlerts(supabase: any, rules: AlertRule[], emailRules: stri
   ] = await Promise.all([
     supabase.from('products').select('id, name, margin_list_pct'),
     supabase.from('inventory').select('product_id, quantity_on_hand, products(name, reorder_point)'),
-    supabase.from('sale_items').select('product_id, quantity, unit_price_usd, unit_cost_usd, line_total_usd, sales(date, contact_id, crm_clients(name))'),
-    supabase.from('sales').select('id, total_usd, date, payment_status, crm_clients(name), contact_id'),
+    supabase.from('sale_items').select('product_id, quantity, unit_price_usd, unit_cost_usd, line_total_usd, sales(date, contact_id, contacts(contact_name))'),
+    supabase.from('sales').select('id, total_usd, date, payment_status, contacts(contact_name), contact_id'),
     supabase.from('deals').select('id, title, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
     supabase.from('activities').select('id, title, due_date').eq('is_completed', false),
     supabase.from('expenses').select('date, amount_usd'),
@@ -186,7 +186,7 @@ async function computeAlerts(supabase: any, rules: AlertRule[], emailRules: stri
     sales.forEach((s: any) => {
       if (!s.contact_id) return
       if (!lp[s.contact_id] || s.date > lp[s.contact_id].lastDate) {
-        lp[s.contact_id] = { name: s.crm_clients?.name || '?', lastDate: s.date }
+        lp[s.contact_id] = { name: s.contacts?.contact_name || '?', lastDate: s.date }
       }
     })
     const inactive = Object.values(lp).filter(c => (now - new Date(c.lastDate).getTime()) / 86400000 > threshold)

@@ -16,10 +16,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
-const tabs = ['Clientes', 'Proveedores', 'Productos', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Proveedores', 'Productos', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
 export default function MaestrasPage() {
-  const [tab, setTab] = useState('Clientes');
+  const [tab, setTab] = useState('Proveedores');
 
   return (
     <AppLayout>
@@ -39,7 +39,6 @@ export default function MaestrasPage() {
           ))}
         </div>
 
-        {tab === 'Clientes' && <ClientesMaestra />}
         {tab === 'Proveedores' && <ProveedoresMaestra />}
         {tab === 'Productos' && <ProductosMaestra />}
         {tab === 'Marcas' && <MarcasMaestra />}
@@ -62,143 +61,8 @@ function useSearch(data: any[], keys: string[]) {
   return { search, setSearch, filtered };
 }
 
-// ============ CLIENTES ============
 
-function ClientesMaestra() {
-  const queryClient = useQueryClient();
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['maestras-clients'],
-    queryFn: async () => { const { data } = await supabase.from('crm_clients').select('*').order('name'); return data || []; },
-  });
-  const { search, setSearch, filtered } = useSearch(clients, ['name', 'company', 'email', 'phone']);
-  const [editing, setEditing] = useState<any>(null);
-  const [deleting, setDeleting] = useState<any>(null);
 
-  const handleSave = async (formData: any) => {
-    if (formData.id) {
-      const { error } = await supabase.from('crm_clients').update(formData).eq('id', formData.id);
-      if (error) { toast.error('Error al actualizar'); return; }
-      toast.success('Cliente actualizado');
-    } else {
-      const { error } = await supabase.from('crm_clients').insert(formData);
-      if (error) { toast.error('Error al crear'); return; }
-      toast.success('Cliente creado');
-    }
-    queryClient.invalidateQueries({ queryKey: ['maestras-clients'] });
-    queryClient.invalidateQueries({ queryKey: ['crm-clients'] });
-    setEditing(null);
-  };
-
-  const handleDelete = async () => {
-    if (!deleting) return;
-    const { error } = await supabase.from('crm_clients').delete().eq('id', deleting.id);
-    if (error) { toast.error('Error al eliminar'); return; }
-    toast.success('Cliente eliminado');
-    queryClient.invalidateQueries({ queryKey: ['maestras-clients'] });
-    queryClient.invalidateQueries({ queryKey: ['crm-clients'] });
-    setDeleting(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente..." className="pl-9 h-9" />
-        </div>
-        <span className="text-xs text-muted-foreground">{filtered.length} registros</span>
-        <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => exportToExcel(clients.map(c => ({ Nombre: c.name, Empresa: c.company, Teléfono: c.phone, Email: c.email, Estado: c.status })), 'clientes', 'Clientes')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
-          <Button size="sm" onClick={() => setEditing({ name: '', company: '', phone: '', email: '', status: 'active' })}><Plus className="w-3.5 h-3.5 mr-1" />Nuevo</Button>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs">Nombre</TableHead>
-              <TableHead className="text-xs">Empresa</TableHead>
-              <TableHead className="text-xs">Teléfono</TableHead>
-              <TableHead className="text-xs">Email</TableHead>
-              <TableHead className="text-xs">Estado</TableHead>
-              <TableHead className="text-xs w-20"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((c: any) => (
-              <TableRow key={c.id}>
-                <TableCell className="text-xs font-medium">{c.name}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{c.company || '—'}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{c.phone || '—'}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{c.email || '—'}</TableCell>
-                <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', c.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>{c.status}</span></TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(c)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(c)}><Trash2 className="w-3 h-3" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
-          </TableBody>
-        </Table>
-      </div>
-
-      {editing && (
-        <Dialog open onOpenChange={() => setEditing(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>{editing.id ? 'Editar Cliente' : 'Nuevo Cliente'}</DialogTitle></DialogHeader>
-            <ClienteForm initial={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <DeleteConfirmDialog open={!!deleting} onOpenChange={() => setDeleting(null)} onConfirm={handleDelete} title="Eliminar Cliente" description={`¿Eliminar "${deleting?.name}"? Esta acción no se puede deshacer.`} />
-    </div>
-  );
-}
-
-function ClienteForm({ initial, onSave, onCancel }: any) {
-  const [form, setForm] = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const set = (k: string, v: string) => setForm((p: any) => ({ ...p, [k]: v }));
-
-  const submit = async () => {
-    if (!form.name?.trim()) { toast.error('Nombre es requerido'); return; }
-    setSaving(true);
-    const payload: any = { name: form.name, company: form.company || null, phone: form.phone || null, email: form.email || null, status: form.status || 'active' };
-    if (form.id) payload.id = form.id;
-    await onSave(payload);
-    setSaving(false);
-  };
-
-  return (
-    <div className="space-y-3">
-      <div><Label className="text-xs">Nombre *</Label><Input value={form.name} onChange={e => set('name', e.target.value)} className="mt-1" /></div>
-      <div><Label className="text-xs">Empresa</Label><Input value={form.company || ''} onChange={e => set('company', e.target.value)} className="mt-1" /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label className="text-xs">Teléfono</Label><Input value={form.phone || ''} onChange={e => set('phone', e.target.value)} className="mt-1" /></div>
-        <div><Label className="text-xs">Email</Label><Input value={form.email || ''} onChange={e => set('email', e.target.value)} className="mt-1" /></div>
-      </div>
-      <div><Label className="text-xs">Estado</Label>
-        <Select value={form.status} onValueChange={v => set('status', v)}>
-          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Activo</SelectItem>
-            <SelectItem value="prospect">Prospecto</SelectItem>
-            <SelectItem value="inactive">Inactivo</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex gap-2 pt-2">
-        <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
-        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-      </div>
-    </div>
-  );
-}
 
 // ============ PROVEEDORES ============
 

@@ -77,8 +77,8 @@ export function useAlerts() {
       ] = await Promise.all([
         supabase.from('products').select('id, name, margin_list_pct, margin_wholesale_pct, margin_project_pct, margin_architect_pct'),
         supabase.from('inventory').select('product_id, quantity_on_hand, products(name, reorder_point)'),
-        supabase.from('sale_items').select('product_id, quantity, unit_price_usd, unit_cost_usd, line_total_usd, sales(date, contact_id, crm_clients(name))'),
-        supabase.from('sales').select('id, invoice_ref, total_usd, date, payment_status, crm_clients(name)'),
+        supabase.from('sale_items').select('product_id, quantity, unit_price_usd, unit_cost_usd, line_total_usd, sales(date, contact_id, contacts(contact_name))'),
+        supabase.from('sales').select('id, invoice_ref, total_usd, date, payment_status, contacts(contact_name)'),
         supabase.from('deals').select('id, title, value_usd, stage, updated_at, contacts(contact_name)').not('stage', 'in', '("won","lost")'),
         supabase.from('activities').select('id, title, due_date, contacts(contact_name)').eq('is_completed', false),
         supabase.from('expenses').select('date, amount_usd'),
@@ -129,7 +129,7 @@ export function useAlerts() {
           if (!cid) return;
           const amt = Number(si.line_total_usd || 0);
           grandTotal += amt;
-          if (!clientRevenue[cid]) clientRevenue[cid] = { name: si.sales?.crm_clients?.name || '?', total: 0 };
+          if (!clientRevenue[cid]) clientRevenue[cid] = { name: si.sales?.contacts?.contact_name || '?', total: 0 };
           clientRevenue[cid].total += amt;
         });
         if (grandTotal > 0) {
@@ -321,7 +321,7 @@ export function useAlerts() {
           const cid = s.contact_id;
           if (!cid) return;
           if (!lastPurchase[cid] || s.date > lastPurchase[cid].lastDate) {
-            lastPurchase[cid] = { name: s.crm_clients?.name || '?', lastDate: s.date };
+            lastPurchase[cid] = { name: s.contacts?.contact_name || '?', lastDate: s.date };
           }
         });
         const inactive = Object.values(lastPurchase).filter(c => {
