@@ -28,6 +28,7 @@ import { ClientSparklines, ConcentrationAnalysis, ProductMarginBreakdown } from 
 import { CrearTransaccionTab } from '@/components/finanzas/CrearTransaccionTab';
 import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
+import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/DatePeriodFilter';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
 const tabs = ['Crear Transacción', 'Resumen', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
