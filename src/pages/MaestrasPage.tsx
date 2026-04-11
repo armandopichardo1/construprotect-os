@@ -769,17 +769,29 @@ function CuentasMaestra() {
             </span>
             {isChild && (() => {
               const crumbs = getBreadcrumb(a);
+              const tooltipText = crumbs.length > 0
+                ? [...crumbs.map(c => `${c.code ? c.code + ' · ' : ''}${c.description}`), `${a.code ? a.code + ' · ' : ''}${a.description}`].join(' → ')
+                : '';
               return crumbs.length > 0 ? (
-                <span className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-0.5">
-                  {crumbs.map((c, i) => (
-                    <Fragment key={i}>
-                      {i > 0 && <span className="text-muted-foreground/40">›</span>}
-                      <span>{c}</span>
-                    </Fragment>
-                  ))}
-                  <span className="text-muted-foreground/40">›</span>
-                  <span className="text-muted-foreground/80">{a.code || a.description}</span>
-                </span>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-0.5 cursor-help">
+                        {crumbs.map((c, i) => (
+                          <Fragment key={i}>
+                            {i > 0 && <span className="text-muted-foreground/40">›</span>}
+                            <span>{c.code || c.description}</span>
+                          </Fragment>
+                        ))}
+                        <span className="text-muted-foreground/40">›</span>
+                        <span className="text-muted-foreground/80">{a.code || a.description}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
+                      {tooltipText}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               ) : null;
             })()}
           </div>
