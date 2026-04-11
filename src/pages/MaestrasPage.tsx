@@ -41,7 +41,6 @@ export default function MaestrasPage() {
 
         {tab === 'Proveedores' && <ProveedoresMaestra />}
         {tab === 'Productos' && <ProductosMaestra />}
-        {tab === 'Productos' && <ProductosMaestra />}
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
