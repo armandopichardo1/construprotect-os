@@ -398,10 +398,47 @@ export function ReorderTab() {
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Settings2 className="w-4 h-4" /> Configuración Actual de Puntos de Reorden
         </h2>
+
+        {/* Selection action bar */}
+        {selectedIds.size > 0 && (
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 flex items-center gap-3 flex-wrap">
+            <ShoppingCart className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-foreground">{selectedIds.size} producto(s) seleccionado(s)</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs text-muted-foreground">{selectedTotalUnits.toLocaleString()} unidades</span>
+            <span className="text-xs text-muted-foreground">·</span>
+            <span className="text-xs font-medium text-primary">{formatUSD(selectedTotalCost)} costo estimado</span>
+            <Button size="sm" variant="ghost" className="text-xs ml-auto" onClick={() => setSelectedIds(new Set())}>Limpiar</Button>
+          </div>
+        )}
+
+        {/* Quick selection buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] text-muted-foreground">Seleccionar:</span>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={toggleSelectAll}>
+            {selectedIds.size === items.length ? 'Deseleccionar todos' : 'Todos'}
+          </Button>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={selectNeedsAttention}>
+            ⚠️ Requieren atención ({needsAttention.length})
+          </Button>
+          {criticalItems.length > 0 && (
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 border-destructive/30 text-destructive" onClick={selectCritical}>
+              🔴 Críticos ({criticalItems.length})
+            </Button>
+          )}
+        </div>
+
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={items.length > 0 && selectedIds.size === items.length}
+                    onCheckedChange={toggleSelectAll}
+                    className="h-3.5 w-3.5"
+                  />
+                </TableHead>
                 <TableHead className="text-xs">SKU</TableHead>
                 <TableHead className="text-xs">Producto</TableHead>
                 <TableHead className="text-xs text-right">Stock</TableHead>
@@ -422,8 +459,20 @@ export function ReorderTab() {
                 const editing = editingRows[p.id];
                 const isWarning = p.daysOfSupply < p.lead_time_days || p.qty <= p.reorder_point;
                 const isCritical = p.arrivalDay < 0 && p.avgMonthly > 0;
+                const isSelected = selectedIds.has(p.id);
                 return (
-                  <TableRow key={p.id} className={cn(isCritical ? 'bg-destructive/10' : isWarning && 'bg-destructive/5')}>
+                  <TableRow key={p.id} className={cn(
+                    isSelected && 'bg-primary/5',
+                    !isSelected && isCritical && 'bg-destructive/10',
+                    !isSelected && !isCritical && isWarning && 'bg-destructive/5',
+                  )}>
+                    <TableCell className="py-1.5">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(p.id)}
+                        className="h-3.5 w-3.5"
+                      />
+                    </TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
                     <TableCell className="text-xs text-right font-mono font-bold">{p.qty}</TableCell>
