@@ -803,6 +803,7 @@ function CuentasMaestra() {
   };
 
 
+  const renderRow = (a: any, depth: number, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = hasChildren ? getSubtreeBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
     const hasKids = hasChildren;
