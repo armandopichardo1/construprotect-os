@@ -561,6 +561,8 @@ function CuentasMaestra() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkTargetParent, setBulkTargetParent] = useState<string>('none');
   const [bulkMoving, setBulkMoving] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
