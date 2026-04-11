@@ -776,25 +776,25 @@ function CuentasMaestra() {
     setBulkMoveOpen(false);
   };
 
-  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
-    const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
+  const renderRow = (a: any, depth: number, hasChildren: boolean, isCollapsed: boolean) => {
+    const balance = hasChildren ? getSubtreeBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
-    const isParentRow = !isChild && hasChildren;
+    const hasKids = hasChildren;
     return (
-    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
+    <TableRow key={a.id} className={cn(hasKids && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
       <TableCell className="w-8 px-2">
         <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} className="h-3.5 w-3.5" />
       </TableCell>
       <TableCell className="text-xs font-mono font-medium">
-        <div className="flex items-center gap-1">
-          {!isChild && hasChildren ? (
+        <div className="flex items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
+          {hasChildren ? (
             <button onClick={() => toggleCollapse(a.id)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-muted transition-colors">
               {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
           ) : (
             <span className="w-5" />
           )}
-          {isChild && <span className="w-4 border-l-2 border-b-2 border-border h-3 ml-2 mr-1 rounded-bl-sm" />}
+          {depth > 0 && <span className="w-4 border-l-2 border-b-2 border-border h-3 mr-1 rounded-bl-sm" />}
           {isInline ? (
             <Input
               ref={inlineCodeRef}
