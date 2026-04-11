@@ -86,6 +86,17 @@ export default function MasPage() {
   const [targetForm, setTargetForm] = useState({ list: '30', architect: '25', project: '20', wholesale: '15' });
   const [savingTargets, setSavingTargets] = useState(false);
 
+  // Chart margin targets (gross & net)
+  const { data: chartMarginTargets, refetch: refetchChartTargets } = useQuery({
+    queryKey: ['chart-margin-targets'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'chart_margin_targets').maybeSingle();
+      return (data?.value as { gross: number; net: number }) ?? { gross: 40, net: 15 };
+    },
+  });
+  const [chartTargetForm, setChartTargetForm] = useState({ gross: '40', net: '15' });
+  const [savingChartTargets, setSavingChartTargets] = useState(false);
+
   useEffect(() => {
     if (targetMargins) {
       setTargetForm({
@@ -96,6 +107,12 @@ export default function MasPage() {
       });
     }
   }, [targetMargins]);
+
+  useEffect(() => {
+    if (chartMarginTargets) {
+      setChartTargetForm({ gross: String(chartMarginTargets.gross), net: String(chartMarginTargets.net) });
+    }
+  }, [chartMarginTargets]);
 
   useEffect(() => {
     if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
