@@ -171,7 +171,26 @@ export function ContainerPlanner() {
       'Costo Unit (USD)': p.unitCost,
       'Costo Total (USD)': Number((p.qty * p.unitCost).toFixed(2)),
     }));
-    exportToExcel(data, `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
+
+    // Summary rows
+    const totalUnits = activeLines.reduce((s, l) => s + l.qty, 0);
+    const emptyRow: Record<string, any> = {};
+    const summaryRows = [
+      emptyRow,
+      { SKU: 'RESUMEN', Producto: '', Categoría: '', 'Stock Actual': '', 'Vel/Mes': '', 'Días Stock': '', Urgencia: '', 'Min Batch': '', 'Qty Sugerida': '', 'Qty Ordenar': '', 'CBM/Unidad': '', 'CBM Total': '', 'Peso/Unidad (kg)': '', 'Peso Total (kg)': '', 'Costo Unit (USD)': '', 'Costo Total (USD)': '' },
+      { SKU: 'Contenedor', Producto: CONTAINER_TYPES[containerType].label, 'CBM Total': '', 'Peso Total (kg)': '', 'Costo Total (USD)': '' },
+      { SKU: 'SKUs', Producto: `${activeLines.length} productos`, 'Qty Ordenar': totalUnits, 'CBM Total': '', 'Peso Total (kg)': '', 'Costo Total (USD)': '' },
+      { SKU: 'CBM Total', Producto: `${totalCbm.toFixed(2)} / ${container.maxCbm} m³`, 'Qty Ordenar': '', 'CBM Total': Number(totalCbm.toFixed(2)), 'Peso Total (kg)': '', 'Costo Total (USD)': '' },
+      { SKU: 'Peso Total', Producto: `${totalWeight.toFixed(0)} / ${container.maxKg.toLocaleString()} kg`, 'Qty Ordenar': '', 'CBM Total': '', 'Peso Total (kg)': Number(totalWeight.toFixed(0)), 'Costo Total (USD)': '' },
+      { SKU: 'Llenado Vol.', Producto: `${fillPctVolume.toFixed(1)}%` },
+      { SKU: 'Llenado Peso', Producto: `${fillPctWeight.toFixed(1)}%` },
+      { SKU: 'Costo Producto', Producto: `$${totalCost.toFixed(2)}`, 'Costo Total (USD)': Number(totalCost.toFixed(2)) },
+      { SKU: 'Flete Estimado', Producto: `$${container.costEstimate.toFixed(2)}`, 'Costo Total (USD)': container.costEstimate },
+      { SKU: 'Costo Total', Producto: `$${(totalCost + container.costEstimate).toFixed(2)}`, 'Costo Total (USD)': Number((totalCost + container.costEstimate).toFixed(2)) },
+      { SKU: 'Fecha', Producto: new Date().toLocaleDateString('es-DO') },
+    ];
+
+    exportToExcel([...data, ...summaryRows], `orden-contenedor-${containerType}-${new Date().toISOString().slice(0, 10)}`, 'Orden Contenedor');
   };
 
   const handleCreateShipment = async () => {
