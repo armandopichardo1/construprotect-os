@@ -588,7 +588,23 @@ function CuentasMaestra() {
     return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
   }, [filtered]);
 
-  // Compute balances: own + accumulated for parents
+  // Build ancestor breadcrumb path for any account
+  const accountById = useMemo(() => {
+    const map: Record<string, any> = {};
+    accounts.forEach((a: any) => { map[a.id] = a; });
+    return map;
+  }, [accounts]);
+
+  const getBreadcrumb = (account: any): string[] => {
+    const path: string[] = [];
+    let current = account.parent_id ? accountById[account.parent_id] : null;
+    while (current) {
+      path.unshift(current.code ? `${current.code}` : current.description);
+      current = current.parent_id ? accountById[current.parent_id] : null;
+    }
+    return path;
+  };
+
   const getAccountBalance = (id: string): number => accountBalances[id] || 0;
   const getParentBalance = (parentId: string): number => {
     const children = childrenMap[parentId] || [];
