@@ -971,6 +971,9 @@ function CuentasMaestra() {
           <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => { setBulkTargetParent('none'); setBulkMoveOpen(true); }}>
             <FolderInput className="w-3.5 h-3.5" />Mover a otra madre
           </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setBulkDeleteOpen(true)}>
+            <Trash2 className="w-3.5 h-3.5" />Eliminar
+          </Button>
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>Deseleccionar</Button>
         </div>
       )}
