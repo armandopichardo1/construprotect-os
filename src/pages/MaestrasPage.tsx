@@ -622,7 +622,15 @@ function CuentasMaestra() {
 
   const collapseAll = () => {
     const all: Record<string, boolean> = {};
-    parentAccounts.forEach(p => { if (childrenMap[p.id]?.length) all[p.id] = true; });
+    const markCollapse = (list: any[]) => {
+      list.forEach(a => {
+        if (childrenMap[a.id]?.length) {
+          all[a.id] = true;
+          markCollapse(childrenMap[a.id]);
+        }
+      });
+    };
+    markCollapse(rootAccounts);
     setCollapsed(all);
   };
 
