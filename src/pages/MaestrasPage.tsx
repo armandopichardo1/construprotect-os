@@ -757,14 +757,31 @@ function CuentasMaestra() {
             <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2" onClick={() => setInlineEdit(null)}>✕</Button>
           </div>
         ) : (
-          <span className="inline-flex items-center gap-1.5" onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
-            {a.description}
-            {isParentRow && (
-              <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
-                {(childrenMap[a.id] || []).length}
-              </span>
-            )}
-          </span>
+          <div className="flex flex-col">
+            <span className="inline-flex items-center gap-1.5" onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
+              {a.description}
+              {isParentRow && (
+                <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
+                  {(childrenMap[a.id] || []).length}
+                </span>
+              )}
+            </span>
+            {isChild && (() => {
+              const crumbs = getBreadcrumb(a);
+              return crumbs.length > 0 ? (
+                <span className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-0.5">
+                  {crumbs.map((c, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && <span className="text-muted-foreground/40">›</span>}
+                      <span>{c}</span>
+                    </Fragment>
+                  ))}
+                  <span className="text-muted-foreground/40">›</span>
+                  <span className="text-muted-foreground/80">{a.code || a.description}</span>
+                </span>
+              ) : null;
+            })()}
+          </div>
         )}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
