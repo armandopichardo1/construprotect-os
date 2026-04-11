@@ -74,6 +74,17 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('ai');
+
+  // Fetch chart of accounts for selector
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+  // Only leaf accounts (no children) for selection
+  const leafAccounts = accounts.filter(a => !accounts.some(b => b.parent_id === a.id));
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
