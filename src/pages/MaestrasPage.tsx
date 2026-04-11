@@ -536,11 +536,12 @@ function CuentasMaestra() {
       const [{ data: expenses }, { data: costs }, { data: sales }] = await Promise.all([
         supabase.from('expenses').select('account_id, amount_usd').not('account_id', 'is', null),
         supabase.from('costs').select('account_id, amount_usd').not('account_id', 'is', null),
-        supabase.from('sales').select('id, subtotal_usd'),
+        supabase.from('sales').select('account_id, total_usd').not('account_id', 'is', null),
       ]);
       const balances: Record<string, number> = {};
       (expenses || []).forEach(e => { balances[e.account_id!] = (balances[e.account_id!] || 0) + Number(e.amount_usd); });
       (costs || []).forEach(c => { balances[c.account_id!] = (balances[c.account_id!] || 0) + Number(c.amount_usd); });
+      (sales || []).forEach(s => { balances[(s as any).account_id!] = (balances[(s as any).account_id!] || 0) + Number(s.total_usd); });
       return balances;
     },
   });
