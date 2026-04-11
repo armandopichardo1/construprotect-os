@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pencil, Trash2, Bot, RefreshCw, Megaphone, LayoutGrid, List, Phone, MessageCircle, Mail, Search, Filter } from 'lucide-react';
+import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
@@ -169,7 +170,24 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                   const dayColor = stageColor(days);
                   const stageCfg = DEAL_STAGES[deal.stage];
                   return (
-                    <TableRow key={deal.id} className="group hover:bg-muted/30 cursor-pointer sm:cursor-default" onClick={() => onEdit(deal)}>
+                    <SwipeableRow
+                      key={deal.id}
+                      rightActions={[
+                        {
+                          icon: <Pencil className="w-4 h-4" />,
+                          label: 'Editar',
+                          color: 'bg-warning',
+                          onClick: () => onEdit(deal),
+                        },
+                        {
+                          icon: <Trash2 className="w-4 h-4" />,
+                          label: 'Eliminar',
+                          color: 'bg-destructive',
+                          onClick: () => onDelete(deal),
+                        },
+                      ]}
+                    >
+                    <TableRow className="group hover:bg-muted/30 cursor-pointer sm:cursor-default" onClick={() => onEdit(deal)}>
                       <TableCell className="py-1.5">
                         <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{deal.title}</p>
                         <p className="text-[9px] text-muted-foreground truncate sm:hidden">{deal.contacts?.contact_name || ''}</p>
@@ -211,6 +229,7 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                         </div>
                       </TableCell>
                     </TableRow>
+                    </SwipeableRow>
                   );
                 })}
                 {filteredDeals.length === 0 && (
