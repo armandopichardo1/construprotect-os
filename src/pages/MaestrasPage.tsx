@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, FolderInput } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
@@ -555,6 +556,10 @@ function CuentasMaestra() {
   const [newParent, setNewParent] = useState({ code: '', description: '', account_type: 'Activo' });
   const [inlineEdit, setInlineEdit] = useState<{ id: string; code: string; description: string } | null>(null);
   const inlineCodeRef = useRef<HTMLInputElement>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkTargetParent, setBulkTargetParent] = useState<string>('none');
+  const [bulkMoving, setBulkMoving] = useState(false);
 
   const accountTypes = useMemo(() => [...new Set(accounts.map((a: any) => a.account_type))].sort(), [accounts]);
 
@@ -711,12 +716,71 @@ function CuentasMaestra() {
     if (e.key === 'Escape') setInlineEdit(null);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allChildIds = useMemo(() => {
+    const ids: string[] = [];
+    Object.values(childrenMap).forEach((children: any[]) => children.forEach(c => ids.push(c.id)));
+    // Also include parent accounts that have a parent_id (are subcuentas themselves)
+    filtered.forEach((a: any) => { if (a.parent_id) ids.push(a.id); });
+    return [...new Set(ids)];
+  }, [childrenMap, filtered]);
+
+  const toggleSelectAll = () => {
+    if (selected.size === allChildIds.length && allChildIds.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allChildIds));
+    }
+  };
+
+  const bulkMoveTargets = useMemo(() => {
+    const roots = accounts.filter((a: any) => !a.parent_id);
+    return roots.filter((a: any) => !selected.has(a.id));
+  }, [accounts, selected]);
+
+  const handleBulkMove = async () => {
+    if (selected.size === 0) return;
+    setBulkMoving(true);
+    const targetId = bulkTargetParent === 'none' ? null : bulkTargetParent;
+    const ids = Array.from(selected);
+    
+    // Validate no cycles
+    if (targetId) {
+      for (const id of ids) {
+        const descendants = getDescendantIds(id);
+        if (descendants.has(targetId) || id === targetId) {
+          toast.error('Referencia circular detectada. Algunas cuentas seleccionadas no pueden moverse a ese destino.');
+          setBulkMoving(false);
+          return;
+        }
+      }
+    }
+
+    const { error } = await supabase.from('chart_of_accounts').update({ parent_id: targetId }).in('id', ids);
+    setBulkMoving(false);
+    if (error) { toast.error('Error al mover cuentas'); return; }
+    toast.success(`${ids.length} cuenta(s) movida(s)`);
+    queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+    setSelected(new Set());
+    setBulkMoveOpen(false);
+  };
+
   const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
     const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
     const isParentRow = !isChild && hasChildren;
     return (
-    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold')}>
+    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
+      <TableCell className="w-8 px-2">
+        <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} className="h-3.5 w-3.5" />
+      </TableCell>
       <TableCell className="text-xs font-mono font-medium">
         <div className="flex items-center gap-1">
           {!isChild && hasChildren ? (
@@ -826,6 +890,9 @@ function CuentasMaestra() {
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8 px-2">
+              <Checkbox checked={allChildIds.length > 0 && selected.size === allChildIds.length} onCheckedChange={toggleSelectAll} className="h-3.5 w-3.5" />
+            </TableHead>
             <TableHead className="text-xs w-28">Código</TableHead>
             <TableHead className="text-xs">Descripción</TableHead>
             <TableHead className="text-xs">Clasificación</TableHead>
@@ -846,10 +913,53 @@ function CuentasMaestra() {
                 </Fragment>
               );
             })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <span className="text-xs font-medium text-foreground">{selected.size} cuenta(s) seleccionada(s)</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => { setBulkTargetParent('none'); setBulkMoveOpen(true); }}>
+            <FolderInput className="w-3.5 h-3.5" />Mover a otra madre
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>Deseleccionar</Button>
+        </div>
+      )}
+
+      {bulkMoveOpen && (
+        <Dialog open onOpenChange={() => setBulkMoveOpen(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="text-base">Mover {selected.size} cuenta(s)</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Cuenta madre destino</Label>
+                <Select value={bulkTargetParent} onValueChange={setBulkTargetParent}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin cuenta madre (raíz)</SelectItem>
+                    {bulkMoveTargets.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.code ? `${p.code} · ` : ''}{p.description}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-2.5 max-h-32 overflow-y-auto">
+                <p className="text-[10px] font-medium text-muted-foreground mb-1">Cuentas a mover:</p>
+                {Array.from(selected).map(id => {
+                  const acc = accountById[id];
+                  return acc ? <p key={id} className="text-xs text-muted-foreground">{acc.code ? `${acc.code} · ` : ''}{acc.description}</p> : null;
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button onClick={handleBulkMove} disabled={bulkMoving} className="flex-1 text-xs">{bulkMoving ? 'Moviendo...' : 'Mover'}</Button>
+                <Button variant="outline" onClick={() => setBulkMoveOpen(false)} className="text-xs">Cancelar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {editing && (
         <Dialog open onOpenChange={() => setEditing(null)}>
