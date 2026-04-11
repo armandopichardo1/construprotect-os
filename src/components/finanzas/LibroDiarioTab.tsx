@@ -171,21 +171,28 @@ export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
     if (!editEntry) return;
     setSaving(true);
     try {
-      const table = editEntry.type === 'sale' ? 'sales' : editEntry.type === 'expense' ? 'expenses' : 'costs';
-
       if (editEntry.type === 'sale') {
-        const { error } = await supabase.from(table).update({
+        const { error } = await supabase.from('sales').update({
           invoice_ref: editForm.description,
           date: editForm.date,
         }).eq('id', editEntry.id);
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from(table).update({
+      } else if (editEntry.type === 'expense') {
+        const { error } = await supabase.from('expenses').update({
           description: editForm.description,
           amount_usd: Number(editForm.amount_usd),
           amount_dop: Number(editForm.amount_dop),
           date: editForm.date,
-          category: editForm.category,
+          category: editForm.category as any,
+        }).eq('id', editEntry.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('costs').update({
+          description: editForm.description,
+          amount_usd: Number(editForm.amount_usd),
+          amount_dop: Number(editForm.amount_dop),
+          date: editForm.date,
+          category: editForm.category as any,
         }).eq('id', editEntry.id);
         if (error) throw error;
       }
