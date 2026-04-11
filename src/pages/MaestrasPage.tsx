@@ -716,7 +716,62 @@ function CuentasMaestra() {
     if (e.key === 'Escape') setInlineEdit(null);
   };
 
-  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allChildIds = useMemo(() => {
+    const ids: string[] = [];
+    Object.values(childrenMap).forEach((children: any[]) => children.forEach(c => ids.push(c.id)));
+    // Also include parent accounts that have a parent_id (are subcuentas themselves)
+    filtered.forEach((a: any) => { if (a.parent_id) ids.push(a.id); });
+    return [...new Set(ids)];
+  }, [childrenMap, filtered]);
+
+  const toggleSelectAll = () => {
+    if (selected.size === allChildIds.length && allChildIds.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allChildIds));
+    }
+  };
+
+  const bulkMoveTargets = useMemo(() => {
+    const roots = accounts.filter((a: any) => !a.parent_id);
+    return roots.filter((a: any) => !selected.has(a.id));
+  }, [accounts, selected]);
+
+  const handleBulkMove = async () => {
+    if (selected.size === 0) return;
+    setBulkMoving(true);
+    const targetId = bulkTargetParent === 'none' ? null : bulkTargetParent;
+    const ids = Array.from(selected);
+    
+    // Validate no cycles
+    if (targetId) {
+      for (const id of ids) {
+        const descendants = getDescendantIds(id);
+        if (descendants.has(targetId) || id === targetId) {
+          toast.error('Referencia circular detectada. Algunas cuentas seleccionadas no pueden moverse a ese destino.');
+          setBulkMoving(false);
+          return;
+        }
+      }
+    }
+
+    const { error } = await supabase.from('chart_of_accounts').update({ parent_id: targetId }).in('id', ids);
+    setBulkMoving(false);
+    if (error) { toast.error('Error al mover cuentas'); return; }
+    toast.success(`${ids.length} cuenta(s) movida(s)`);
+    queryClient.invalidateQueries({ queryKey: ['maestras-accounts'] });
+    setSelected(new Set());
+    setBulkMoveOpen(false);
+  };
+
     const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
     const isParentRow = !isChild && hasChildren;
