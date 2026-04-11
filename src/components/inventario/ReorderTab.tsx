@@ -51,6 +51,23 @@ export function ReorderTab() {
   const [showConfigAll, setShowConfigAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCart, setShowCart] = useState(false);
+  const [cashFlow, setCashFlow] = useState<{ paidRevenue: number; totalExpenses: number } | null>(null);
+
+  // Fetch current month cash flow when AI data arrives
+  useEffect(() => {
+    if (!aiData) { setCashFlow(null); return; }
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    Promise.all([
+      supabase.from('sales').select('total_usd').eq('payment_status', 'paid').gte('date', monthStart).lte('date', monthEnd),
+      supabase.from('expenses').select('amount_usd').gte('date', monthStart).lte('date', monthEnd),
+    ]).then(([salesRes, expRes]) => {
+      const paidRevenue = (salesRes.data || []).reduce((s, r) => s + Number(r.total_usd || 0), 0);
+      const totalExpenses = (expRes.data || []).reduce((s, r) => s + Number(r.amount_usd || 0), 0);
+      setCashFlow({ paidRevenue, totalExpenses });
+    });
+  }, [aiData]);
   const { data: products } = useQuery({
     queryKey: ['reorder-products'],
     queryFn: async () => {
