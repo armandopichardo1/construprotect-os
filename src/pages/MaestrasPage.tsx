@@ -579,6 +579,15 @@ function CuentasMaestra() {
     return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
   }, [filtered]);
 
+  // Compute balances: own + accumulated for parents
+  const getAccountBalance = (id: string): number => accountBalances[id] || 0;
+  const getParentBalance = (parentId: string): number => {
+    const children = childrenMap[parentId] || [];
+    const ownBalance = getAccountBalance(parentId);
+    const childrenTotal = children.reduce((sum: number, child: any) => sum + getAccountBalance(child.id), 0);
+    return ownBalance + childrenTotal;
+  };
+
   const toggleCollapse = (id: string) => {
     setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
   };
