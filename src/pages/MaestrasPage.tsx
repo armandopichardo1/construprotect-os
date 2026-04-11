@@ -568,18 +568,11 @@ function CuentasMaestra() {
     if (inlineEdit && inlineCodeRef.current) inlineCodeRef.current.focus();
   }, [inlineEdit]);
 
-  // Build hierarchy: parent accounts (no parent_id) and their children
-  const { parentAccounts, childrenMap, parentMap } = useMemo(() => {
-    const parents: any[] = [];
+  // Build hierarchy: recursive tree from parent_id relationships
+  const { rootAccounts, childrenMap } = useMemo(() => {
     const children: Record<string, any[]> = {};
-    const pMap: Record<string, any> = {};
-    
-    filtered.forEach((a: any) => {
-      if (!a.parent_id) {
-        parents.push(a);
-        pMap[a.id] = a;
-      }
-    });
+    const roots: any[] = [];
+    const allIds = new Set(filtered.map((a: any) => a.id));
     
     filtered.forEach((a: any) => {
       if (a.parent_id) {
@@ -587,11 +580,15 @@ function CuentasMaestra() {
         children[a.parent_id].push(a);
       }
     });
-
-    // Accounts whose parent is filtered out → show as standalone
-    const orphans = filtered.filter((a: any) => a.parent_id && !pMap[a.parent_id] && !parents.find(p => p.id === a.parent_id));
     
-    return { parentAccounts: [...parents, ...orphans], childrenMap: children, parentMap: pMap };
+    filtered.forEach((a: any) => {
+      // Root if no parent, or parent is not in filtered set
+      if (!a.parent_id || !allIds.has(a.parent_id)) {
+        roots.push(a);
+      }
+    });
+    
+    return { rootAccounts: roots, childrenMap: children };
   }, [filtered]);
 
   // Build ancestor breadcrumb path for any account
@@ -612,11 +609,11 @@ function CuentasMaestra() {
   };
 
   const getAccountBalance = (id: string): number => accountBalances[id] || 0;
-  const getParentBalance = (parentId: string): number => {
-    const children = childrenMap[parentId] || [];
-    const ownBalance = getAccountBalance(parentId);
-    const childrenTotal = children.reduce((sum: number, child: any) => sum + getAccountBalance(child.id), 0);
-    return ownBalance + childrenTotal;
+  const getSubtreeBalance = (accountId: string): number => {
+    const own = getAccountBalance(accountId);
+    const children = childrenMap[accountId] || [];
+    const childrenTotal = children.reduce((sum: number, child: any) => sum + getSubtreeBalance(child.id), 0);
+    return own + childrenTotal;
   };
 
   const toggleCollapse = (id: string) => {
@@ -625,7 +622,15 @@ function CuentasMaestra() {
 
   const collapseAll = () => {
     const all: Record<string, boolean> = {};
-    parentAccounts.forEach(p => { if (childrenMap[p.id]?.length) all[p.id] = true; });
+    const markCollapse = (list: any[]) => {
+      list.forEach(a => {
+        if (childrenMap[a.id]?.length) {
+          all[a.id] = true;
+          markCollapse(childrenMap[a.id]);
+        }
+      });
+    };
+    markCollapse(rootAccounts);
     setCollapsed(all);
   };
 
@@ -694,12 +699,11 @@ function CuentasMaestra() {
     'Gasto': 'bg-destructive/10 text-destructive',
   };
 
-  // Possible parents for the dropdown (only accounts that have no parent themselves)
+  // Possible parents for the dropdown (any account except self and descendants)
   const possibleParents = useMemo(() => {
-    const roots = accounts.filter((a: any) => !a.parent_id);
-    if (!editing?.id) return roots;
+    if (!editing?.id) return accounts;
     const descendants = getDescendantIds(editing.id);
-    return roots.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
+    return accounts.filter((a: any) => a.id !== editing.id && !descendants.has(a.id));
   }, [accounts, editing]);
 
   const handleInlineSave = async () => {
@@ -742,8 +746,7 @@ function CuentasMaestra() {
   };
 
   const bulkMoveTargets = useMemo(() => {
-    const roots = accounts.filter((a: any) => !a.parent_id);
-    return roots.filter((a: any) => !selected.has(a.id));
+    return accounts.filter((a: any) => !selected.has(a.id));
   }, [accounts, selected]);
 
   const handleBulkMove = async () => {
@@ -773,25 +776,25 @@ function CuentasMaestra() {
     setBulkMoveOpen(false);
   };
 
-  const renderRow = (a: any, isChild: boolean, hasChildren: boolean, isCollapsed: boolean) => {
-    const balance = !isChild && hasChildren ? getParentBalance(a.id) : getAccountBalance(a.id);
+  const renderRow = (a: any, depth: number, hasChildren: boolean, isCollapsed: boolean) => {
+    const balance = hasChildren ? getSubtreeBalance(a.id) : getAccountBalance(a.id);
     const isInline = inlineEdit?.id === a.id;
-    const isParentRow = !isChild && hasChildren;
+    const hasKids = hasChildren;
     return (
-    <TableRow key={a.id} className={cn(isParentRow && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
+    <TableRow key={a.id} className={cn(hasKids && 'bg-muted/40 font-semibold', selected.has(a.id) && 'bg-primary/5')}>
       <TableCell className="w-8 px-2">
         <Checkbox checked={selected.has(a.id)} onCheckedChange={() => toggleSelect(a.id)} className="h-3.5 w-3.5" />
       </TableCell>
       <TableCell className="text-xs font-mono font-medium">
-        <div className="flex items-center gap-1">
-          {!isChild && hasChildren ? (
+        <div className="flex items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
+          {hasChildren ? (
             <button onClick={() => toggleCollapse(a.id)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-muted transition-colors">
               {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
           ) : (
             <span className="w-5" />
           )}
-          {isChild && <span className="w-4 border-l-2 border-b-2 border-border h-3 ml-2 mr-1 rounded-bl-sm" />}
+          {depth > 0 && <span className="w-4 border-l-2 border-b-2 border-border h-3 mr-1 rounded-bl-sm" />}
           {isInline ? (
             <Input
               ref={inlineCodeRef}
@@ -802,13 +805,13 @@ function CuentasMaestra() {
               placeholder="Código"
             />
           ) : (
-            <span onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })} className={cn(isParentRow && 'cursor-text')}>
+            <span onDoubleClick={() => hasKids && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })} className={cn(hasKids && 'cursor-text')}>
               {a.code || '—'}
             </span>
           )}
         </div>
       </TableCell>
-      <TableCell className={cn('text-xs', isParentRow ? 'font-semibold' : '')}>
+      <TableCell className={cn('text-xs', hasKids ? 'font-semibold' : '')}>
         {isInline ? (
           <div className="flex items-center gap-1.5">
             <Input
@@ -823,15 +826,15 @@ function CuentasMaestra() {
           </div>
         ) : (
           <div className="flex flex-col">
-            <span className="inline-flex items-center gap-1.5" onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
+            <span className="inline-flex items-center gap-1.5" onDoubleClick={() => hasKids && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
               {a.description}
-              {isParentRow && (
+              {hasKids && (
                 <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
                   {(childrenMap[a.id] || []).length}
                 </span>
               )}
             </span>
-            {isChild && (() => {
+            {depth > 0 && (() => {
               const crumbs = getBreadcrumb(a);
               const tooltipText = crumbs.length > 0
                 ? [...crumbs.map(c => `${c.code ? c.code + ' · ' : ''}${c.description}`), `${a.code ? a.code + ' · ' : ''}${a.description}`].join(' → ')
@@ -864,7 +867,7 @@ function CuentasMaestra() {
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
-      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (isParentRow ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
+      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (hasKids ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
         {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
       </TableCell>
       <TableCell>
@@ -915,18 +918,22 @@ function CuentasMaestra() {
             <TableHead className="text-xs w-20"></TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {parentAccounts.map((a: any) => {
-              const children = childrenMap[a.id] || [];
-              const hasChildren = children.length > 0;
-              const isCollapsed = !!collapsed[a.id];
-              return (
-                <Fragment key={a.id}>
-                  {renderRow(a, false, hasChildren, isCollapsed)}
-                  {!isCollapsed && children.map((child: any) => renderRow(child, true, false, false))}
-                </Fragment>
-              );
-            })}
-            {parentAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
+             {(() => {
+               const renderTree = (items: any[], depth: number): React.ReactNode[] => {
+                 return items.flatMap((a: any) => {
+                   const children = childrenMap[a.id] || [];
+                   const hasChildren = children.length > 0;
+                   const isCollapsed = !!collapsed[a.id];
+                   const rows: React.ReactNode[] = [renderRow(a, depth, hasChildren, isCollapsed)];
+                   if (hasChildren && !isCollapsed) {
+                     rows.push(...renderTree(children, depth + 1));
+                   }
+                   return rows;
+                 });
+               };
+               return renderTree(rootAccounts, 0);
+             })()}
+             {rootAccounts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-xs text-muted-foreground py-8">{isLoading ? 'Cargando...' : 'Sin registros'}</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
