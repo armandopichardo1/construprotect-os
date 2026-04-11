@@ -387,6 +387,27 @@ export default function MasPage() {
                   <Save className="w-3.5 h-3.5 mr-1" /> {savingTargets ? 'Guardando...' : 'Guardar Márgenes Objetivo'}
                 </Button>
               </div>
+
+              <div className="border-t border-border" />
+
+              {/* Chart margin targets */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">Metas de Margen para Gráfico Dashboard</p>
+                <p className="text-[10px] text-muted-foreground">Líneas de referencia que aparecerán en el gráfico de Ingresos vs Costos del Dashboard.</p>
+                <div className="grid grid-cols-2 gap-3 max-w-xs">
+                  <div>
+                    <Label className="text-xs">Margen Bruto Meta (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={chartTargetForm.gross} onChange={e => setChartTargetForm(f => ({ ...f, gross: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Margen Neto Meta (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={chartTargetForm.net} onChange={e => setChartTargetForm(f => ({ ...f, net: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleSaveChartTargets} disabled={savingChartTargets}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingChartTargets ? 'Guardando...' : 'Guardar Metas'}
+                </Button>
+              </div>
             </div>
 
             {/* Data Export */}
