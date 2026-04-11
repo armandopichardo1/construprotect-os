@@ -61,7 +61,8 @@ function useSearch(data: any[], keys: string[]) {
   return { search, setSearch, filtered };
 }
 
-}
+
+
 
 // ============ PROVEEDORES ============
 
