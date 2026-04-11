@@ -811,7 +811,7 @@ function CuentasMaestra() {
           )}
         </div>
       </TableCell>
-      <TableCell className={cn('text-xs', isParentRow ? 'font-semibold' : '')}>
+      <TableCell className={cn('text-xs', hasKids ? 'font-semibold' : '')}>
         {isInline ? (
           <div className="flex items-center gap-1.5">
             <Input
@@ -826,15 +826,15 @@ function CuentasMaestra() {
           </div>
         ) : (
           <div className="flex flex-col">
-            <span className="inline-flex items-center gap-1.5" onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
+            <span className="inline-flex items-center gap-1.5" onDoubleClick={() => hasKids && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })}>
               {a.description}
-              {isParentRow && (
+              {hasKids && (
                 <span className="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-semibold min-w-[18px] h-[18px] px-1">
                   {(childrenMap[a.id] || []).length}
                 </span>
               )}
             </span>
-            {isChild && (() => {
+            {depth > 0 && (() => {
               const crumbs = getBreadcrumb(a);
               const tooltipText = crumbs.length > 0
                 ? [...crumbs.map(c => `${c.code ? c.code + ' · ' : ''}${c.description}`), `${a.code ? a.code + ' · ' : ''}${a.description}`].join(' → ')
@@ -867,7 +867,7 @@ function CuentasMaestra() {
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
-      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (isParentRow ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
+      <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (hasKids ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
         {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
       </TableCell>
       <TableCell>
