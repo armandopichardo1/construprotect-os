@@ -746,8 +746,7 @@ function CuentasMaestra() {
   };
 
   const bulkMoveTargets = useMemo(() => {
-    const roots = accounts.filter((a: any) => !a.parent_id);
-    return roots.filter((a: any) => !selected.has(a.id));
+    return accounts.filter((a: any) => !selected.has(a.id));
   }, [accounts, selected]);
 
   const handleBulkMove = async () => {
