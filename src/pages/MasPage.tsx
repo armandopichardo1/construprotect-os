@@ -86,6 +86,17 @@ export default function MasPage() {
   const [targetForm, setTargetForm] = useState({ list: '30', architect: '25', project: '20', wholesale: '15' });
   const [savingTargets, setSavingTargets] = useState(false);
 
+  // Chart margin targets (gross & net)
+  const { data: chartMarginTargets, refetch: refetchChartTargets } = useQuery({
+    queryKey: ['chart-margin-targets'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'chart_margin_targets').maybeSingle();
+      return (data?.value as { gross: number; net: number }) ?? { gross: 40, net: 15 };
+    },
+  });
+  const [chartTargetForm, setChartTargetForm] = useState({ gross: '40', net: '15' });
+  const [savingChartTargets, setSavingChartTargets] = useState(false);
+
   useEffect(() => {
     if (targetMargins) {
       setTargetForm({
@@ -96,6 +107,12 @@ export default function MasPage() {
       });
     }
   }, [targetMargins]);
+
+  useEffect(() => {
+    if (chartMarginTargets) {
+      setChartTargetForm({ gross: String(chartMarginTargets.gross), net: String(chartMarginTargets.net) });
+    }
+  }, [chartMarginTargets]);
 
   useEffect(() => {
     if (marginThreshold !== undefined) setMarginInput(String(marginThreshold));
@@ -208,6 +225,18 @@ export default function MasPage() {
     toast.success('Márgenes objetivo actualizados');
     refetchTargetMargins();
     queryClient.invalidateQueries({ queryKey: ['target-margins'] });
+  };
+
+  const handleSaveChartTargets = async () => {
+    const vals = { gross: Number(chartTargetForm.gross), net: Number(chartTargetForm.net) };
+    if (Object.values(vals).some(v => isNaN(v) || v < 0 || v > 100)) { toast.error('Valores entre 0 y 100'); return; }
+    setSavingChartTargets(true);
+    const { error } = await supabase.from('settings').upsert({ key: 'chart_margin_targets', value: vals as any }, { onConflict: 'key' });
+    setSavingChartTargets(false);
+    if (error) { toast.error('Error al guardar'); return; }
+    toast.success('Metas de margen actualizadas');
+    refetchChartTargets();
+    queryClient.invalidateQueries({ queryKey: ['chart-margin-targets'] });
   };
 
   const company = companySettings || { name: 'ConstruProtect SRL', rnc: '130-45678-9', address: 'Av. 27 de Febrero #234' };
@@ -356,6 +385,27 @@ export default function MasPage() {
                 </div>
                 <Button size="sm" onClick={handleSaveTargetMargins} disabled={savingTargets}>
                   <Save className="w-3.5 h-3.5 mr-1" /> {savingTargets ? 'Guardando...' : 'Guardar Márgenes Objetivo'}
+                </Button>
+              </div>
+
+              <div className="border-t border-border" />
+
+              {/* Chart margin targets */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-foreground">Metas de Margen para Gráfico Dashboard</p>
+                <p className="text-[10px] text-muted-foreground">Líneas de referencia que aparecerán en el gráfico de Ingresos vs Costos del Dashboard.</p>
+                <div className="grid grid-cols-2 gap-3 max-w-xs">
+                  <div>
+                    <Label className="text-xs">Margen Bruto Meta (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={chartTargetForm.gross} onChange={e => setChartTargetForm(f => ({ ...f, gross: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Margen Neto Meta (%)</Label>
+                    <Input type="number" min={0} max={100} step={0.5} value={chartTargetForm.net} onChange={e => setChartTargetForm(f => ({ ...f, net: e.target.value }))} className="h-8 text-xs mt-1" />
+                  </div>
+                </div>
+                <Button size="sm" onClick={handleSaveChartTargets} disabled={savingChartTargets}>
+                  <Save className="w-3.5 h-3.5 mr-1" /> {savingChartTargets ? 'Guardando...' : 'Guardar Metas'}
                 </Button>
               </div>
             </div>

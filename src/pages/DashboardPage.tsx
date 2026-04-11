@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
-  LineChart, Line, ComposedChart, Legend, LabelList, AreaChart, Area,
+  LineChart, Line, ComposedChart, Legend, LabelList, AreaChart, Area, ReferenceLine,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -191,6 +191,14 @@ export default function DashboardPage() {
     },
   });
 
+  const { data: chartMarginTargets } = useQuery({
+    queryKey: ['chart-margin-targets'],
+    queryFn: async () => {
+      const { data } = await supabase.from('settings').select('*').eq('key', 'chart_margin_targets').maybeSingle();
+      return (data?.value as { gross: number; net: number }) ?? { gross: 40, net: 15 };
+    },
+  });
+
   const { data: pipelineData } = useQuery({
     queryKey: ['dashboard-pipeline'],
     queryFn: async () => {
@@ -347,6 +355,12 @@ export default function DashboardPage() {
                     return fmt(v);
                   }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {chartMarginTargets && (
+                    <>
+                      <ReferenceLine yAxisId="right" y={chartMarginTargets.gross} stroke="hsl(160, 84%, 39%)" strokeDasharray="8 4" strokeOpacity={0.5} label={{ value: `Meta Bruto ${chartMarginTargets.gross}%`, fill: 'hsl(160, 84%, 50%)', fontSize: 9, position: 'insideTopRight' }} />
+                      <ReferenceLine yAxisId="right" y={chartMarginTargets.net} stroke="hsl(38, 92%, 50%)" strokeDasharray="8 4" strokeOpacity={0.5} label={{ value: `Meta Neto ${chartMarginTargets.net}%`, fill: 'hsl(38, 92%, 60%)', fontSize: 9, position: 'insideBottomRight' }} />
+                    </>
+                  )}
                   <Bar yAxisId="left" dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos">
                     <LabelList dataKey="revenue" position="top" formatter={(v: number) => v > 0 ? `RD$${(v * rate / 1000).toFixed(1)}k` : ''} style={{ fill: 'hsl(220, 12%, 60%)', fontSize: 9 }} />
                   </Bar>
