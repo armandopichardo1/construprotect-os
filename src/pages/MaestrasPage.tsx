@@ -609,11 +609,11 @@ function CuentasMaestra() {
   };
 
   const getAccountBalance = (id: string): number => accountBalances[id] || 0;
-  const getParentBalance = (parentId: string): number => {
-    const children = childrenMap[parentId] || [];
-    const ownBalance = getAccountBalance(parentId);
-    const childrenTotal = children.reduce((sum: number, child: any) => sum + getAccountBalance(child.id), 0);
-    return ownBalance + childrenTotal;
+  const getSubtreeBalance = (accountId: string): number => {
+    const own = getAccountBalance(accountId);
+    const children = childrenMap[accountId] || [];
+    const childrenTotal = children.reduce((sum: number, child: any) => sum + getSubtreeBalance(child.id), 0);
+    return own + childrenTotal;
   };
 
   const toggleCollapse = (id: string) => {
