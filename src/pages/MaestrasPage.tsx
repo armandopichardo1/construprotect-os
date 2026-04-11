@@ -805,7 +805,7 @@ function CuentasMaestra() {
               placeholder="Código"
             />
           ) : (
-            <span onDoubleClick={() => isParentRow && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })} className={cn(isParentRow && 'cursor-text')}>
+            <span onDoubleClick={() => hasKids && setInlineEdit({ id: a.id, code: a.code || '', description: a.description })} className={cn(hasKids && 'cursor-text')}>
               {a.code || '—'}
             </span>
           )}
