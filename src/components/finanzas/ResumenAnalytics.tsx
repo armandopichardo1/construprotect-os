@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
-import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, Cell } from 'recharts';
 import { AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
@@ -144,32 +144,44 @@ export function ProductMarginBreakdown({ saleItems }: { saleItems: any[] }) {
       map[pid].units += Number(si.quantity || 0);
     });
     return Object.values(map)
-      .map(p => ({ ...p, gm: p.revenue - p.cogs, gmPct: p.revenue > 0 ? ((p.revenue - p.cogs) / p.revenue) * 100 : 0 }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
+      .map(p => ({
+        ...p,
+        gm: p.revenue - p.cogs,
+        gmPct: p.revenue > 0 ? ((p.revenue - p.cogs) / p.revenue) * 100 : 0,
+      }))
+      .filter(p => p.revenue > 0)
+      .sort((a, b) => b.gmPct - a.gmPct)
+      .slice(0, 15);
   }, [saleItems]);
 
   if (products.length === 0) return null;
 
+  const chartData = products.map(p => ({
+    name: p.name.length > 20 ? p.name.substring(0, 20) + '…' : p.name,
+    margin: Math.round(p.gmPct * 10) / 10,
+    fill: p.gmPct >= 55 ? 'hsl(160, 84%, 39%)' : p.gmPct >= 45 ? 'hsl(38, 92%, 50%)' : 'hsl(0, 84%, 60%)',
+  }));
+
   return (
-    <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
-      <h2 className="text-sm font-semibold text-foreground">Margen por Producto</h2>
-      <div className="space-y-2">
-        {products.map((p, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-xs text-foreground flex-1 truncate">{p.name}</span>
-            <div className="w-[60px] h-1.5 bg-muted rounded-full shrink-0">
-              <div className={cn('h-full rounded-full', p.gmPct >= 55 ? 'bg-success' : p.gmPct >= 45 ? 'bg-warning' : 'bg-destructive')}
-                style={{ width: `${Math.min(p.gmPct, 100)}%` }} />
-            </div>
-            <span className={cn('text-xs font-mono w-[44px] text-right shrink-0',
-              p.gmPct >= 55 ? 'text-success' : p.gmPct >= 45 ? 'text-warning' : 'text-destructive')}>
-              {p.gmPct.toFixed(0)}%
-            </span>
-            <span className="text-xs font-mono text-muted-foreground w-[65px] text-right shrink-0">{formatUSD(p.revenue)}</span>
-          </div>
-        ))}
+    <div className="lg:col-span-3 rounded-2xl bg-card border border-border p-5 space-y-3">
+      <h2 className="text-sm font-semibold text-foreground">Margen Bruto por Producto (%)</h2>
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success inline-block" /> &gt;55%</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning inline-block" /> 45-55%</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" /> &lt;45%</span>
       </div>
+      <ResponsiveContainer width="100%" height={Math.max(200, products.length * 32)}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 40 }}>
+          <XAxis type="number" domain={[0, 100]} tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+          <YAxis type="category" dataKey="name" width={140} tick={{ fill: 'hsl(220, 12%, 65%)', fontSize: 10 }} axisLine={false} tickLine={false} />
+          <Tooltip contentStyle={{ background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v}%`, 'Margen']} />
+          <Bar dataKey="margin" radius={[0, 4, 4, 0]} barSize={18}>
+            {chartData.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }

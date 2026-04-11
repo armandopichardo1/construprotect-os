@@ -309,8 +309,8 @@ export default function FinanzasPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <ClientSparklines sales={sales} />
               <ConcentrationAnalysis sales={sales} />
-              <ProductMarginBreakdown saleItems={saleItems} />
             </div>
+            <ProductMarginBreakdown saleItems={saleItems} />
           </div>
         )}
 
@@ -1151,6 +1151,7 @@ function deltaStr(cur: number, prev: number): string {
 
 function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems: any[]; expenses: any[]; costs: any[] }) {
   const [period, setPeriod] = useState('current_month');
+  const [compareMode, setCompareMode] = useState<'both' | 'prev' | 'yoy'>('both');
   const [expandCogs, setExpandCogs] = useState(false);
   const [expandCosts, setExpandCosts] = useState(false);
   const [expandExpenses, setExpandExpenses] = useState(true);
@@ -1317,20 +1318,40 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto"><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
       </div>
 
+      {/* Comparison mode toggle */}
+      <div className="flex items-center gap-1 rounded-xl bg-muted p-1 w-fit">
+        {([['both', 'Completo'], ['prev', 'vs Mes Anterior'], ['yoy', 'vs Año Anterior']] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setCompareMode(key)}
+            className={cn('rounded-lg px-3 py-1 text-[11px] font-medium transition-colors',
+              compareMode === key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-2xl bg-card border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="text-xs w-[200px]">Concepto</TableHead>
               <TableHead className="text-xs text-right">{range.label}</TableHead>
-              <TableHead className="text-xs text-right text-muted-foreground">Δ vs Ant.</TableHead>
-              <TableHead className="text-xs text-right">Período Ant.</TableHead>
-              <TableHead className="text-xs text-right text-muted-foreground">Δ vs Año Ant.</TableHead>
-              <TableHead className="text-xs text-right">Mismo Per. Año Ant.</TableHead>
+              {compareMode === 'both' ? (
+                <>
+                  <TableHead className="text-xs text-right text-muted-foreground">Δ vs Ant.</TableHead>
+                  <TableHead className="text-xs text-right">Período Ant.</TableHead>
+                  <TableHead className="text-xs text-right text-muted-foreground">Δ vs Año Ant.</TableHead>
+                  <TableHead className="text-xs text-right">Mismo Per. Año Ant.</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="text-xs text-right">{compareMode === 'prev' ? 'Período Ant.' : 'Año Ant.'}</TableHead>
+                  <TableHead className="text-xs text-right">% Cambio</TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
-            <PLCompRow label="Ingresos" cur={current.revenue} prv={prev.revenue} yoy={yoy.revenue} bold />
+            <PLCompRow label="Ingresos" cur={current.revenue} prv={prev.revenue} yoy={yoy.revenue} bold mode={compareMode} />
 
             {/* COGS with expandable breakdown */}
             <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandCogs(!expandCogs)}>
@@ -1341,13 +1362,29 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
                 </span>
               </TableCell>
               <TableCell className="text-xs text-right font-mono">-{formatUSD(current.cogs)}</TableCell>
-              <TableCell className={cn('text-xs text-right font-mono', current.cogs < prev.cogs ? 'text-success' : current.cogs > prev.cogs ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.cogs, prev.cogs)}</TableCell>
-              <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.cogs)}</TableCell>
-              <TableCell className={cn('text-xs text-right font-mono', current.cogs < yoy.cogs ? 'text-success' : current.cogs > yoy.cogs ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.cogs, yoy.cogs)}</TableCell>
-              <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.cogs)}</TableCell>
+              {compareMode === 'both' ? (
+                <>
+                  <TableCell className={cn('text-xs text-right font-mono', current.cogs < prev.cogs ? 'text-success' : current.cogs > prev.cogs ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.cogs, prev.cogs)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.cogs)}</TableCell>
+                  <TableCell className={cn('text-xs text-right font-mono', current.cogs < yoy.cogs ? 'text-success' : current.cogs > yoy.cogs ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.cogs, yoy.cogs)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.cogs)}</TableCell>
+                </>
+              ) : (() => {
+                const comp = compareMode === 'prev' ? prev.cogs : yoy.cogs;
+                const pctChange = comp !== 0 ? ((current.cogs - comp) / comp * 100) : (current.cogs > 0 ? 100 : 0);
+                const isGood = current.cogs < comp;
+                return (
+                  <>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(comp)}</TableCell>
+                    <TableCell className={cn('text-xs text-right font-mono font-semibold', isGood ? 'text-success' : pctChange > 0 ? 'text-destructive' : 'text-muted-foreground')}>
+                      {pctChange > 0 ? '+' : ''}{pctChange.toFixed(1)}%
+                    </TableCell>
+                  </>
+                );
+              })()}
             </TableRow>
             {expandCogs && allCogProducts.map(prod => (
-              <PLCompRow key={prod} label={`    ${prod}`} cur={current.cogsByProduct[prod] || 0} prv={prev.cogsByProduct[prod] || 0} yoy={yoy.cogsByProduct[prod] || 0} negative sub />
+              <PLCompRow key={prod} label={`    ${prod}`} cur={current.cogsByProduct[prod] || 0} prv={prev.cogsByProduct[prod] || 0} yoy={yoy.cogsByProduct[prod] || 0} negative sub mode={compareMode} />
             ))}
 
             {/* Direct Costs (from costs module) */}
@@ -1361,24 +1398,40 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
                     </span>
                   </TableCell>
                   <TableCell className="text-xs text-right font-mono">-{formatUSD(current.directCosts)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < prev.directCosts ? 'text-success' : current.directCosts > prev.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, prev.directCosts)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.directCosts)}</TableCell>
-                  <TableCell className={cn('text-xs text-right font-mono', current.directCosts < yoy.directCosts ? 'text-success' : current.directCosts > yoy.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, yoy.directCosts)}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.directCosts)}</TableCell>
+                  {compareMode === 'both' ? (
+                    <>
+                      <TableCell className={cn('text-xs text-right font-mono', current.directCosts < prev.directCosts ? 'text-success' : current.directCosts > prev.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, prev.directCosts)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(prev.directCosts)}</TableCell>
+                      <TableCell className={cn('text-xs text-right font-mono', current.directCosts < yoy.directCosts ? 'text-success' : current.directCosts > yoy.directCosts ? 'text-destructive' : 'text-muted-foreground')}>{deltaStr(current.directCosts, yoy.directCosts)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(yoy.directCosts)}</TableCell>
+                    </>
+                  ) : (() => {
+                    const comp = compareMode === 'prev' ? prev.directCosts : yoy.directCosts;
+                    const pctChange = comp !== 0 ? ((current.directCosts - comp) / comp * 100) : (current.directCosts > 0 ? 100 : 0);
+                    const isGood = current.directCosts < comp;
+                    return (
+                      <>
+                        <TableCell className="text-xs text-right font-mono text-muted-foreground">-{formatUSD(comp)}</TableCell>
+                        <TableCell className={cn('text-xs text-right font-mono font-semibold', isGood ? 'text-success' : pctChange > 0 ? 'text-destructive' : 'text-muted-foreground')}>
+                          {pctChange > 0 ? '+' : ''}{pctChange.toFixed(1)}%
+                        </TableCell>
+                      </>
+                    );
+                  })()}
                 </TableRow>
                 {expandCosts && allCostCats.map(cat => (
-                  <PLCompRow key={cat} label={`    ${cat}`} cur={current.costsByCategory[cat] || 0} prv={prev.costsByCategory[cat] || 0} yoy={yoy.costsByCategory[cat] || 0} negative sub />
+                  <PLCompRow key={cat} label={`    ${cat}`} cur={current.costsByCategory[cat] || 0} prv={prev.costsByCategory[cat] || 0} yoy={yoy.costsByCategory[cat] || 0} negative sub mode={compareMode} />
                 ))}
               </>
             )}
 
-            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
-            <PLCompRow label="Utilidad Bruta" cur={current.grossProfit} prv={prev.grossProfit} yoy={yoy.grossProfit} bold />
-            <PLCompRow label="Margen Bruto" cur={current.revenue > 0 ? current.grossProfit / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.grossProfit / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.grossProfit / yoy.revenue * 100 : 0} pct />
+            <TableRow><TableCell colSpan={compareMode === 'both' ? 6 : 4} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
+            <PLCompRow label="Utilidad Bruta" cur={current.grossProfit} prv={prev.grossProfit} yoy={yoy.grossProfit} bold mode={compareMode} />
+            <PLCompRow label="Margen Bruto" cur={current.revenue > 0 ? current.grossProfit / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.grossProfit / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.grossProfit / yoy.revenue * 100 : 0} pct mode={compareMode} />
 
             {/* Expenses with expandable breakdown */}
             <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => setExpandExpenses(!expandExpenses)}>
-              <TableCell colSpan={6} className="py-1">
+              <TableCell colSpan={compareMode === 'both' ? 6 : 4} className="py-1">
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   <span>{expandExpenses ? '▼' : '▶'}</span>
                   Gastos Operativos
@@ -1386,13 +1439,13 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
               </TableCell>
             </TableRow>
             {expandExpenses && allExpCats.map(cat => (
-              <PLCompRow key={cat} label={`  ${cat}`} cur={current.expensesByCategory[cat] || 0} prv={prev.expensesByCategory[cat] || 0} yoy={yoy.expensesByCategory[cat] || 0} negative sub />
+              <PLCompRow key={cat} label={`  ${cat}`} cur={current.expensesByCategory[cat] || 0} prv={prev.expensesByCategory[cat] || 0} yoy={yoy.expensesByCategory[cat] || 0} negative sub mode={compareMode} />
             ))}
-            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
-            <PLCompRow label="(-) Total Gastos" cur={current.totalExpenses} prv={prev.totalExpenses} yoy={yoy.totalExpenses} negative bold />
-            <TableRow><TableCell colSpan={6} className="p-0"><div className="border-t-2 border-border" /></TableCell></TableRow>
-            <PLCompRow label="Utilidad Neta" cur={current.netIncome} prv={prev.netIncome} yoy={yoy.netIncome} bold highlight />
-            <PLCompRow label="Margen Neto" cur={current.revenue > 0 ? current.netIncome / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.netIncome / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.netIncome / yoy.revenue * 100 : 0} pct />
+            <TableRow><TableCell colSpan={compareMode === 'both' ? 6 : 4} className="p-0"><div className="border-t border-border" /></TableCell></TableRow>
+            <PLCompRow label="(-) Total Gastos" cur={current.totalExpenses} prv={prev.totalExpenses} yoy={yoy.totalExpenses} negative bold mode={compareMode} />
+            <TableRow><TableCell colSpan={compareMode === 'both' ? 6 : 4} className="p-0"><div className="border-t-2 border-border" /></TableCell></TableRow>
+            <PLCompRow label="Utilidad Neta" cur={current.netIncome} prv={prev.netIncome} yoy={yoy.netIncome} bold highlight mode={compareMode} />
+            <PLCompRow label="Margen Neto" cur={current.revenue > 0 ? current.netIncome / current.revenue * 100 : 0} prv={prev.revenue > 0 ? prev.netIncome / prev.revenue * 100 : 0} yoy={yoy.revenue > 0 ? yoy.netIncome / yoy.revenue * 100 : 0} pct mode={compareMode} />
           </TableBody>
         </Table>
       </div>
@@ -1501,7 +1554,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   );
 }
 
-function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }: { label: string; cur: number; prv: number; yoy: number; bold?: boolean; negative?: boolean; pct?: boolean; highlight?: boolean; sub?: boolean }) {
+function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub, mode = 'both' }: { label: string; cur: number; prv: number; yoy: number; bold?: boolean; negative?: boolean; pct?: boolean; highlight?: boolean; sub?: boolean; mode?: 'both' | 'prev' | 'yoy' }) {
   const fmtVal = (v: number) => pct ? `${v.toFixed(1)}%` : (negative ? (v > 0 ? `-${formatUSD(v)}` : formatUSD(Math.abs(v))) : formatUSD(v));
   const deltaColor = (c: number, p: number) => {
     if (p === 0 && c === 0) return 'text-muted-foreground';
@@ -1510,6 +1563,22 @@ function PLCompRow({ label, cur, prv, yoy, bold, negative, pct, highlight, sub }
   };
   const dPrev = pct ? `${(cur - prv).toFixed(1)}pp` : deltaStr(cur, prv);
   const dYoy = pct ? `${(cur - yoy).toFixed(1)}pp` : deltaStr(cur, yoy);
+
+  if (mode !== 'both') {
+    const comp = mode === 'prev' ? prv : yoy;
+    const pctChange = pct
+      ? `${(cur - comp).toFixed(1)}pp`
+      : (comp !== 0 ? `${((cur - comp) / comp * 100) > 0 ? '+' : ''}${((cur - comp) / comp * 100).toFixed(1)}%` : (cur > 0 ? '+100.0%' : '0.0%'));
+    return (
+      <TableRow className={cn(highlight ? 'bg-muted/30' : '', sub && 'bg-muted/10')}>
+        <TableCell className={cn('text-xs', bold && 'font-bold', sub && 'text-muted-foreground pl-6')}>{label}</TableCell>
+        <TableCell className={cn('text-xs text-right font-mono', bold && 'font-bold', highlight && (cur >= 0 ? 'text-success' : 'text-destructive'), sub && 'text-muted-foreground')}>{fmtVal(cur)}</TableCell>
+        <TableCell className="text-xs text-right font-mono text-muted-foreground">{fmtVal(comp)}</TableCell>
+        <TableCell className={cn('text-xs text-right font-mono font-semibold', deltaColor(cur, comp))}>{pctChange}</TableCell>
+      </TableRow>
+    );
+  }
+
   return (
     <TableRow className={cn(highlight ? 'bg-muted/30' : '', sub && 'bg-muted/10')}>
       <TableCell className={cn('text-xs', bold && 'font-bold', sub && 'text-muted-foreground pl-6')}>{label}</TableCell>
