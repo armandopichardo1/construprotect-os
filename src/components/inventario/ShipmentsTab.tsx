@@ -43,17 +43,50 @@ export function ShipmentsTab() {
     for (const item of items) {
       if (!item.product_id) continue;
       const qty = item.quantity_ordered;
-      // Update inventory
+      const newItemCost = Number(item.unit_cost_usd || 0);
+
+      // Get current inventory qty
       const { data: inv } = await supabase.from('inventory').select('id, quantity_on_hand').eq('product_id', item.product_id).maybeSingle();
+      const existingQty = inv ? inv.quantity_on_hand : 0;
+
+      // Get current product cost for WAC calculation
+      const { data: prod } = await supabase.from('products').select('unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd').eq('id', item.product_id).single();
+      const currentCost = Number(prod?.unit_cost_usd || 0);
+
+      // Calculate Weighted Average Cost
+      const totalQty = existingQty + qty;
+      const newWAC = totalQty > 0
+        ? ((existingQty * currentCost) + (qty * newItemCost)) / totalQty
+        : newItemCost;
+
+      // Update product cost (WAC) and recalculate margins
+      const marginUpdates: Record<string, number> = { unit_cost_usd: Number(newWAC.toFixed(4)), total_unit_cost_usd: Number(newWAC.toFixed(4)) };
+      if (prod) {
+        const prices = [
+          { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+          { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+          { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+          { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+        ];
+        for (const { price, field } of prices) {
+          if (price > 0) {
+            marginUpdates[field] = Number((((price - newWAC) / price) * 100).toFixed(1));
+          }
+        }
+      }
+      await supabase.from('products').update(marginUpdates as any).eq('id', item.product_id);
+
+      // Update inventory
       if (inv) {
-        await supabase.from('inventory').update({ quantity_on_hand: inv.quantity_on_hand + qty }).eq('id', inv.id);
+        await supabase.from('inventory').update({ quantity_on_hand: existingQty + qty }).eq('id', inv.id);
       } else {
         await supabase.from('inventory').insert({ product_id: item.product_id, quantity_on_hand: qty });
       }
+
       // Create movement
       await supabase.from('inventory_movements').insert({
         product_id: item.product_id, quantity: qty, movement_type: 'receipt',
-        unit_cost_usd: item.unit_cost_usd, reference_id: shipment.id, reference_type: 'shipment',
+        unit_cost_usd: newItemCost, reference_id: shipment.id, reference_type: 'shipment',
         notes: `Recepción PO ${shipment.po_number || shipment.id.slice(0, 8)}`,
       });
     }
