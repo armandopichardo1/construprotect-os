@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Users, DollarSign, Settings, LogOut, Boxes, Database } from 'lucide-react';
+import { LayoutDashboard, Users, DollarSign, Settings, LogOut, Boxes, Database } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
