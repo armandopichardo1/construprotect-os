@@ -20,8 +20,9 @@ import { MovimientosTab } from '@/components/inventario/MovimientosTab';
 import { DaysOfSupplyChart, OverstockWarnings } from '@/components/inventario/InventoryAnalytics';
 import { ReorderTab } from '@/components/inventario/ReorderTab';
 import { ContainerPlanner } from '@/components/inventario/ContainerPlanner';
+import { MovimientosReportTab } from '@/components/inventario/MovimientosReportTab';
 
-const tabs = ['Stock', 'Reorden', 'Contenedor', 'Movimientos', 'Analytics', 'Envíos', 'ABC'];
+const tabs = ['Stock', 'Reorden', 'Contenedor', 'Movimientos', 'Analytics', 'Envíos', 'ABC', 'Reportes'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -485,7 +486,8 @@ export default function InventarioPage() {
         )}
 
         {tab === 'Envíos' && <ShipmentsTab />}
-        
+
+        {tab === 'Reportes' && <MovimientosReportTab />}
 
         {tab === 'ABC' && (
           <div className="space-y-4">
