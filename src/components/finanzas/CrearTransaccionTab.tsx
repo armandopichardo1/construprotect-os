@@ -238,14 +238,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     return currencyBase === 'DOP' ? n : n * xr;
   };
 
-  const addJournalLine = () => setJournalLines(prev => [...prev, { account_id: '', debit: 0, credit: 0, description: '' }]);
+  const addJournalLine = () => setJournalLines(prev => [...prev, { account_id: '', debit: '', credit: '', description: '' }]);
   const removeJournalLine = (i: number) => setJournalLines(prev => prev.filter((_, idx) => idx !== i));
   const updateJournalLine = (i: number, field: string, value: any) => {
     setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
   };
 
-  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
-  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
+  const parseNum = (v: string) => parseFloat(v) || 0;
+  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + parseNum(l.debit), 0);
+  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + parseNum(l.credit), 0);
   const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
   const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
