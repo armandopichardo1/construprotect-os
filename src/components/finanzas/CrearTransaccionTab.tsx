@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
@@ -126,7 +127,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const queryClient = useQueryClient();
   const latestXr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
-  const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('USD');
+  const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('DOP');
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
@@ -1346,14 +1347,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Categoría *</Label>
-                  <Select value={category} onValueChange={handleCategoryChange}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(currentCategories).map(([k, label]) => (
-                        <SelectItem key={k} value={k}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={category}
+                    onValueChange={handleCategoryChange}
+                    placeholder="Seleccionar categoría"
+                    searchPlaceholder="Buscar categoría..."
+                    emptyMessage="Categoría no encontrada"
+                    options={Object.entries(currentCategories).map(([k, label]) => ({ value: k, label }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -1369,14 +1370,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       <span className="text-[9px] text-success bg-success/10 px-1.5 py-0.5 rounded">✓ Auto-asignada</span>
                     )}
                   </div>
-                  <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
-                    <SelectContent>
-                      {leafAccounts.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={accountId}
+                    onValueChange={setAccountId}
+                    placeholder="Seleccionar cuenta contable"
+                    searchPlaceholder="Buscar cuenta..."
+                    emptyMessage="Cuenta no encontrada"
+                    options={leafAccounts.map(a => ({ value: a.id, label: `${a.code} — ${a.description}` }))}
+                  />
                 </div>
 
                 <AmountInput
