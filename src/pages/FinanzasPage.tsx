@@ -146,6 +146,15 @@ export default function FinanzasPage() {
     },
   });
 
+  const { data: journalEntries = [] } = useQuery({
+    queryKey: ['journal-entries-finanzas'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('journal_entries').select('*, journal_entry_lines(*, chart_of_accounts(code, description, account_type))').order('date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: territoryData = [] } = useQuery({
     queryKey: ['territory-coverage'],
     queryFn: async () => {
@@ -315,7 +324,7 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'Libro Diario' && <LibroDiarioTab sales={sales} expenses={expenses} costs={costs} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Libro Diario' && <LibroDiarioTab sales={sales} expenses={expenses} costs={costs} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
 
         {tab === 'Ventas' && (
           <div className="space-y-6">
@@ -342,7 +351,7 @@ export default function FinanzasPage() {
           })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
-        {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
