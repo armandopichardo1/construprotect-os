@@ -1590,19 +1590,29 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">📋 Estado de Resultados Mensual</h2>
           <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => {
-            const rows = ['Ingresos', 'COGS', 'Costos Directos', 'Utilidad Bruta', 'Gastos Operativos', 'Utilidad Neta', 'Margen Bruto %', 'Margen Neto %'];
-            const exportData = rows.map(concept => {
+            const concepts = ['Ingresos', 'COGS', 'Costos Directos', 'Utilidad Bruta', 'Gastos Operativos', 'Utilidad Neta', 'Margen Bruto %', 'Margen Neto %'];
+            const exportData = concepts.map(concept => {
               const row: Record<string, any> = { Concepto: concept };
+              let total = 0;
               trendData.forEach(m => {
-                const totalCosts = m.revenue - m.profit;
-                const cogs = totalCosts * 0.6; // approximation from trend data
-                if (concept === 'Ingresos') row[m.month] = m.revenue;
-                else if (concept === 'COGS') row[m.month] = m.revenue > 0 ? m.revenue - m.profit - (totalCosts - (m.revenue - m.profit)) : 0;
-                else if (concept === 'Utilidad Bruta') row[m.month] = m.revenue > 0 ? m.revenue * 0.6 : 0;
-                else if (concept === 'Gastos Operativos') row[m.month] = totalCosts > 0 ? totalCosts * 0.4 : 0;
-                else if (concept === 'Utilidad Neta') row[m.month] = m.profit;
-                else if (concept === 'Margen Neto %') row[m.month] = m.revenue > 0 ? `${(m.profit / m.revenue * 100).toFixed(1)}%` : '0%';
+                let val = 0;
+                if (concept === 'Ingresos') val = m.revenue;
+                else if (concept === 'COGS') val = m.cogs;
+                else if (concept === 'Costos Directos') val = m.directCosts;
+                else if (concept === 'Utilidad Bruta') val = m.grossProfit;
+                else if (concept === 'Gastos Operativos') val = m.totalExpenses;
+                else if (concept === 'Utilidad Neta') val = m.profit;
+                else if (concept === 'Margen Bruto %') { row[m.month] = m.revenue > 0 ? `${(m.grossProfit / m.revenue * 100).toFixed(1)}%` : '0%'; return; }
+                else if (concept === 'Margen Neto %') { row[m.month] = m.revenue > 0 ? `${(m.profit / m.revenue * 100).toFixed(1)}%` : '0%'; return; }
+                row[m.month] = Number(val.toFixed(2));
+                total += val;
               });
+              if (!concept.includes('%')) row['Total'] = Number(total.toFixed(2));
+              else {
+                const totalRev = trendData.reduce((s, m) => s + m.revenue, 0);
+                if (concept === 'Margen Bruto %') row['Total'] = totalRev > 0 ? `${(trendData.reduce((s, m) => s + m.grossProfit, 0) / totalRev * 100).toFixed(1)}%` : '0%';
+                else row['Total'] = totalRev > 0 ? `${(trendData.reduce((s, m) => s + m.profit, 0) / totalRev * 100).toFixed(1)}%` : '0%';
+              }
               return row;
             });
             exportToExcel(exportData, 'PL_Mensual', 'P&L Mensual');
