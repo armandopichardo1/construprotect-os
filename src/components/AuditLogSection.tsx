@@ -227,13 +227,10 @@ export function AuditLogSection() {
 }
 
 function AuditDetailDialog({ row, onClose }: { row: AuditRow | null; onClose: () => void }) {
-  if (!row) return null;
+  const actionInfo = row ? (ACTION_LABELS[row.action] || { label: row.action, color: '' }) : { label: '', color: '' };
 
-  const actionInfo = ACTION_LABELS[row.action] || { label: row.action, color: '' };
-
-  // Compute changes for updates
   const changes = useMemo(() => {
-    if (row.action !== 'update' || !row.old_data || !row.new_data) return null;
+    if (!row || row.action !== 'update' || !row.old_data || !row.new_data) return null;
     const diffs: { field: string; old: any; new: any }[] = [];
     for (const key of Object.keys(row.new_data)) {
       if (SKIP_FIELDS.has(key)) continue;
@@ -246,7 +243,9 @@ function AuditDetailDialog({ row, onClose }: { row: AuditRow | null; onClose: ()
     return diffs;
   }, [row]);
 
-  const displayData = row.action === 'delete' ? row.old_data : row.new_data;
+  const displayData = row ? (row.action === 'delete' ? row.old_data : row.new_data) : null;
+
+  if (!row) return null;
 
   return (
     <Dialog open={!!row} onOpenChange={() => onClose()}>
