@@ -161,6 +161,17 @@ export function AuditLogSection() {
             <SelectItem value="delete">Eliminado</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={userFilter} onValueChange={setUserFilter}>
+          <SelectTrigger className="w-[150px] h-8 text-xs">
+            <SelectValue placeholder="Usuario" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los usuarios</SelectItem>
+            {users.map(u => (
+              <SelectItem key={u} value={u}>{u}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
