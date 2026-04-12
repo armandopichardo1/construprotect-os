@@ -177,11 +177,17 @@ export default function InventarioPage() {
         else if (qty > Number(p.reorder_point) * 5) status = 'excess';
         const mvmts = movementsByProduct[i.product_id] || [0, 0, 0, 0, 0, 0];
         const velocity = (salesByProduct[i.product_id] || 0) / 6;
+        const leadTimeDays = Number(p.lead_time_days) || 21;
+        // ROP = (avg daily demand × lead time) + safety stock
+        // Safety stock = avg daily demand × √lead_time (covers variability)
+        const dailyDemand = velocity / 30;
+        const safetyStock = dailyDemand * Math.sqrt(leadTimeDays);
+        const recommendedROP = Math.ceil((dailyDemand * leadTimeDays) + safetyStock);
         return {
           id: i.id, name: p.name, sku: p.sku, qty, reorder: Number(p.reorder_point),
           status, category: p.category || 'Otros',
           value: qty * Number(p.unit_cost_usd), movements: mvmts, velocity,
-          costUsd: Number(p.unit_cost_usd),
+          costUsd: Number(p.unit_cost_usd), leadTimeDays, recommendedROP,
         } as StockItem;
       }).filter(Boolean) as StockItem[];
     },
