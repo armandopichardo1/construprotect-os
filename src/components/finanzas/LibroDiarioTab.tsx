@@ -36,16 +36,18 @@ const TYPE_LABELS: Record<string, { label: string; emoji: string; color: string 
   sale: { label: 'Venta', emoji: '💰', color: 'text-success' },
   expense: { label: 'Gasto', emoji: '📤', color: 'text-destructive' },
   cost: { label: 'Costo', emoji: '🏭', color: 'text-warning' },
+  journal: { label: 'Asiento', emoji: '📒', color: 'text-primary' },
 };
 
 interface Props {
   sales: any[];
   expenses: any[];
   costs: any[];
+  journalEntries: any[];
   rate: number;
 }
 
-export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
+export function LibroDiarioTab({ sales, expenses, costs, journalEntries, rate }: Props) {
   const queryClient = useQueryClient();
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,8 +122,34 @@ export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
       });
     });
 
+    // === ASIENTOS MANUALES (journal_entries) ===
+    journalEntries.forEach((je: any) => {
+      const lines = je.journal_entry_lines || [];
+      const totalDebit = lines.reduce((s: number, l: any) => s + Number(l.debit_usd || 0), 0);
+      const totalCredit = lines.reduce((s: number, l: any) => s + Number(l.credit_usd || 0), 0);
+      const exRate = Number(je.exchange_rate) || rate;
+      const firstLine = lines[0];
+      all.push({
+        id: je.id,
+        date: je.date,
+        type: 'journal',
+        description: je.description,
+        category: 'Asiento Manual',
+        account_code: firstLine?.chart_of_accounts?.code || '',
+        account_name: lines.map((l: any) => l.chart_of_accounts?.description || '').filter(Boolean).join(', ').slice(0, 60) || 'Asiento',
+        debit_usd: totalDebit,
+        credit_usd: totalCredit,
+        debit_dop: totalDebit * exRate,
+        credit_dop: totalCredit * exRate,
+        exchange_rate: exRate,
+        vendor_client: '—',
+        ref: '',
+        raw: je,
+      });
+    });
+
     return all.sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales, expenses, costs, rate]);
+  }, [sales, expenses, costs, journalEntries, rate]);
 
   const filtered = useMemo(() => {
     let items = filterByDate(entries);
