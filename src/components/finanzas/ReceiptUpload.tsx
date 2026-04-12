@@ -7,9 +7,10 @@ interface Props {
   expenseId: string;
   currentUrl: string | null;
   onUploaded: (url: string) => void;
+  tableName?: 'expenses' | 'costs';
 }
 
-export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
+export function ReceiptUpload({ expenseId, currentUrl, onUploaded, tableName = 'expenses' }: Props) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
