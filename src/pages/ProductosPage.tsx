@@ -449,6 +449,7 @@ export function ProductosContent() {
                         linkedField="margin_list_pct"
                         cost={cost}
                         displayValue={formatUSD(Number(p.price_list_usd))}
+                        minMargin={minMargin}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-center">
@@ -460,6 +461,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_list_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || defaultList)} label="Margen Lista" minMargin={minMargin} />
                         }
@@ -474,6 +476,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_architect_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || defaultArchitect)} label="Margen Arquitecto" minMargin={minMargin} />
                         }
@@ -488,6 +491,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_project_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
                         }
@@ -503,6 +507,7 @@ export function ProductosContent() {
                         linkedField="margin_wholesale_pct"
                         cost={cost}
                         displayValue={formatUSD(Number(p.price_wholesale_usd))}
+                        minMargin={minMargin}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-center">
@@ -514,6 +519,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_wholesale_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
                         }
