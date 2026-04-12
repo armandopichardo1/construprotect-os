@@ -81,6 +81,7 @@ export function AuditLogSection() {
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
   const [selectedRow, setSelectedRow] = useState<AuditRow | null>(null);
 
   const { data: logs = [], isLoading } = useQuery({
@@ -100,6 +101,7 @@ export function AuditLogSection() {
     return logs.filter(r => {
       if (moduleFilter !== 'all' && r.module !== moduleFilter) return false;
       if (actionFilter !== 'all' && r.action !== actionFilter) return false;
+      if (userFilter !== 'all' && (r.user_name || '—') !== userFilter) return false;
       if (search) {
         const s = search.toLowerCase();
         return (
@@ -110,9 +112,10 @@ export function AuditLogSection() {
       }
       return true;
     });
-  }, [logs, moduleFilter, actionFilter, search]);
+  }, [logs, moduleFilter, actionFilter, userFilter, search]);
 
   const modules = useMemo(() => [...new Set(logs.map(r => r.module))].sort(), [logs]);
+  const users = useMemo(() => [...new Set(logs.map(r => r.user_name || '—'))].sort(), [logs]);
 
   if (isLoading) {
     return <p className="text-xs text-muted-foreground py-8 text-center">Cargando historial de actividad...</p>;
@@ -156,6 +159,17 @@ export function AuditLogSection() {
             <SelectItem value="create">Creado</SelectItem>
             <SelectItem value="update">Editado</SelectItem>
             <SelectItem value="delete">Eliminado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={userFilter} onValueChange={setUserFilter}>
+          <SelectTrigger className="w-[150px] h-8 text-xs">
+            <SelectValue placeholder="Usuario" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los usuarios</SelectItem>
+            {users.map(u => (
+              <SelectItem key={u} value={u}>{u}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
