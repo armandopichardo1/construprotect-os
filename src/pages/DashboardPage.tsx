@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert, ChevronDown, Sparkles } from 'lucide-react';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert, ChevronDown, Sparkles, Star, Trash2, BookmarkPlus } from 'lucide-react';
 import { streamBusinessAI, AI_MODELS } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useAlertLogger } from '@/hooks/useAlertHistory';
