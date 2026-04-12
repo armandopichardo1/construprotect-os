@@ -27,10 +27,11 @@ export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
     const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: true });
     if (error) { toast.error('Error al subir archivo'); setUploading(false); return; }
 
-    const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(path);
+    // Store the storage path (not a public URL) since bucket is private
+    const storagePath = path;
 
-    // Update expense record
-    await supabase.from('expenses').update({ receipt_url: publicUrl }).eq('id', expenseId);
+    // Update expense record with the storage path
+    await supabase.from('expenses').update({ receipt_url: storagePath }).eq('id', expenseId);
 
     onUploaded(publicUrl);
     toast.success('Recibo subido');
