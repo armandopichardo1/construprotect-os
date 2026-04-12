@@ -1490,7 +1490,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
       {/* Waterfall Comparison Chart */}
       <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Waterfall: Comparación por Categoría (USD)</h2>
+          <h2 className="text-sm font-semibold text-foreground">Waterfall: Comparación por Categoría (RD$)</h2>
           <div className="flex items-center gap-3 text-[10px]">
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'hsl(217, 91%, 60%)' }} /> Actual</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: 'hsl(220, 12%, 40%)' }} /> Anterior</span>
@@ -2357,7 +2357,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
         <div className="space-y-4">
           <div className="rounded-2xl bg-card border border-border p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold">Tendencia 12 Meses (USD)</h3>
+              <h3 className="text-sm font-semibold">Tendencia 12 Meses (RD$)</h3>
               <div className="flex gap-1 rounded-lg bg-muted p-0.5">
                 {(['bars', 'margin'] as const).map(mode => (
                   <button
