@@ -268,6 +268,7 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
             <SelectItem value="sale" className="text-xs">💰 Ventas</SelectItem>
             <SelectItem value="expense" className="text-xs">📤 Gastos</SelectItem>
             <SelectItem value="cost" className="text-xs">🏭 Costos</SelectItem>
+            <SelectItem value="journal" className="text-xs">📒 Asientos</SelectItem>
           </SelectContent>
         </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
