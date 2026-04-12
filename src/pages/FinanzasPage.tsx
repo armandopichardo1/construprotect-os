@@ -1638,16 +1638,31 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
                 {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-primary">{formatUSD(m.revenue)}</TableCell>)}
                 <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(trendData.reduce((s, m) => s + m.revenue, 0))}</TableCell>
               </TableRow>
-              {/* Total Costs */}
+              {/* COGS */}
               <TableRow>
-                <TableCell className="text-xs sticky left-0 bg-card z-10">(-) Costos y Gastos</TableCell>
-                {trendData.map(m => {
-                  const tc = m.revenue - m.profit;
-                  return <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">-{formatUSD(tc)}</TableCell>;
-                })}
-                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + (m.revenue - m.profit), 0))}</TableCell>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) COGS</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.cogs > 0 ? `-${formatUSD(m.cogs)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.cogs, 0))}</TableCell>
               </TableRow>
-              {/* Separator */}
+              {/* Direct Costs */}
+              <TableRow>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) Costos Directos</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.directCosts > 0 ? `-${formatUSD(m.directCosts)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.directCosts, 0))}</TableCell>
+              </TableRow>
+              {/* Gross Profit */}
+              <TableRow className="border-t border-border/50 font-semibold">
+                <TableCell className="text-xs sticky left-0 bg-card z-10">Utilidad Bruta</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className={cn('text-xs text-right font-mono', m.grossProfit >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(m.grossProfit)}</TableCell>)}
+                <TableCell className={cn('text-xs text-right font-mono font-bold', trendData.reduce((s, m) => s + m.grossProfit, 0) >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(trendData.reduce((s, m) => s + m.grossProfit, 0))}</TableCell>
+              </TableRow>
+              {/* Operating Expenses */}
+              <TableRow>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) Gastos Operativos</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.totalExpenses > 0 ? `-${formatUSD(m.totalExpenses)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.totalExpenses, 0))}</TableCell>
+              </TableRow>
+              {/* Net Income */}
               <TableRow className="border-t-2 border-border">
                 <TableCell className="text-xs font-bold sticky left-0 bg-card z-10">Utilidad Neta</TableCell>
                 {trendData.map(m => (
