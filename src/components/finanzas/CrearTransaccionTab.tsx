@@ -255,6 +255,49 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
   // ===== MANUAL SAVE =====
   const saveManual = async () => {
+    // ===== JOURNAL ENTRY =====
+    if (manualType === 'journal') {
+      if (!journalDescription.trim()) { toast.error('Descripción requerida'); return; }
+      const validLines = journalLines.filter(l => l.account_id && (l.debit > 0 || l.credit > 0));
+      if (validLines.length < 2) { toast.error('Se requieren al menos 2 líneas con cuentas y montos'); return; }
+      if (!journalIsBalanced) { toast.error('Los débitos y créditos deben cuadrar'); return; }
+
+      setManualSaving(true);
+      const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
+      try {
+        const entryPayload: any = {
+          description: journalDescription.trim(),
+          total_debit_usd: journalTotalDebit,
+          total_credit_usd: journalTotalCredit,
+          exchange_rate: xr,
+          notes: journalNotes.trim() || null,
+        };
+        if (dateStr) entryPayload.date = dateStr;
+
+        const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
+        if (error || !entry) throw error || new Error('Error creando asiento');
+
+        const linesData = validLines.map(l => ({
+          journal_entry_id: entry.id,
+          account_id: l.account_id,
+          debit_usd: l.debit || 0,
+          credit_usd: l.credit || 0,
+          description: l.description || null,
+        }));
+        await supabase.from('journal_entry_lines').insert(linesData);
+
+        toast.success('Asiento contable registrado');
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+
+        setHistory(prev => [{ type: 'journal', description: journalDescription, amount: formatUSD(journalTotalDebit), timestamp: new Date() }, ...prev].slice(0, 5));
+        resetManualForm();
+      } catch (e: any) {
+        toast.error(e.message || 'Error al registrar asiento');
+      }
+      setManualSaving(false);
+      return;
+    }
+
     if (manualType === 'sale') {
       // Validate sale
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
