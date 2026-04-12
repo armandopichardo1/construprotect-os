@@ -32,7 +32,7 @@ function ProtectedRoutes() {
     <Routes>
       <Route path="/" element={<DashboardPage />} />
       <Route path="/inventario" element={<InventarioPage />} />
-      <Route path="/productos" element={<ProductosPage />} />
+      <Route path="/productos" element={<Navigate to="/maestras?tab=productos" replace />} />
       <Route path="/crm" element={<CrmPage />} />
       <Route path="/finanzas" element={<FinanzasPage />} />
       <Route path="/maestras" element={<MaestrasPage />} />

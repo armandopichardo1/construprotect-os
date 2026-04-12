@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
-const tabs = ['Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Productos', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
 export default function MaestrasPage() {
   const [tab, setTab] = useState('Proveedores');

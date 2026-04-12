@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 const mainItems = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Inventario', url: '/inventario', icon: Boxes },
-  { title: 'Productos', url: '/productos', icon: Package },
   { title: 'CRM', url: '/crm', icon: Users },
   { title: 'Finanzas', url: '/finanzas', icon: DollarSign },
   { title: 'Maestras', url: '/maestras', icon: Database },
