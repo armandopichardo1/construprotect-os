@@ -98,6 +98,20 @@ export function MovimientosReportTab() {
     fill: s.color,
   })), [typeSummary]);
 
+  // Daily trend data
+  const dailyTrend = useMemo(() => {
+    const map: Record<string, { date: string; entries: number; exits: number; net: number }> = {};
+    movements.forEach((m: any) => {
+      const day = new Date(m.created_at).toISOString().split('T')[0];
+      if (!map[day]) map[day] = { date: day, entries: 0, exits: 0, net: 0 };
+      if (m.quantity > 0) map[day].entries += m.quantity;
+      else map[day].exits += Math.abs(m.quantity);
+    });
+    return Object.values(map)
+      .map(d => ({ ...d, net: d.entries - d.exits }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [movements]);
+
   // Grand totals
   const totals = useMemo(() => ({
     movements: movements.length,
