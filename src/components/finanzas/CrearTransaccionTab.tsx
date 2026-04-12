@@ -215,8 +215,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Journal entry state
   const [journalLines, setJournalLines] = useState<JournalLine[]>([
-    { account_id: '', debit: 0, credit: 0, description: '' },
-    { account_id: '', debit: 0, credit: 0, description: '' },
+    { account_id: '', debit: '', credit: '', description: '' },
+    { account_id: '', debit: '', credit: '', description: '' },
   ]);
   const [journalDescription, setJournalDescription] = useState('');
   const [journalNotes, setJournalNotes] = useState('');
