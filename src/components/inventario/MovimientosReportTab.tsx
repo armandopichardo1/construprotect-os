@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { exportToExcel } from '@/lib/export-utils';
-import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search } from 'lucide-react';
+import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search, Scale } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend, Line, ReferenceLine } from 'recharts';
 
 const TYPE_MAP: Record<string, { label: string; icon: string; color: string }> = {
