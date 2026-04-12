@@ -16,7 +16,7 @@ import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, Fold
 import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
-import ProductosPage from '@/pages/ProductosPage';
+import { ProductosContent } from '@/pages/ProductosPage';
 
 const tabs = ['Productos', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
