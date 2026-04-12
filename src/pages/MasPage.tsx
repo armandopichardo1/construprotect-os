@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { exportToExcel } from '@/lib/export-utils';
 import { formatUSD } from '@/lib/format';
-import { Pencil, Save, X, Plus, Trash2, Mail } from 'lucide-react';
+import { Pencil, Save, X, Plus, Trash2, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { DEFAULT_ALERT_RULES } from '@/hooks/useAlerts';
 import { cn } from '@/lib/utils';
 import { AuditLogSection } from '@/components/AuditLogSection';
@@ -941,31 +941,67 @@ function AlertHistorySection() {
 
 // ---- Users Section with Invite ----
 function UsersSection({ profiles, queryClient }: { profiles: any[]; queryClient: any }) {
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState('viewer');
-  const [sending, setSending] = useState(false);
+  const { user } = useAuth();
+  const [showCreate, setShowCreate] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createRole, setCreateRole] = useState('viewer');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) { toast.error('Ingresa un email'); return; }
-    setSending(true);
+  const handleCreate = async () => {
+    if (!createEmail.trim()) { toast.error('Ingresa un email'); return; }
+    if (!createPassword || createPassword.length < 6) { toast.error('La contraseña debe tener al menos 6 caracteres'); return; }
+    setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke('invite-user', {
-        body: { email: inviteEmail.trim(), role: inviteRole, full_name: inviteName.trim() || undefined },
+        body: { action: 'create', email: createEmail.trim(), password: createPassword, role: createRole, full_name: createName.trim() || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Invitación enviada a ${inviteEmail}`);
-      setShowInvite(false);
-      setInviteEmail('');
-      setInviteName('');
-      setInviteRole('viewer');
+      toast.success(`Usuario ${createEmail} creado exitosamente`);
+      setShowCreate(false);
+      setCreateEmail(''); setCreatePassword(''); setCreateName(''); setCreateRole('viewer');
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
     } catch (err: any) {
-      toast.error(err.message || 'Error al enviar invitación');
+      toast.error(err.message || 'Error al crear usuario');
     } finally {
-      setSending(false);
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (userId: string) => {
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { action: 'delete', user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Usuario eliminado');
+      setShowDeleteConfirm(null);
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar usuario');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { action: 'update_role', user_id: userId, role: newRole },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Rol actualizado');
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al cambiar rol');
     }
   };
 
@@ -979,57 +1015,101 @@ function UsersSection({ profiles, queryClient }: { profiles: any[]; queryClient:
     <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Usuarios</h2>
-        <Button variant="outline" size="sm" onClick={() => setShowInvite(true)}>
-          <Mail className="w-3.5 h-3.5 mr-1.5" /> Invitar
+        <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
+          <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Crear Usuario
         </Button>
       </div>
       <div className="space-y-2">
         {profiles.map(p => {
           const roleInfo = ROLE_LABELS[p.role] || ROLE_LABELS.viewer;
+          const isCurrentUser = p.id === user?.id;
           return (
             <div key={p.id} className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">{p.full_name}</p>
-                <Badge variant="outline" className={cn('text-[10px] mt-0.5', roleInfo.color)}>{roleInfo.label}</Badge>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{p.full_name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {isCurrentUser ? (
+                    <Badge variant="outline" className={cn('text-[10px]', roleInfo.color)}>{roleInfo.label}</Badge>
+                  ) : (
+                    <Select value={p.role || 'viewer'} onValueChange={v => handleRoleChange(p.id, v)}>
+                      <SelectTrigger className="h-5 text-[10px] border-none bg-transparent shadow-none px-0 w-auto gap-1">
+                        <Badge variant="outline" className={cn('text-[10px]', roleInfo.color)}>{roleInfo.label}</Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin" className="text-xs">Admin</SelectItem>
+                        <SelectItem value="editor" className="text-xs">Editor</SelectItem>
+                        <SelectItem value="viewer" className="text-xs">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {isCurrentUser && <span className="text-[10px] text-muted-foreground">(tú)</span>}
+                </div>
               </div>
-              <span className="h-2.5 w-2.5 rounded-full bg-success" />
+              {!isCurrentUser && (
+                <button
+                  onClick={() => setShowDeleteConfirm(p.id)}
+                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10"
+                  title="Eliminar usuario"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           );
         })}
         {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
       </div>
 
-      {/* Invite Dialog */}
-      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+      {/* Create User Dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-sm flex items-center gap-2">
-              <Mail className="w-4 h-4" /> Invitar Usuario
+              <UserPlus className="w-4 h-4" /> Crear Usuario
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Nombre completo *</Label>
+              <Input
+                placeholder="Nombre del usuario"
+                value={createName}
+                onChange={e => setCreateName(e.target.value)}
+                className="h-8 text-xs mt-1"
+              />
+            </div>
             <div>
               <Label className="text-xs">Email *</Label>
               <Input
                 type="email"
                 placeholder="usuario@ejemplo.com"
-                value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
+                value={createEmail}
+                onChange={e => setCreateEmail(e.target.value)}
                 className="h-8 text-xs mt-1"
               />
             </div>
             <div>
-              <Label className="text-xs">Nombre completo</Label>
-              <Input
-                placeholder="Nombre del usuario"
-                value={inviteName}
-                onChange={e => setInviteName(e.target.value)}
-                className="h-8 text-xs mt-1"
-              />
+              <Label className="text-xs">Contraseña *</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Mínimo 6 caracteres"
+                  value={createPassword}
+                  onChange={e => setCreatePassword(e.target.value)}
+                  className="h-8 text-xs mt-1 pr-8"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
             <div>
               <Label className="text-xs">Rol *</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
+              <Select value={createRole} onValueChange={setCreateRole}>
                 <SelectTrigger className="h-8 text-xs mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -1040,12 +1120,29 @@ function UsersSection({ profiles, queryClient }: { profiles: any[]; queryClient:
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-full" size="sm" onClick={handleInvite} disabled={sending}>
-              {sending ? '⏳ Enviando...' : '📧 Enviar Invitación'}
+            <Button className="w-full" size="sm" onClick={handleCreate} disabled={saving}>
+              {saving ? '⏳ Creando...' : '✅ Crear Usuario'}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Se enviará un email con enlace para crear su cuenta
-            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-sm">¿Eliminar usuario?</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Se eliminará permanentemente este usuario y su acceso a la plataforma. Esta acción no se puede deshacer.
+          </p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowDeleteConfirm(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" size="sm" className="flex-1" onClick={() => showDeleteConfirm && handleDelete(showDeleteConfirm)} disabled={deleting}>
+              {deleting ? '⏳ Eliminando...' : '🗑️ Eliminar'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
