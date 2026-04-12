@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { Plus, ClipboardCheck } from 'lucide-react';
+import { BulkPhysicalCountDialog } from './BulkPhysicalCountDialog';
 
 const MOVEMENT_TYPES: Record<string, { label: string; icon: string; sign: number; desc: string }> = {
   receipt: { label: 'Entrada Manual', icon: '📥', sign: 1, desc: 'Ingreso de productos sin envío' },
