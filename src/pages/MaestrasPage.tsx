@@ -229,7 +229,10 @@ function MarcasMaestra() {
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar marca..." className="pl-9 h-9" />
         </div>
         <span className="text-xs text-muted-foreground">{filtered.length} registros</span>
-        <Button size="sm" className="ml-auto" onClick={() => setEditing({ name: '', is_active: true })}><Plus className="w-3.5 h-3.5 mr-1" />Nueva</Button>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(brands.map(b => ({ Marca: b.name, Estado: b.is_active ? 'Activa' : 'Inactiva' })), 'marcas', 'Marcas')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
+          <Button size="sm" onClick={() => setEditing({ name: '', is_active: true })}><Plus className="w-3.5 h-3.5 mr-1" />Nueva</Button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -318,7 +321,10 @@ function ServiciosMaestra() {
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar servicio..." className="pl-9 h-9" />
         </div>
         <span className="text-xs text-muted-foreground">{filtered.length} registros</span>
-        <Button size="sm" className="ml-auto" onClick={() => setEditing({ sku: '', description: '', business_line: '', family: '' })}><Plus className="w-3.5 h-3.5 mr-1" />Nuevo</Button>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(services.map(s => ({ SKU: s.sku, Descripción: s.description, 'Línea de Negocio': s.business_line || '', Familia: s.family || '' })), 'servicios', 'Servicios')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
+          <Button size="sm" onClick={() => setEditing({ sku: '', description: '', business_line: '', family: '' })}><Plus className="w-3.5 h-3.5 mr-1" />Nuevo</Button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
