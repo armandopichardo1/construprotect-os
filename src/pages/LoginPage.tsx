@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const isSignUp = false;
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -117,22 +117,9 @@ export default function LoginPage() {
             {loading ? 'Cargando...' : isSignUp ? 'Registrarse' : 'Entrar'}
           </Button>
         </form>
-        <div className="text-center space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}{' '}
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-primary hover:underline font-medium"
-            >
-              {isSignUp ? 'Iniciar sesión' : 'Registrarse'}
-            </button>
-          </p>
-          {!isSignUp && (
-            <p className="text-[10px] text-muted-foreground/60">
-              Usuarios: apichardo, lazar, dazar
-            </p>
-          )}
-        </div>
+        <p className="text-center text-[10px] text-muted-foreground/60">
+          Usuarios: apichardo, lazar, dazar
+        </p>
       </div>
     </div>
   );
