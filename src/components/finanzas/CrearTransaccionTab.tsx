@@ -82,14 +82,15 @@ interface JournalLine {
   description: string;
 }
 
-export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
+export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpense, onEditCost }: {
   rate: any;
+  rateForMonth?: (yearMonth: string) => number;
   onEditSale?: (data: any) => void;
   onEditExpense?: (data: any) => void;
   onEditCost?: (data: any) => void;
 }) {
   const queryClient = useQueryClient();
-  const xr = Number(rate?.usd_sell) || 60.76;
+  const latestXr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
   const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('USD');
 
