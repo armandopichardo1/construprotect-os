@@ -493,9 +493,9 @@ export function ContainerPlanner() {
       </div>
 
       {/* Product table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-[10px]">SKU</TableHead>
               <TableHead className="text-[10px]">Producto</TableHead>
