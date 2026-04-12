@@ -17,6 +17,7 @@ import { formatUSD } from '@/lib/format';
 import { Pencil, Save, X, Plus, Trash2, Mail } from 'lucide-react';
 import { DEFAULT_ALERT_RULES } from '@/hooks/useAlerts';
 import { cn } from '@/lib/utils';
+import { AuditLogSection } from '@/components/AuditLogSection';
 
 
 
@@ -435,7 +436,7 @@ export default function MasPage() {
         )}
 
         {tab === 'alerts' && <AlertsConfigSection />}
-        {tab === 'historial' && <AlertHistorySection />}
+        {tab === 'historial' && <AuditLogSection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
       </div>
     </AppLayout>

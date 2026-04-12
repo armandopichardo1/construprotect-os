@@ -107,6 +107,48 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          module: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          summary: string
+          table_name: string
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          module: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          summary: string
+          table_name: string
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          module?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          summary?: string
+          table_name?: string
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       brands: {
         Row: {
           created_at: string
@@ -1485,7 +1527,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      build_audit_summary: {
+        Args: { action: string; rec: Json; tbl: string }
+        Returns: string
+      }
+      get_module_for_table: { Args: { tbl: string }; Returns: string }
     }
     Enums: {
       activity_type:
