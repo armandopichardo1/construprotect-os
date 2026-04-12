@@ -1225,14 +1225,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
-                    <Select value={purchaseSupplierId} onValueChange={handlePurchaseSupplier}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
+                      value={purchaseSupplierId}
+                      onValueChange={handlePurchaseSupplier}
+                      placeholder="Seleccionar proveedor"
+                      searchPlaceholder="Buscar proveedor..."
+                      emptyMessage="No se encontró proveedor"
+                    />
                   ) : (
                     <Input value={purchaseSupplierName} onChange={e => setPurchaseSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
                   )}
@@ -1243,14 +1243,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   {purchaseItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end">
                       <div className="flex-1">
-                        <Select value={item.product_id} onValueChange={v => updatePurchaseItem(i, 'product_id', v)}>
-                          <SelectTrigger className="text-xs"><SelectValue placeholder="Producto" /></SelectTrigger>
-                          <SelectContent>
-                            {products.map((p: any) => (
-                              <SelectItem key={p.id} value={p.id} className="text-xs">{p.sku} — {p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
+                          value={item.product_id}
+                          onValueChange={v => updatePurchaseItem(i, 'product_id', v)}
+                          placeholder="Producto"
+                          searchPlaceholder="Buscar producto..."
+                          emptyMessage="No se encontró producto"
+                          className="text-xs"
+                        />
                       </div>
                       <Input type="number" min={1} value={item.quantity}
                         onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 1)}
@@ -1304,14 +1305,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
-                    <Select value={cnSupplierId} onValueChange={handleCnSupplier}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
+                      value={cnSupplierId}
+                      onValueChange={handleCnSupplier}
+                      placeholder="Seleccionar proveedor"
+                      searchPlaceholder="Buscar proveedor..."
+                      emptyMessage="No se encontró proveedor"
+                    />
                   ) : (
                     <Input value={cnSupplierName} onChange={e => setCnSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
                   )}
