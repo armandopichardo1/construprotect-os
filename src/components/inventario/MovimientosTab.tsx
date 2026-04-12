@@ -61,6 +61,10 @@ export function MovimientosTab() {
         <Button size="sm" onClick={() => setShowForm(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" /> Nuevo Movimiento
         </Button>
+        <Button size="sm" variant="outline" onClick={() => setShowBulkCount(true)}>
+          <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Conteo Físico
+        </Button>
+        </Button>
         <div className="flex gap-1 flex-wrap">
           {FILTER_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => setFilter(opt.value)}
