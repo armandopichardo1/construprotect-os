@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { KpiCard } from '@/components/KpiCard';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert, ChevronDown, Sparkles } from 'lucide-react';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert, ChevronDown, Sparkles, Star, Trash2, BookmarkPlus } from 'lucide-react';
 import { streamBusinessAI, AI_MODELS } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useAlertLogger } from '@/hooks/useAlertHistory';
@@ -54,7 +54,41 @@ export default function DashboardPage() {
   const [reviewModel, setReviewModel] = useState('google/gemini-2.5-flash');
   const [reviewPrompt, setReviewPrompt] = useState('');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [savedPrompts, setSavedPrompts] = useState<{ name: string; prompt: string; model?: string }[]>([]);
   const alertsNotifiedRef = useRef(false);
+
+  // Load saved prompts from settings
+  useEffect(() => {
+    supabase.from('settings').select('value').eq('key', 'ai_saved_prompts').single().then(({ data }) => {
+      if (data?.value && Array.isArray(data.value)) setSavedPrompts(data.value as any);
+    });
+  }, []);
+
+  const persistPrompts = async (prompts: typeof savedPrompts) => {
+    setSavedPrompts(prompts);
+    const { error } = await supabase.from('settings').upsert({ key: 'ai_saved_prompts', value: prompts as any }, { onConflict: 'key' });
+    if (error) toast.error('Error guardando prompts');
+  };
+
+  const saveCurrentPrompt = () => {
+    if (!reviewPrompt.trim()) { toast.error('Escribe un prompt primero'); return; }
+    const name = reviewPrompt.slice(0, 50).trim() + (reviewPrompt.length > 50 ? '…' : '');
+    if (savedPrompts.some(p => p.prompt === reviewPrompt.trim())) { toast.info('Este prompt ya está guardado'); return; }
+    const newPrompts = [...savedPrompts, { name, prompt: reviewPrompt.trim(), model: reviewModel }];
+    persistPrompts(newPrompts);
+    toast.success('Prompt guardado');
+  };
+
+  const deleteSavedPrompt = (index: number) => {
+    persistPrompts(savedPrompts.filter((_, i) => i !== index));
+    toast.success('Prompt eliminado');
+  };
+
+  const loadSavedPrompt = (p: typeof savedPrompts[0]) => {
+    setReviewPrompt(p.prompt);
+    if (p.model) setReviewModel(p.model);
+    setShowPromptEditor(true);
+  };
 
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
@@ -588,15 +622,52 @@ export default function DashboardPage() {
             </div>
 
             {showPromptEditor && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Instrucciones personalizadas (se agregan al prompt del sistema)</label>
-                <Textarea
-                  value={reviewPrompt}
-                  onChange={e => setReviewPrompt(e.target.value)}
-                  placeholder="Ej: Enfócate más en el análisis de márgenes por categoría. Incluye recomendaciones de pricing. Analiza la estacionalidad de las ventas..."
-                  className="text-xs min-h-[80px] resize-y"
-                />
-                <p className="text-[10px] text-muted-foreground">💡 Tip: Sé específico sobre qué áreas quieres profundizar (financiero, operativo, ventas, inventario, etc.)</p>
+              <div className="space-y-3">
+                {/* Saved prompts */}
+                {savedPrompts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <Star className="w-3 h-3" /> Prompts guardados
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {savedPrompts.map((p, i) => (
+                        <div key={i} className="group flex items-center gap-1 bg-muted/60 hover:bg-muted rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors">
+                          <button
+                            className="text-[11px] text-foreground/80 hover:text-foreground truncate max-w-[200px]"
+                            onClick={() => loadSavedPrompt(p)}
+                            title={p.prompt}
+                          >
+                            {p.name}
+                          </button>
+                          <button
+                            className="text-muted-foreground/50 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); deleteSavedPrompt(i); }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Instrucciones personalizadas</label>
+                    {reviewPrompt.trim() && (
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground" onClick={saveCurrentPrompt}>
+                        <BookmarkPlus className="w-3 h-3" /> Guardar prompt
+                      </Button>
+                    )}
+                  </div>
+                  <Textarea
+                    value={reviewPrompt}
+                    onChange={e => setReviewPrompt(e.target.value)}
+                    placeholder="Ej: Enfócate más en el análisis de márgenes por categoría. Incluye recomendaciones de pricing. Analiza la estacionalidad de las ventas..."
+                    className="text-xs min-h-[80px] resize-y"
+                  />
+                  <p className="text-[10px] text-muted-foreground">💡 Tip: Sé específico sobre qué áreas quieres profundizar (financiero, operativo, ventas, inventario, etc.)</p>
+                </div>
               </div>
             )}
           </div>
