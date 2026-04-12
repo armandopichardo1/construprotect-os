@@ -911,6 +911,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       <div><span className="text-muted-foreground text-xs">Descripción</span><p className="font-medium">{preview.data.description}</p></div>
                       <div><span className="text-muted-foreground text-xs">Cuenta Contable</span>
                         <p className="font-medium">{preview.data.account_code ? `${preview.data.account_code} - ${preview.data.account_name}` : 'Sin asignar'}</p>
+                        {!preview.data.account_id && preview.data.missing_account_suggestion && (
+                          <div className="mt-1.5 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                            <p className="font-semibold text-warning mb-0.5">⚠️ Cuenta no encontrada en el catálogo</p>
+                            <p className="text-muted-foreground">
+                              Se recomienda crear: <span className="font-mono font-medium text-foreground">{preview.data.missing_account_suggestion.code}</span> — {preview.data.missing_account_suggestion.description} ({preview.data.missing_account_suggestion.account_type})
+                            </p>
+                            <p className="text-muted-foreground mt-0.5">Ve a <span className="font-medium text-foreground">Maestras → Catálogo de Cuentas</span> para agregarla.</p>
+                          </div>
+                        )}
                       </div>
                       <div><span className="text-muted-foreground text-xs">Monto USD</span><p className="font-bold text-lg">{formatUSD(preview.data.amount_usd)}</p></div>
                       <div><span className="text-muted-foreground text-xs">Monto DOP</span><p className="font-bold text-lg">{formatDOP(preview.data.amount_dop)}</p></div>
