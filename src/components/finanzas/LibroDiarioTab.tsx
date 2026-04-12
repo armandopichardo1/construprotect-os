@@ -374,9 +374,14 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
                     {formatDOP(entry.debit_dop || entry.credit_dop)}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Pencil className="w-3 h-3" />
-                    </button>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => setDeleteEntry(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
