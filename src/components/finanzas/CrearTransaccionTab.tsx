@@ -89,7 +89,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 }) {
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
-  const [mode, setMode] = useState<Mode>('ai');
+  const [mode, setMode] = useState<Mode>('manual');
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
@@ -132,7 +132,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [history, setHistory] = useState<SessionEntry[]>([]);
 
   // Manual form state
-  const [manualType, setManualType] = useState<TxType>('expense');
+  const [manualType, setManualType] = useState<TxType>('journal');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [vendor, setVendor] = useState('');
@@ -260,10 +260,20 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
+  // Account overrides from preview editing
+  const [previewAccountOverrides, setPreviewAccountOverrides] = useState<Record<number, string>>({});
+
+  // Reset overrides when type changes
+  const handleTypeChange = (t: TxType) => {
+    setManualType(t);
+    setCategory('');
+    setPreviewAccountOverrides({});
+  };
+
   // === Accounting Preview Lines ===
   const previewLines = useMemo(() => {
     const getAcct = (id: string) => accounts.find((a: any) => a.id === id);
-    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number }[] = [];
+    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number; accountId?: string }[] = [];
 
     if (manualType === 'journal') {
       journalLines.forEach(jl => {
@@ -273,45 +283,61 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           accountCode: acct?.code || '',
           accountName: acct?.description || 'Sin asignar',
           accountType: acct?.account_type || '',
+          accountId: acct?.id,
           debit: jl.debit || 0,
           credit: jl.credit || 0,
         });
       });
     } else if (manualType === 'purchase' && purchaseTotal > 0) {
-      // Purchase: Debit Inventario/Mercancía, Credit CxP Proveedor
       const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
       const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
-      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: purchaseTotal, credit: 0 });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: purchaseTotal, credit: 0 });
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: purchaseTotal, credit: 0 });
-      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: 0, credit: purchaseTotal });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: 0, credit: purchaseTotal });
       else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: 0, credit: purchaseTotal });
     } else if (manualType === 'credit_note' && parseFloat(cnAmountUsd) > 0) {
       const amt = parseFloat(cnAmountUsd);
-      // Credit Note: Debit CxP (reduce debt), Credit Inventario/Costo (reduce cost)
       const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
       const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
-      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: amt, credit: 0 });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: amt, credit: 0 });
       else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: amt, credit: 0 });
-      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: 0, credit: amt });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: 0, credit: amt });
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: 0, credit: amt });
     } else if (manualType === 'sale' && totalSale > 0) {
       const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
       const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
       const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
-      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, debit: totalSale, credit: 0 });
-      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, debit: 0, credit: totalSale });
+      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, accountId: counterAcct.id, debit: totalSale, credit: 0 });
+      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, accountId: incomeAcct.id, debit: 0, credit: totalSale });
     } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amountUsd) > 0 || parseFloat(amountDop) > 0)) {
       const amt = parseFloat(amountUsd) || (parseFloat(amountDop) || 0) / xr;
       const expAcct = accountId ? getAcct(accountId) : null;
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
-      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, debit: amt, credit: 0 });
+      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, accountId: expAcct.id, debit: amt, credit: 0 });
       else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amt, credit: 0 });
-      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, debit: 0, credit: amt });
+      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, accountId: cashAcct.id, debit: 0, credit: amt });
     }
 
-    return lines;
-  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd]);
+    // Apply overrides
+    return lines.map((line, idx) => {
+      const overrideId = previewAccountOverrides[idx];
+      if (!overrideId) return line;
+      const overrideAcct = accounts.find(a => a.id === overrideId);
+      if (!overrideAcct) return line;
+      return {
+        ...line,
+        accountCode: overrideAcct.code || '',
+        accountName: overrideAcct.description,
+        accountType: overrideAcct.account_type,
+        accountId: overrideAcct.id,
+      };
+    });
+  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd, previewAccountOverrides]);
+
+  const handlePreviewAccountChange = (lineIndex: number, newAccountId: string) => {
+    setPreviewAccountOverrides(prev => ({ ...prev, [lineIndex]: newAccountId }));
+  };
 
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
@@ -330,6 +356,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     ]);
     setJournalDescription('');
     setJournalNotes('');
+    setPreviewAccountOverrides({});
   };
 
   // Helper to create journal entry from computed preview lines
@@ -351,14 +378,14 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
     if (error || !entry) throw error || new Error('Error creando asiento');
 
-    // Match preview lines to accounts
+    // Match preview lines to accounts — use accountId if available from override
     const linesData = previewLines.map(pl => {
-      const acct = pl.accountCode
-        ? accounts.find(a => a.code === pl.accountCode)
-        : accounts.find(a => a.description === pl.accountName);
+      const acctId = pl.accountId
+        || accounts.find(a => a.code === pl.accountCode)?.id
+        || accounts.find(a => a.description === pl.accountName)?.id;
       return {
         journal_entry_id: entry.id,
-        account_id: acct?.id || accounts[0]?.id,
+        account_id: acctId || accounts[0]?.id,
         debit_usd: pl.debit || 0,
         credit_usd: pl.credit || 0,
         description: desc,
@@ -730,15 +757,15 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       <div className="lg:col-span-2 space-y-5">
         {/* Mode toggle */}
         <div className="flex gap-1 rounded-xl bg-muted p-0.5 w-fit">
-          <button onClick={() => setMode('ai')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <Sparkles className="w-3.5 h-3.5" /> Con IA
-          </button>
           <button onClick={() => setMode('manual')}
             className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
               mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
             <FileText className="w-3.5 h-3.5" /> Manual
+          </button>
+          <button onClick={() => setMode('ai')}
+            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+            <Sparkles className="w-3.5 h-3.5" /> Con IA
           </button>
         </div>
 
@@ -855,8 +882,8 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
             {/* Type selector - scrollable row */}
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {(['sale', 'expense', 'cost', 'purchase', 'credit_note', 'journal'] as const).map(t => (
-                <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
+              {(['journal', 'expense', 'cost', 'sale', 'purchase', 'credit_note'] as const).map(t => (
+                <button key={t} onClick={() => handleTypeChange(t)}
                   className={cn(
                     'shrink-0 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap',
                     manualType === t
@@ -1299,12 +1326,17 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
             {/* Accounting Preview */}
             {mode === 'manual' && previewLines.length > 0 && (
-              <AccountingPreview lines={previewLines} description={
-                manualType === 'journal' ? journalDescription
-                : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
-                : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
-                : description
-              } />
+              <AccountingPreview
+                lines={previewLines}
+                accounts={accounts}
+                onAccountChange={handlePreviewAccountChange}
+                description={
+                  manualType === 'journal' ? journalDescription
+                  : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
+                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
+                  : description
+                }
+              />
             )}
 
             {/* Submit */}
