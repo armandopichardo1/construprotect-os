@@ -440,15 +440,32 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
 
 // Helper: map expense category to account
 function findExpenseAccount(accounts: any[], category: string) {
-  const map: Record<string, string> = {
-    payroll: '51', rent: '52', utilities: '53', insurance: '54', maintenance: '55',
-    warehouse: '51', software: '52', accounting: '52', marketing: '56',
-    shipping: '52', customs: '52', travel: '57', samples: '52', office: '52',
-    bank_fees: '58', purchases: '50', other: '59',
+  // Maps to actual chart of accounts codes (6xxxx series)
+  const map: Record<string, string[]> = {
+    payroll: ['601', '600'],
+    rent: ['631', '630'],
+    utilities: ['632', '633'],
+    insurance: ['640'],
+    maintenance: ['636', '637'],
+    warehouse: ['631', '630'],
+    software: ['642', '643', '644', '645'],
+    accounting: ['641'],
+    marketing: ['621', '622', '620'],
+    shipping: ['635'],
+    customs: ['635'],
+    travel: ['623', '610'],
+    samples: ['625'],
+    office: ['634', '630'],
+    bank_fees: ['639'],
+    purchases: ['500'],
+    other: ['639', '630'],
   };
-  const prefix = map[category] || '59';
-  return accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Gasto') ||
-    accounts.find((a: any) => a.account_type === 'Gasto');
+  const prefixes = map[category] || ['630'];
+  for (const prefix of prefixes) {
+    const match = accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Gasto');
+    if (match) return match;
+  }
+  return accounts.find((a: any) => a.account_type === 'Gasto');
 }
 
 function findCostAccount(accounts: any[], category: string) {
