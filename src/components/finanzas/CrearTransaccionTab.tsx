@@ -112,8 +112,8 @@ interface PurchaseItem {
 
 interface JournalLine {
   account_id: string;
-  debit: number;
-  credit: number;
+  debit: string;
+  credit: string;
   description: string;
 }
 
