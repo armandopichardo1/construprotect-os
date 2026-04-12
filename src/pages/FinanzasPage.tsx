@@ -389,9 +389,9 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
         <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Cliente</TableHead>
@@ -692,9 +692,9 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
         <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Categoría</TableHead>
@@ -903,9 +903,9 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
         <Button size="sm" variant="outline" onClick={onExport}><Download className="w-3.5 h-3.5 mr-1" /> Excel</Button>
         <div className="ml-auto"><DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} /></div>
       </div>
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs">Fecha</TableHead>
               <TableHead className="text-xs">Categoría</TableHead>
@@ -1331,9 +1331,9 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         ))}
       </div>
 
-      <div className="rounded-2xl bg-card border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-2xl bg-card border border-border overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs w-[200px]">Concepto</TableHead>
               <TableHead className="text-xs text-right">{range.label}</TableHead>

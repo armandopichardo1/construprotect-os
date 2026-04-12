@@ -273,10 +273,10 @@ export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
       </div>
 
       {/* Journal Table */}
-      <div className="rounded-xl border border-border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
+      <div className="rounded-xl border border-border bg-card overflow-x-auto max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+            <TableRow>
               <TableHead className="text-[10px] font-semibold">Fecha</TableHead>
               <TableHead className="text-[10px] font-semibold">Tipo</TableHead>
               <TableHead className="text-[10px] font-semibold">Descripción</TableHead>
