@@ -5,10 +5,11 @@ import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Bot, RefreshCw, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { streamBusinessAI } from '@/lib/business-ai';
 import ReactMarkdown from 'react-markdown';
@@ -73,7 +74,7 @@ function StockThermometer({ qty, reorder, maxQty }: { qty: number; reorder: numb
 type StockItem = {
   id: string; name: string; sku: string; qty: number; reorder: number;
   status: string; category: string; value: number; movements: number[];
-  velocity: number; costUsd: number;
+  velocity: number; costUsd: number; leadTimeDays: number; recommendedROP: number;
 };
 
 type SortField = 'status' | 'name' | 'category' | 'qty' | 'value' | 'velocity';
@@ -148,7 +149,7 @@ export default function InventarioPage() {
     queryFn: async () => {
       const [{ data: inv }, { data: products }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
-        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point').eq('is_active', true),
+        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, lead_time_days').eq('is_active', true),
         supabase.from('inventory_movements').select('product_id, quantity, created_at, movement_type').order('created_at'),
       ]);
       if (!inv || !products) return [];
@@ -177,11 +178,17 @@ export default function InventarioPage() {
         else if (qty > Number(p.reorder_point) * 5) status = 'excess';
         const mvmts = movementsByProduct[i.product_id] || [0, 0, 0, 0, 0, 0];
         const velocity = (salesByProduct[i.product_id] || 0) / 6;
+        const leadTimeDays = Number(p.lead_time_days) || 21;
+        // ROP = (avg daily demand × lead time) + safety stock
+        // Safety stock = avg daily demand × √lead_time (covers variability)
+        const dailyDemand = velocity / 30;
+        const safetyStock = dailyDemand * Math.sqrt(leadTimeDays);
+        const recommendedROP = Math.ceil((dailyDemand * leadTimeDays) + safetyStock);
         return {
           id: i.id, name: p.name, sku: p.sku, qty, reorder: Number(p.reorder_point),
           status, category: p.category || 'Otros',
           value: qty * Number(p.unit_cost_usd), movements: mvmts, velocity,
-          costUsd: Number(p.unit_cost_usd),
+          costUsd: Number(p.unit_cost_usd), leadTimeDays, recommendedROP,
         } as StockItem;
       }).filter(Boolean) as StockItem[];
     },
@@ -324,6 +331,8 @@ export default function InventarioPage() {
                     <SortHeader field="category">Categoría</SortHeader>
                     <SortHeader field="qty">Stock</SortHeader>
                     <TableHead className="text-xs w-[180px]">Nivel</TableHead>
+                    <TableHead className="text-xs text-center">Reorden Actual</TableHead>
+                    <TableHead className="text-xs text-center">ROP Recomendado</TableHead>
                     <SortHeader field="value">Valor</SortHeader>
                     <SortHeader field="velocity">Vel/mes</SortHeader>
                     <SortHeader field="status">Estado</SortHeader>
@@ -331,7 +340,10 @@ export default function InventarioPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sorted.map(item => (
+                  {sorted.map(item => {
+                    const ropDiff = item.recommendedROP - item.reorder;
+                    const ropMismatch = item.recommendedROP > 0 && Math.abs(ropDiff) > Math.max(item.reorder * 0.3, 2);
+                    return (
                     <TableRow key={item.id}>
                       <TableCell className="text-xs font-mono text-muted-foreground">{item.sku}</TableCell>
                       <TableCell className="text-xs font-medium">{item.name}</TableCell>
@@ -340,12 +352,43 @@ export default function InventarioPage() {
                       <TableCell className="px-2">
                         <StockThermometer qty={item.qty} reorder={item.reorder} maxQty={maxQty} />
                       </TableCell>
+                      <TableCell className="text-xs text-center font-mono">{item.reorder}</TableCell>
+                      <TableCell className="text-xs text-center">
+                        <TooltipProvider delayDuration={200}>
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                'inline-flex items-center gap-1 font-mono font-semibold',
+                                item.recommendedROP === 0 ? 'text-muted-foreground' :
+                                ropMismatch && ropDiff > 0 ? 'text-warning' :
+                                ropMismatch && ropDiff < 0 ? 'text-primary' :
+                                'text-success'
+                              )}>
+                                {ropMismatch && item.recommendedROP > 0 && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                                {item.recommendedROP}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              <p className="font-semibold mb-1">Fórmula ROP</p>
+                              <p>Demanda diaria: {(item.velocity / 30).toFixed(2)} uds</p>
+                              <p>Lead time: {item.leadTimeDays} días</p>
+                              <p>Stock seguridad: {Math.ceil((item.velocity / 30) * Math.sqrt(item.leadTimeDays))} uds</p>
+                              <p className="mt-1 pt-1 border-t border-border">
+                                ROP = ({(item.velocity / 30).toFixed(2)} × {item.leadTimeDays}) + {Math.ceil((item.velocity / 30) * Math.sqrt(item.leadTimeDays))} = <strong>{item.recommendedROP}</strong>
+                              </p>
+                              {ropMismatch && ropDiff > 0 && <p className="text-warning mt-1">⚠ Reorden actual ({item.reorder}) menor al recomendado</p>}
+                              {ropMismatch && ropDiff < 0 && <p className="text-primary mt-1">ℹ Reorden actual ({item.reorder}) mayor al recomendado</p>}
+                            </TooltipContent>
+                          </UITooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
                       <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.velocity.toFixed(1)}</TableCell>
                       <TableCell><StatusBadge status={item.status} /></TableCell>
                       <TableCell><MiniSparkline data={item.movements} /></TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
               {sorted.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Sin productos en inventario</p>}
@@ -366,7 +409,7 @@ export default function InventarioPage() {
                   <ResponsiveContainer width={160} height={160}>
                     <PieChart><Pie data={categoryValues} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {categoryValues.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
+                    </Pie><RechartsTooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-2">
                     {categoryValues.map(c => (
@@ -421,7 +464,7 @@ export default function InventarioPage() {
                     <XAxis dataKey="x" name="Velocidad/mes" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
                     <YAxis dataKey="y" name="Stock" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
                     <ZAxis dataKey="z" range={[40, 400]} name="Valor" />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
+                    <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
                       if (name === 'Valor') return formatUSD(v);
                       return v;
                     }} labelFormatter={() => ''} />
