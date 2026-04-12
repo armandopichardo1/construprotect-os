@@ -9,7 +9,6 @@ import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
 import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle, Box } from 'lucide-react';
-import { SwipeableRow } from '@/components/ui/swipeable-row';
 import { BulkLogisticsDialog } from '@/components/BulkLogisticsDialog';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -165,24 +164,7 @@ export function ProductosContent() {
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
-                  <SwipeableRow
-                    key={p.id}
-                    rightActions={[
-                      {
-                        icon: <Pencil className="w-4 h-4" />,
-                        label: 'Editar',
-                        color: 'bg-warning',
-                        onClick: () => { setEditProduct(p); setDialogOpen(true); },
-                      },
-                      {
-                        icon: <Trash2 className="w-4 h-4" />,
-                        label: 'Eliminar',
-                        color: 'bg-destructive',
-                        onClick: () => setDeleteProduct(p),
-                      },
-                    ]}
-                  >
-                  <TableRow>
+                  <TableRow key={p.id}>
                     <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
                     <TableCell className="text-xs font-medium">{p.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.brand || '—'}</TableCell>
@@ -218,7 +200,6 @@ export function ProductosContent() {
                       </div>
                     </TableCell>
                   </TableRow>
-                  </SwipeableRow>
                 ))}
               </TableBody>
               {(() => {
