@@ -73,7 +73,7 @@ function StockThermometer({ qty, reorder, maxQty }: { qty: number; reorder: numb
 type StockItem = {
   id: string; name: string; sku: string; qty: number; reorder: number;
   status: string; category: string; value: number; movements: number[];
-  velocity: number; costUsd: number;
+  velocity: number; costUsd: number; leadTimeDays: number; recommendedROP: number;
 };
 
 type SortField = 'status' | 'name' | 'category' | 'qty' | 'value' | 'velocity';
