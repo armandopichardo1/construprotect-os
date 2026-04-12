@@ -204,9 +204,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
   };
 
-  const journalTotalDebit = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
-  const journalTotalCredit = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
-  const journalIsBalanced = Math.abs(journalTotalDebit - journalTotalCredit) < 0.01;
+  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
+  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
+  const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
+  const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
+  const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
 
   // Purchase computed
   const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
