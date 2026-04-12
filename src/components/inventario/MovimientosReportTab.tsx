@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { exportToExcel } from '@/lib/export-utils';
-import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search } from 'lucide-react';
+import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search, Scale } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend, Line, ReferenceLine } from 'recharts';
 
 const TYPE_MAP: Record<string, { label: string; icon: string; color: string }> = {
@@ -141,12 +141,17 @@ export function MovimientosReportTab() {
   }, [movements]);
 
   // Grand totals
-  const totals = useMemo(() => ({
-    movements: movements.length,
-    entries: movements.filter((m: any) => m.quantity > 0).reduce((s: number, m: any) => s + m.quantity, 0),
-    exits: movements.filter((m: any) => m.quantity < 0).reduce((s: number, m: any) => s + Math.abs(m.quantity), 0),
-    totalValue: movements.reduce((s: number, m: any) => s + Math.abs(m.quantity) * (Number(m.unit_cost_usd) || 0), 0),
-  }), [movements]);
+  const totals = useMemo(() => {
+    let entries = 0, exits = 0, totalValue = 0, netValue = 0;
+    movements.forEach((m: any) => {
+      const cost = Number(m.unit_cost_usd) || 0;
+      if (m.quantity > 0) entries += m.quantity;
+      else exits += Math.abs(m.quantity);
+      totalValue += Math.abs(m.quantity) * cost;
+      netValue += m.quantity * cost;
+    });
+    return { movements: movements.length, entries, exits, totalValue, netQty: entries - exits, netValue };
+  }, [movements]);
 
   // Filtered detail
   const filteredMovements = useMemo(() => {
@@ -267,10 +272,11 @@ export function MovimientosReportTab() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KpiMini icon={<FileBarChart className="w-4 h-4" />} label="Movimientos" value={totals.movements} color="text-primary" />
         <KpiMini icon={<TrendingUp className="w-4 h-4" />} label="Entradas (uds)" value={`+${totals.entries}`} color="text-success" />
         <KpiMini icon={<TrendingDown className="w-4 h-4" />} label="Salidas (uds)" value={`-${totals.exits}`} color="text-destructive" />
+        <KpiMini icon={<Scale className="w-4 h-4" />} label="Neto Acumulado" value={`${totals.netQty >= 0 ? '+' : ''}${totals.netQty} uds · ${formatUSD(totals.netValue)}`} color={totals.netQty >= 0 ? 'text-success' : 'text-destructive'} />
         <KpiMini icon={<Package className="w-4 h-4" />} label="Valor Total" value={formatUSD(totals.totalValue)} color="text-warning" />
       </div>
 
