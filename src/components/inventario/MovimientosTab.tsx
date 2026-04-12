@@ -217,7 +217,7 @@ function MovementFormDialog({ open, onOpenChange, queryClient }: { open: boolean
     toast.success('Movimiento registrado — inventario actualizado');
     queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-    queryClient.invalidateQueries({ queryKey: ['journal-entries-finanzas'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     onOpenChange(false);
     setForm({ product_id: '', movement_type: 'receipt', quantity: '', unit_cost_usd: '', notes: '' });
   };

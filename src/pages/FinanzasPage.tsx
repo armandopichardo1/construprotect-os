@@ -138,7 +138,7 @@ export default function FinanzasPage() {
   });
 
   const { data: journalEntries = [] } = useQuery({
-    queryKey: ['journal-entries-finanzas'],
+    queryKey: ['journal-entries'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('journal_entries')
