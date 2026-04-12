@@ -246,7 +246,7 @@ export default function FinanzasPage() {
         </div>
 
         {tab === 'Crear Transacción' && (
-          <CrearTransaccionTab rate={latestRate}
+          <CrearTransaccionTab rate={latestRate} rateForMonth={rateForMonth}
             onEditSale={(data: any) => { setSalePrefill(data); setTab('Ventas'); }}
             onEditExpense={(data: any) => { setExpensePrefill(data); setTab('Gastos'); }}
             onEditCost={(data: any) => { setCostPrefill(data); setTab('Costos'); }} />
