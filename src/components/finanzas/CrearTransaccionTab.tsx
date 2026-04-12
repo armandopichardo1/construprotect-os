@@ -1302,12 +1302,20 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30">
                       <span className="text-xs font-bold">Totales</span>
                       <div className="text-right">
-                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
-                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalDebit * xr)}</span>
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>
+                          {currencyBase === 'DOP' ? formatDOP(journalTotalDebitRaw) : formatUSD(journalTotalDebitRaw)}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                          {currencyBase === 'DOP' ? formatUSD(journalTotalDebit) : formatDOP(journalTotalDebitRaw * xr)}
+                        </span>
                       </div>
                       <div className="text-right">
-                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
-                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalCredit * xr)}</span>
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>
+                          {currencyBase === 'DOP' ? formatDOP(journalTotalCreditRaw) : formatUSD(journalTotalCreditRaw)}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                          {currencyBase === 'DOP' ? formatUSD(journalTotalCredit) : formatDOP(journalTotalCreditRaw * xr)}
+                        </span>
                       </div>
                       <span />
                     </div>
