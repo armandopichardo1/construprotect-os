@@ -157,6 +157,22 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
       }
     });
 
+    // === ASIENTOS MANUALES (journal_entries → journal_entry_lines) ===
+    const filteredJournals = filterByDate(journalEntries);
+    filteredJournals.forEach((je: any) => {
+      const lines = je.journal_entry_lines || [];
+      lines.forEach((line: any) => {
+        const accId = line.account_id;
+        if (!accId) return;
+        const debit = Number(line.debit_usd || 0);
+        const credit = Number(line.credit_usd || 0);
+        if (debit === 0 && credit === 0) return;
+        ensure(accId);
+        accMap[accId].debits += debit;
+        accMap[accId].credits += credit;
+      });
+    });
+
     // Build rows
     const result: AccountRow[] = accounts
       .map((a: any) => {
