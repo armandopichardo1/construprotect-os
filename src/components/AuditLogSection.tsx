@@ -101,6 +101,7 @@ export function AuditLogSection() {
     return logs.filter(r => {
       if (moduleFilter !== 'all' && r.module !== moduleFilter) return false;
       if (actionFilter !== 'all' && r.action !== actionFilter) return false;
+      if (userFilter !== 'all' && (r.user_name || '—') !== userFilter) return false;
       if (search) {
         const s = search.toLowerCase();
         return (
@@ -111,9 +112,10 @@ export function AuditLogSection() {
       }
       return true;
     });
-  }, [logs, moduleFilter, actionFilter, search]);
+  }, [logs, moduleFilter, actionFilter, userFilter, search]);
 
   const modules = useMemo(() => [...new Set(logs.map(r => r.module))].sort(), [logs]);
+  const users = useMemo(() => [...new Set(logs.map(r => r.user_name || '—'))].sort(), [logs]);
 
   if (isLoading) {
     return <p className="text-xs text-muted-foreground py-8 text-center">Cargando historial de actividad...</p>;
