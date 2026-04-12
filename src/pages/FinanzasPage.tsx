@@ -358,7 +358,7 @@ export default function FinanzasPage() {
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
         {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
-        {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
+        {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} costs={costs} journalEntries={journalEntries} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
         {tab === 'AI Asesor' && <AIAsesorTab sales={sales} expenses={expenses} revenueMTD={revenueMTD} grossMargin={grossMargin} />}
       </div>
