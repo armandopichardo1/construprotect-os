@@ -1,78 +1,79 @@
 
 
-# Auditoría Completa — ConstruProtect OS
+# Plan: Reorganizar Productos, Pricing y Costo Promedio Ponderado
 
-## Bugs y Glitches Encontrados
+## Resumen
 
-### 1. BUG CRÍTICO: `SelectItem value=""` en formularios de Gasto/Costo
-**Archivo:** `src/pages/FinanzasPage.tsx` (líneas 856, 1066)
-**Problema:** `<SelectItem value="">Sin asignar</SelectItem>` — Radix UI Select no permite strings vacíos como valor. Esto causa un error silencioso donde el select no puede ser "reseteado" a "Sin asignar" una vez que se elige una cuenta. El componente puede crashear o no funcionar correctamente.
-**Fix:** Cambiar `value=""` a `value="none"` y mapear "none" → null al guardar.
+Separar la gestión de productos en dos partes:
+1. **Maestras > Productos**: Solo datos básicos del producto (SKU, nombre, marca, categoría, dimensiones, specs)
+2. **Finanzas > Pricing**: Nueva pestaña con toda la gestión de precios, márgenes y costos
+3. **Costo unitario**: Empieza en 0 y se actualiza automáticamente con el método de costo promedio ponderado al recibir envíos
 
-### 2. BUG: ExchangeRateKpi invalida query key incorrecto
-**Archivo:** `src/pages/FinanzasPage.tsx` (línea 83)
-**Problema:** `queryClient.invalidateQueries({ queryKey: ['latest-rate'] })` — pero el hook `useExchangeRate` usa `queryKey: ['all-exchange-rates']`. Cuando actualizas la tasa desde el botón refresh en Finanzas > Resumen, el KPI se actualiza pero los cálculos del resto de la página (que usan `rateForMonth`) no se refrescan.
-**Fix:** Agregar invalidación de `['all-exchange-rates']` junto con `['latest-rate']`.
+---
 
-### 3. BUG: Gastos tab muestra empty state incorrecto
-**Archivo:** `src/pages/FinanzasPage.tsx` (línea 758)
-**Problema:** `{expenses.length === 0 && ...}` usa el array sin filtrar, no `filteredExpenses`. Si hay gastos pero están fuera del rango del filtro, el usuario verá una tabla vacía sin mensaje.
-**Fix:** Cambiar a `{filteredExpenses.length === 0 && ...}`. Lo mismo aplica para Costos (línea 969).
+## Cambios detallados
 
-### 4. BUG: Ventas editadas pierden payment_status
-**Archivo:** `src/pages/FinanzasPage.tsx` (línea 573)
-**Problema:** `SaleFormDialog.handleSave` siempre setea `payment_status: 'pending'` al editar. Si una venta estaba marcada como "Pagado", al editarla se revierte a "Pendiente".
-**Fix:** Preservar el `editSale.payment_status` existente al editar.
+### 1. Simplificar ProductDialog (formulario de alta de productos)
 
-### 5. BUG: Sale form dialog no genera asiento contable
-**Archivo:** `src/pages/FinanzasPage.tsx` (SaleFormDialog)
-**Problema:** El formulario de venta dentro de Finanzas > Ventas NO genera asiento contable automático, pero el formulario en "Crear Transacción" sí lo hace. Inconsistencia funcional.
-**Fix:** Unificar la lógica o agregar generación de asiento en SaleFormDialog.
+**Archivo:** `src/components/ProductDialog.tsx`
 
-### 6. GLITCH: P&L usa `amount_usd` para gastos — inconsistencia con moneda
-**Archivo:** `src/pages/FinanzasPage.tsx` (línea 1124, 1126)
-**Problema:** `calcPeriodTotals` suma `amount_usd` para gastos, pero algunos gastos pueden haber sido ingresados en DOP (con `amount_usd` calculado via tasa). Cuando la tasa cambia, los valores históricos se distorsionan. Este es un issue de diseño menor pero consistente.
-**Fix:** El diseño actual es aceptable (USD como moneda base interna), pero conviene verificar que `amount_usd` siempre se popula correctamente.
+- Eliminar del formulario: Costo Unitario, los 4 precios (lista, arquitecto, proyecto, mayoreo), los 4 márgenes
+- Mantener solo: SKU, Nombre, Marca, Categoría, Cobertura m², Punto Reorden, Dimensiones, Uds/Caja, Lead Time, Qty Reorden, Min Order Qty, CBM, Peso
+- Al crear producto, los campos de precio/margen/costo se guardan en 0
 
-### 7. BUG: Expense/Cost form dialogs no auto-asignan cuenta
-**Archivo:** `src/pages/FinanzasPage.tsx` (ExpenseFormDialog, CostFormDialog)
-**Problema:** Los formularios de edición rápida (Gastos tab, Costos tab) no aplican la lógica de auto-asignación de cuenta contable al cambiar categoría, a diferencia del formulario en "Crear Transacción" que sí lo hace.
-**Fix:** Agregar la misma lógica `EXPENSE_ACCOUNT_MAP` / `COST_ACCOUNT_MAP` a estos dialogs.
+### 2. Simplificar tabla de Productos en ProductosPage
 
-### 8. GLITCH: Login page muestra hint de usuarios
-**Archivo:** `src/pages/LoginPage.tsx` (línea 120-122)
-**Problema:** `<p>Usuarios: apichardo, lazar, dazar</p>` — esto es información sensible visible en producción.
-**Fix:** Eliminar esta línea.
+**Archivo:** `src/pages/ProductosPage.tsx`
 
-### 9. BUG MENOR: Sale deletion no revierte inventario
-**Archivo:** `src/pages/FinanzasPage.tsx` (handleDeleteSale)
-**Problema:** Al eliminar una venta, se eliminan los `sale_items` pero no se revierte la deducción de inventario que hizo el trigger `handle_sale_item_inventory`. La venta se borra pero el inventario queda descontado.
-**Fix:** Antes de eliminar los sale_items, recalcular y devolver cantidades al inventario.
+- Eliminar columnas de: Costo Unitario, Precio Lista, Margen Lista, Margen Arquitecto, Margen Proyecto, Precio Mayorista, Margen Mayorista
+- Dejar columnas: SKU, Nombre, Marca, Categoría, Dimensiones, Uds/Caja, acciones
+- Eliminar lógica de edición inline de precios/márgenes y el footer de promedios de margen
 
-### 10. GLITCH: Receipt upload en Costos tab pasa `expenseId`
-**Archivo:** `src/pages/FinanzasPage.tsx` (línea 950)
-**Problema:** `<ReceiptUpload expenseId={c.id} ...>` — el componente está diseñado para gastos, pero se usa para costos. Si el ReceiptUpload actualiza la tabla `expenses`, el receipt del costo se perdería.
-**Fix:** Verificar que ReceiptUpload sea genérico o crear una variante para costos.
+### 3. Crear pestaña "Pricing" en Finanzas
 
-## Plan de Corrección (Priorizado)
+**Archivo:** `src/pages/FinanzasPage.tsx` (agregar tab) + nuevo `src/components/finanzas/PricingTab.tsx`
 
-### Paso 1: Fixes críticos de UI
-- Cambiar `SelectItem value=""` → `value="none"` en ExpenseFormDialog y CostFormDialog
-- Corregir invalidación de exchange rate queries
-- Corregir empty state condicional en Gastos/Costos tabs
+- Agregar "Pricing" a la lista de tabs de Finanzas
+- Crear componente `PricingTab` que contenga:
+  - Tabla completa de productos con: SKU, Nombre, Costo Unitario (read-only, calculado), 4 precios, 4 márgenes
+  - Edición inline de precios y márgenes (mover la lógica actual de `ProductosPage`)
+  - Cálculo automático de márgenes cuando se cambia precio y viceversa
+  - Footer con promedios de márgenes
+  - Filtros por categoría y búsqueda
+  - El costo unitario será de solo lectura (viene del promedio ponderado de compras)
 
-### Paso 2: Fixes de lógica de negocio
-- Preservar `payment_status` al editar ventas
-- Agregar auto-asignación de cuenta contable en ExpenseFormDialog y CostFormDialog
-- Eliminar hint de usuarios en login page
+### 4. Costo promedio ponderado al recibir envíos
 
-### Paso 3: Fixes de integridad de datos
-- Agregar reversión de inventario al eliminar ventas
-- Verificar ReceiptUpload funcione para tabla de costos
+**Archivo:** `src/components/inventario/ShipmentsTab.tsx`
 
-### Archivos a modificar:
-1. `src/pages/FinanzasPage.tsx` — fixes 1, 2, 3, 4, 5, 7, 9, 10
-2. `src/pages/LoginPage.tsx` — fix 8
+- Al ejecutar `receiveShipment`, después de actualizar inventario, calcular el nuevo costo promedio ponderado:
+  
+```text
+Nuevo Costo = (Qty existente × Costo actual + Qty recibida × Costo nuevo) 
+              ÷ (Qty existente + Qty recibida)
+```
 
-Total: ~10 correcciones en 2 archivos.
+- Actualizar `products.unit_cost_usd` y recalcular `total_unit_cost_usd` y los 4 márgenes basados en los precios existentes
+- Esto asegura que el costo solo cambia cuando hay una recepción real de mercancía
+
+### 5. Limpieza de helpers
+
+- Mover `calcRealMargin`, `calcPriceFromMargin`, `MarginCell`, `EditableCell`, `EditableCategoryCell` de `ProductosPage.tsx` a `PricingTab.tsx` (o a un archivo compartido si se reusan)
+- Eliminar `BulkLogisticsDialog` del ProductosPage si ya no aplica ahí
+
+---
+
+## Flujo resultante
+
+```text
+Alta de producto:  Maestras > Productos > + Nuevo Producto (solo datos básicos)
+                   → Costo unitario = 0, precios = 0
+
+Compra:            Inventario > Envíos > Crear PO con productos y costos
+                   → Recibir envío → Costo promedio ponderado se recalcula
+
+Pricing:           Finanzas > Pricing > Ver/editar precios y márgenes
+                   → Costo unitario (read-only, viene de compras)
+                   → Editar precios → márgenes se recalculan automáticamente
+```
 
