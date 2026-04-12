@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Search, ClipboardCheck, Loader2, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/export-utils';
+import * as XLSX from 'xlsx';
 
 interface CountRow {
   product_id: string;
@@ -141,7 +142,6 @@ export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
     ];
 
     // Build multi-sheet workbook
-    const XLSX = require('xlsx');
     const wb = XLSX.utils.book_new();
     
     const wsDetail = XLSX.utils.json_to_sheet(allData);
