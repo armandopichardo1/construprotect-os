@@ -1037,8 +1037,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           </div>
                         )}
                       </div>
-                      <div><span className="text-muted-foreground text-xs">Monto USD</span><p className="font-bold text-lg">{formatUSD(preview.data.amount_usd)}</p></div>
-                      <div><span className="text-muted-foreground text-xs">Monto DOP</span><p className="font-bold text-lg">{formatDOP(preview.data.amount_dop)}</p></div>
+                      <div><span className="text-muted-foreground text-xs">Monto RD$</span><p className="font-bold text-lg">{formatUSD(preview.data.amount_usd)}</p></div>
                     </>
                   )}
                   {preview.type === 'sale' && (
@@ -1055,8 +1054,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       ))}
                       <div><span className="text-muted-foreground text-xs">Subtotal</span><p className="font-medium">{formatUSD(preview.data.subtotal_usd)}</p></div>
                       <div><span className="text-muted-foreground text-xs">ITBIS (18%)</span><p className="font-medium">{formatUSD(preview.data.itbis_usd)}</p></div>
-                      <div><span className="text-muted-foreground text-xs">Total USD</span><p className="font-bold text-lg">{formatUSD(preview.data.total_usd)}</p></div>
-                      <div><span className="text-muted-foreground text-xs">Total DOP</span><p className="font-bold text-lg">{formatDOP(preview.data.total_dop)}</p></div>
+                      <div><span className="text-muted-foreground text-xs">Total RD$</span><p className="font-bold text-lg">{formatUSD(preview.data.total_usd)}</p></div>
                     </>
                   )}
                 </div>
