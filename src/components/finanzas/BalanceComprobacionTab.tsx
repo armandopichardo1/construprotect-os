@@ -33,6 +33,7 @@ interface BalanceComprobacionTabProps {
   expenses: any[];
   costs: any[];
   saleItems: any[];
+  journalEntries: any[];
   rate: number;
 }
 
@@ -47,7 +48,7 @@ interface AccountRow {
   saldo_acreedor: number;
 }
 
-export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate }: BalanceComprobacionTabProps) {
+export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, journalEntries, rate }: BalanceComprobacionTabProps) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [showEmpty, setShowEmpty] = useState(false);
 
@@ -156,6 +157,22 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate
       }
     });
 
+    // === ASIENTOS MANUALES (journal_entries → journal_entry_lines) ===
+    const filteredJournals = filterByDate(journalEntries);
+    filteredJournals.forEach((je: any) => {
+      const lines = je.journal_entry_lines || [];
+      lines.forEach((line: any) => {
+        const accId = line.account_id;
+        if (!accId) return;
+        const debit = Number(line.debit_usd || 0);
+        const credit = Number(line.credit_usd || 0);
+        if (debit === 0 && credit === 0) return;
+        ensure(accId);
+        accMap[accId].debits += debit;
+        accMap[accId].credits += credit;
+      });
+    });
+
     // Build rows
     const result: AccountRow[] = accounts
       .map((a: any) => {
@@ -183,7 +200,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount, filterByDate]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {
