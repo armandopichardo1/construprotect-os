@@ -260,10 +260,20 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
+  // Account overrides from preview editing
+  const [previewAccountOverrides, setPreviewAccountOverrides] = useState<Record<number, string>>({});
+
+  // Reset overrides when type changes
+  const handleTypeChange = (t: TxType) => {
+    setManualType(t);
+    setCategory('');
+    setPreviewAccountOverrides({});
+  };
+
   // === Accounting Preview Lines ===
   const previewLines = useMemo(() => {
     const getAcct = (id: string) => accounts.find((a: any) => a.id === id);
-    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number }[] = [];
+    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number; accountId?: string }[] = [];
 
     if (manualType === 'journal') {
       journalLines.forEach(jl => {
@@ -273,45 +283,61 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           accountCode: acct?.code || '',
           accountName: acct?.description || 'Sin asignar',
           accountType: acct?.account_type || '',
+          accountId: acct?.id,
           debit: jl.debit || 0,
           credit: jl.credit || 0,
         });
       });
     } else if (manualType === 'purchase' && purchaseTotal > 0) {
-      // Purchase: Debit Inventario/Mercancía, Credit CxP Proveedor
       const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
       const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
-      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: purchaseTotal, credit: 0 });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: purchaseTotal, credit: 0 });
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: purchaseTotal, credit: 0 });
-      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: 0, credit: purchaseTotal });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: 0, credit: purchaseTotal });
       else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: 0, credit: purchaseTotal });
     } else if (manualType === 'credit_note' && parseFloat(cnAmountUsd) > 0) {
       const amt = parseFloat(cnAmountUsd);
-      // Credit Note: Debit CxP (reduce debt), Credit Inventario/Costo (reduce cost)
       const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
       const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
-      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: amt, credit: 0 });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: amt, credit: 0 });
       else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: amt, credit: 0 });
-      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: 0, credit: amt });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: 0, credit: amt });
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: 0, credit: amt });
     } else if (manualType === 'sale' && totalSale > 0) {
       const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
       const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
       const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
-      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, debit: totalSale, credit: 0 });
-      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, debit: 0, credit: totalSale });
+      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, accountId: counterAcct.id, debit: totalSale, credit: 0 });
+      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, accountId: incomeAcct.id, debit: 0, credit: totalSale });
     } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amountUsd) > 0 || parseFloat(amountDop) > 0)) {
       const amt = parseFloat(amountUsd) || (parseFloat(amountDop) || 0) / xr;
       const expAcct = accountId ? getAcct(accountId) : null;
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
-      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, debit: amt, credit: 0 });
+      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, accountId: expAcct.id, debit: amt, credit: 0 });
       else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amt, credit: 0 });
-      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, debit: 0, credit: amt });
+      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, accountId: cashAcct.id, debit: 0, credit: amt });
     }
 
-    return lines;
-  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd]);
+    // Apply overrides
+    return lines.map((line, idx) => {
+      const overrideId = previewAccountOverrides[idx];
+      if (!overrideId) return line;
+      const overrideAcct = accounts.find(a => a.id === overrideId);
+      if (!overrideAcct) return line;
+      return {
+        ...line,
+        accountCode: overrideAcct.code || '',
+        accountName: overrideAcct.description,
+        accountType: overrideAcct.account_type,
+        accountId: overrideAcct.id,
+      };
+    });
+  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd, previewAccountOverrides]);
+
+  const handlePreviewAccountChange = (lineIndex: number, newAccountId: string) => {
+    setPreviewAccountOverrides(prev => ({ ...prev, [lineIndex]: newAccountId }));
+  };
 
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
