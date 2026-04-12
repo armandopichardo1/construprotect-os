@@ -317,8 +317,9 @@ export function ProductosContent() {
             <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border flex items-center gap-1.5">
               <Pencil className="w-3 h-3" /> Haz click en cualquier celda para editar directamente
             </div>
+            <div className="max-h-[calc(100vh-280px)] overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                  <TableRow>
                    <TableHead className="text-xs">SKU</TableHead>
                    <TableHead className="text-xs">Nombre</TableHead>
@@ -507,6 +508,7 @@ export function ProductosContent() {
                 );
               })()}
             </Table>
+            </div>
           </div>
         )}
 
