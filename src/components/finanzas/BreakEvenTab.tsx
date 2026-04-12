@@ -127,7 +127,7 @@ export function BreakEvenTab({ sales, saleItems, expenses }: Props) {
           <ResponsiveContainer width="100%" height={320}>
             <AreaChart data={chartData}>
               <XAxis dataKey="units" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+              <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
               <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} labelFormatter={v => `${v} unidades`} />
               {breakEvenUnits > 0 && <ReferenceLine x={breakEvenUnits} stroke="hsl(38, 92%, 50%)" strokeDasharray="5 5" label={{ value: 'BE', fill: 'hsl(38, 92%, 50%)', fontSize: 10 }} />}
               <Area type="monotone" dataKey="revenue" name="Ingresos" stroke="hsl(217, 91%, 60%)" fill="hsl(217, 91%, 60%)" fillOpacity={0.1} strokeWidth={2} />
