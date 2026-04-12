@@ -13,8 +13,11 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert } from 'lucide-react';
-import { streamBusinessAI } from '@/lib/business-ai';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Bot, RefreshCw, Plus, AlertTriangle, Clock, DollarSign, Package, TrendingUp, BarChart3, Warehouse, Bell, Settings, Users, ShieldAlert, ChevronDown, Sparkles } from 'lucide-react';
+import { streamBusinessAI, AI_MODELS } from '@/lib/business-ai';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useAlertLogger } from '@/hooks/useAlertHistory';
 import ReactMarkdown from 'react-markdown';
@@ -48,6 +51,9 @@ export default function DashboardPage() {
   const [showReview, setShowReview] = useState(false);
   const [reviewContent, setReviewContent] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewModel, setReviewModel] = useState('google/gemini-2.5-flash');
+  const [reviewPrompt, setReviewPrompt] = useState('');
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
   const alertsNotifiedRef = useRef(false);
 
   const { data: inventoryStats } = useQuery({
@@ -274,6 +280,8 @@ export default function DashboardPage() {
     try {
       await streamBusinessAI({
         action: 'review',
+        model: reviewModel,
+        customPrompt: reviewPrompt || undefined,
         onDelta: (chunk) => setReviewContent(prev => prev + chunk),
         onDone: () => setReviewLoading(false),
       });
@@ -553,6 +561,46 @@ export default function DashboardPage() {
               </Button>
             </DialogTitle>
           </DialogHeader>
+
+          {/* Model & Prompt Controls */}
+          <div className="space-y-3 border-b border-border pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1 block">Modelo AI</label>
+                <Select value={reviewModel} onValueChange={setReviewModel}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AI_MODELS.map(m => (
+                      <SelectItem key={m.id} value={m.id} className="text-xs">{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-4">
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setShowPromptEditor(!showPromptEditor)}>
+                  <Sparkles className="w-3 h-3" />
+                  {showPromptEditor ? 'Ocultar prompt' : 'Editar prompt'}
+                  <ChevronDown className={cn("w-3 h-3 transition-transform", showPromptEditor && "rotate-180")} />
+                </Button>
+              </div>
+            </div>
+
+            {showPromptEditor && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Instrucciones personalizadas (se agregan al prompt del sistema)</label>
+                <Textarea
+                  value={reviewPrompt}
+                  onChange={e => setReviewPrompt(e.target.value)}
+                  placeholder="Ej: Enfócate más en el análisis de márgenes por categoría. Incluye recomendaciones de pricing. Analiza la estacionalidad de las ventas..."
+                  className="text-xs min-h-[80px] resize-y"
+                />
+                <p className="text-[10px] text-muted-foreground">💡 Tip: Sé específico sobre qué áreas quieres profundizar (financiero, operativo, ventas, inventario, etc.)</p>
+              </div>
+            )}
+          </div>
+
           <div className="prose prose-sm prose-invert max-w-none">
             {reviewContent ? <ReactMarkdown>{reviewContent}</ReactMarkdown> : (
               <div className="text-center text-muted-foreground py-8">

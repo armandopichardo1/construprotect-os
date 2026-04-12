@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, payload } = await req.json();
+    const { action, payload, model: requestedModel, customPrompt } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -473,6 +473,13 @@ ${(deals || []).slice(0, 10).map((d: any) => `$${Number(d.value_usd).toLocaleStr
 Genera las recomendaciones de punto de reorden en JSON.`;
     }
 
+    // If user provided a custom prompt, append it as additional instructions
+    if (customPrompt && customPrompt.trim()) {
+      systemPrompt = customPrompt.trim() + "\n\n---\nCONTEXTO ADICIONAL DEL SISTEMA ORIGINAL:\n" + systemPrompt;
+    }
+
+    const selectedModel = requestedModel || "google/gemini-2.5-flash";
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -480,7 +487,7 @@ Genera las recomendaciones de punto de reorden en JSON.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: selectedModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
