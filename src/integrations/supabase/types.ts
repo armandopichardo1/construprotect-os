@@ -911,6 +911,105 @@ export type Database = {
         }
         Relationships: []
       }
+      physical_count_items: {
+        Row: {
+          adjustment_value_usd: number
+          counted_qty: number
+          difference: number
+          id: string
+          physical_count_id: string
+          product_id: string | null
+          product_name: string
+          sku: string
+          system_qty: number
+          unit_cost_usd: number
+        }
+        Insert: {
+          adjustment_value_usd?: number
+          counted_qty?: number
+          difference?: number
+          id?: string
+          physical_count_id: string
+          product_id?: string | null
+          product_name: string
+          sku: string
+          system_qty?: number
+          unit_cost_usd?: number
+        }
+        Update: {
+          adjustment_value_usd?: number
+          counted_qty?: number
+          difference?: number
+          id?: string
+          physical_count_id?: string
+          product_id?: string | null
+          product_name?: string
+          sku?: string
+          system_qty?: number
+          unit_cost_usd?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physical_count_items_physical_count_id_fkey"
+            columns: ["physical_count_id"]
+            isOneToOne: false
+            referencedRelation: "physical_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physical_count_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      physical_counts: {
+        Row: {
+          created_at: string
+          id: string
+          net_adjustment_value_usd: number
+          notes: string | null
+          performed_by: string | null
+          performed_by_name: string | null
+          shortfall_value_usd: number
+          surplus_value_usd: number
+          total_differences: number
+          total_products_counted: number
+          total_shortfall: number
+          total_surplus: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          net_adjustment_value_usd?: number
+          notes?: string | null
+          performed_by?: string | null
+          performed_by_name?: string | null
+          shortfall_value_usd?: number
+          surplus_value_usd?: number
+          total_differences?: number
+          total_products_counted?: number
+          total_shortfall?: number
+          total_surplus?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          net_adjustment_value_usd?: number
+          notes?: string | null
+          performed_by?: string | null
+          performed_by_name?: string | null
+          shortfall_value_usd?: number
+          surplus_value_usd?: number
+          total_differences?: number
+          total_products_counted?: number
+          total_shortfall?: number
+          total_surplus?: number
+        }
+        Relationships: []
+      }
       product_requests: {
         Row: {
           category: string | null

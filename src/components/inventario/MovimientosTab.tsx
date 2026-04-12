@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus, ClipboardCheck } from 'lucide-react';
+import { Plus, ClipboardCheck, History } from 'lucide-react';
 import { BulkPhysicalCountDialog } from './BulkPhysicalCountDialog';
+import { PhysicalCountHistoryDialog } from './PhysicalCountHistoryDialog';
 
 const MOVEMENT_TYPES: Record<string, { label: string; icon: string; sign: number; desc: string }> = {
   receipt: { label: 'Entrada Manual', icon: '📥', sign: 1, desc: 'Ingreso de productos sin envío' },
@@ -36,6 +37,7 @@ export function MovimientosTab() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [showBulkCount, setShowBulkCount] = useState(false);
+  const [showCountHistory, setShowCountHistory] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const { data: movements = [] } = useQuery({
@@ -63,6 +65,9 @@ export function MovimientosTab() {
         </Button>
         <Button size="sm" variant="outline" onClick={() => setShowBulkCount(true)}>
           <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Conteo Físico
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setShowCountHistory(true)}>
+          <History className="w-3.5 h-3.5 mr-1" /> Historial Conteos
         </Button>
         <div className="flex gap-1 flex-wrap">
           {FILTER_OPTIONS.map(opt => (
@@ -121,6 +126,7 @@ export function MovimientosTab() {
 
       <MovementFormDialog open={showForm} onOpenChange={setShowForm} queryClient={queryClient} />
       <BulkPhysicalCountDialog open={showBulkCount} onOpenChange={setShowBulkCount} />
+      <PhysicalCountHistoryDialog open={showCountHistory} onOpenChange={setShowCountHistory} />
     </div>
   );
 }
