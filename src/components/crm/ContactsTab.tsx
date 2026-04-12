@@ -54,7 +54,7 @@ export function ContactsTab({ contacts, onEdit, onDelete, onNew, onView }: Conta
       {filtered.length > 0 && (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="overflow-auto max-h-[calc(100vh-320px)]">
-            <Table>
+            <Table wrapperClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <TableRow className="bg-card">
                   <TableHead className="text-[10px] font-semibold w-[180px]">Contacto</TableHead>
