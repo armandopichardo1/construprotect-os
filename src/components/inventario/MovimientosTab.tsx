@@ -35,6 +35,7 @@ const FILTER_OPTIONS = [
 export function MovimientosTab() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [showBulkCount, setShowBulkCount] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const { data: movements = [] } = useQuery({
