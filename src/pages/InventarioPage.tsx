@@ -355,7 +355,7 @@ export default function InventarioPage() {
                       <TableCell className="text-xs text-center font-mono">{item.reorder}</TableCell>
                       <TableCell className="text-xs text-center">
                         <TooltipProvider delayDuration={200}>
-                          <Tooltip>
+                          <UITooltip>
                             <TooltipTrigger asChild>
                               <span className={cn(
                                 'inline-flex items-center gap-1 font-mono font-semibold',
