@@ -33,7 +33,7 @@ interface BalanceComprobacionTabProps {
   expenses: any[];
   costs: any[];
   saleItems: any[];
-  journalEntries: any[];
+  journalEntries?: any[];
   rate: number;
 }
 
@@ -48,7 +48,7 @@ interface AccountRow {
   saldo_acreedor: number;
 }
 
-export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, journalEntries, rate }: BalanceComprobacionTabProps) {
+export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: BalanceComprobacionTabProps) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [showEmpty, setShowEmpty] = useState(false);
 
@@ -157,19 +157,14 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
       }
     });
 
-    // === ASIENTOS MANUALES (journal_entries → journal_entry_lines) ===
-    const filteredJournals = filterByDate(journalEntries);
+    // === ASIENTOS MANUALES (journal entries) ===
+    const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
     filteredJournals.forEach((je: any) => {
-      const lines = je.journal_entry_lines || [];
-      lines.forEach((line: any) => {
-        const accId = line.account_id;
-        if (!accId) return;
-        const debit = Number(line.debit_usd || 0);
-        const credit = Number(line.credit_usd || 0);
-        if (debit === 0 && credit === 0) return;
-        ensure(accId);
-        accMap[accId].debits += debit;
-        accMap[accId].credits += credit;
+      je.journal_entry_lines?.forEach((line: any) => {
+        if (!line.account_id) return;
+        ensure(line.account_id);
+        accMap[line.account_id].debits += Number(line.debit_usd || 0);
+        accMap[line.account_id].credits += Number(line.credit_usd || 0);
       });
     });
 
@@ -200,7 +195,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount, filterByDate]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {

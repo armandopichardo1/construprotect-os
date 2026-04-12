@@ -43,11 +43,11 @@ interface Props {
   sales: any[];
   expenses: any[];
   costs: any[];
-  journalEntries: any[];
+  journalEntries?: any[];
   rate: number;
 }
 
-export function LibroDiarioTab({ sales, expenses, costs, journalEntries, rate }: Props) {
+export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], rate }: Props) {
   const queryClient = useQueryClient();
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,21 +122,19 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries, rate }:
       });
     });
 
-    // === ASIENTOS MANUALES (journal_entries) ===
+    // Journal entries (manual)
     journalEntries.forEach((je: any) => {
-      const lines = je.journal_entry_lines || [];
-      const totalDebit = lines.reduce((s: number, l: any) => s + Number(l.debit_usd || 0), 0);
-      const totalCredit = lines.reduce((s: number, l: any) => s + Number(l.credit_usd || 0), 0);
+      const totalDebit = Number(je.total_debit_usd || 0);
+      const totalCredit = Number(je.total_credit_usd || 0);
       const exRate = Number(je.exchange_rate) || rate;
-      const firstLine = lines[0];
       all.push({
         id: je.id,
         date: je.date,
         type: 'journal',
         description: je.description,
         category: 'Asiento Manual',
-        account_code: firstLine?.chart_of_accounts?.code || '',
-        account_name: lines.map((l: any) => l.chart_of_accounts?.description || '').filter(Boolean).join(', ').slice(0, 60) || 'Asiento',
+        account_code: '',
+        account_name: je.journal_entry_lines?.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
         debit_usd: totalDebit,
         credit_usd: totalCredit,
         debit_dop: totalDebit * exRate,

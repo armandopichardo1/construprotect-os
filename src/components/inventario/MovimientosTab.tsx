@@ -137,98 +137,83 @@ function MovementFormDialog({ open, onOpenChange, queryClient }: { open: boolean
     if (!qty || qty <= 0) { toast.error('Cantidad inválida'); return; }
     setSaving(true);
 
-    try {
-      const typeInfo = MOVEMENT_TYPES[form.movement_type];
-      let finalQty: number;
-      let currentQty = 0;
-
-      if (form.movement_type === 'adjustment') {
-        const { data: inv } = await supabase.from('inventory').select('quantity_on_hand').eq('product_id', form.product_id).maybeSingle();
-        currentQty = inv?.quantity_on_hand || 0;
-        finalQty = qty - currentQty;
-      } else {
-        finalQty = typeInfo.sign >= 0 ? qty : -qty;
-      }
-
-      const costUsd = Number(form.unit_cost_usd) || Number(products.find(p => p.id === form.product_id)?.unit_cost_usd) || 0;
-      const product = products.find(p => p.id === form.product_id);
-
-      // Insert movement
-      const { error: mvError } = await supabase.from('inventory_movements').insert({
-        product_id: form.product_id,
-        movement_type: form.movement_type as any,
-        quantity: finalQty,
-        unit_cost_usd: costUsd,
-        notes: form.notes.trim() || null,
-      });
-      if (mvError) throw mvError;
-
-      // Update inventory
-      const { data: inv } = await supabase.from('inventory').select('id, quantity_on_hand').eq('product_id', form.product_id).maybeSingle();
-      if (inv) {
-        await supabase.from('inventory').update({
-          quantity_on_hand: Math.max(0, inv.quantity_on_hand + finalQty),
-        }).eq('id', inv.id);
-      } else {
-        await supabase.from('inventory').insert({
-          product_id: form.product_id,
-          quantity_on_hand: Math.max(0, finalQty),
-        });
-      }
-
-      // === AUTO JOURNAL ENTRY for adjustments ===
-      if (form.movement_type === 'adjustment' && finalQty !== 0) {
-        const adjustValue = Math.abs(finalQty) * costUsd;
-        if (adjustValue > 0) {
-          // Find accounts: Inventarios (13100) and Ajuste de Inventario (59900)
-          const { data: accounts } = await supabase.from('chart_of_accounts')
-            .select('id, code')
-            .in('code', ['13100', '59900']);
-
-          const invAccount = accounts?.find(a => a.code === '13100');
-          const adjAccount = accounts?.find(a => a.code === '59900');
-
-          if (invAccount && adjAccount) {
-            const desc = `Ajuste inventario: ${product?.sku || ''} ${product?.name || ''} (${currentQty} → ${qty})`;
-            const { data: entry } = await supabase.from('journal_entries').insert({
-              description: desc,
-              total_debit_usd: adjustValue,
-              total_credit_usd: adjustValue,
-              notes: form.notes.trim() || `Conteo físico: ${qty} unidades`,
-            }).select().single();
-
-            if (entry) {
-              const lines = finalQty > 0
-                ? [
-                    // Found MORE than expected: Debit Inventory, Credit Ajuste (gain)
-                    { journal_entry_id: entry.id, account_id: invAccount.id, debit_usd: adjustValue, credit_usd: 0, description: 'Aumento inventario por conteo' },
-                    { journal_entry_id: entry.id, account_id: adjAccount.id, debit_usd: 0, credit_usd: adjustValue, description: 'Ajuste favorable inventario' },
-                  ]
-                : [
-                    // Found LESS than expected: Debit Ajuste (loss), Credit Inventory
-                    { journal_entry_id: entry.id, account_id: adjAccount.id, debit_usd: adjustValue, credit_usd: 0, description: 'Pérdida por ajuste inventario' },
-                    { journal_entry_id: entry.id, account_id: invAccount.id, debit_usd: 0, credit_usd: adjustValue, description: 'Reducción inventario por conteo' },
-                  ];
-              await supabase.from('journal_entry_lines').insert(lines);
-            }
-          }
-        }
-      }
-
-      toast.success(
-        form.movement_type === 'adjustment'
-          ? `Ajuste registrado (${currentQty} → ${qty}) — asiento contable generado`
-          : 'Movimiento registrado — inventario actualizado'
-      );
-      queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-entries-finanzas'] });
-      onOpenChange(false);
-      setForm({ product_id: '', movement_type: 'receipt', quantity: '', unit_cost_usd: '', notes: '' });
-    } catch (e: any) {
-      toast.error(e.message || 'Error al registrar movimiento');
+    const typeInfo = MOVEMENT_TYPES[form.movement_type];
+    // For adjustments, user enters the actual new quantity — we calculate the delta
+    // For others, sign determines direction
+    let finalQty: number;
+    if (form.movement_type === 'adjustment') {
+      // Get current stock to calculate delta
+      const { data: inv } = await supabase.from('inventory').select('quantity_on_hand').eq('product_id', form.product_id).maybeSingle();
+      const currentQty = inv?.quantity_on_hand || 0;
+      finalQty = qty - currentQty; // positive if adding, negative if removing
+    } else {
+      finalQty = typeInfo.sign >= 0 ? qty : -qty;
     }
+
+    const costUsd = Number(form.unit_cost_usd) || Number(products.find(p => p.id === form.product_id)?.unit_cost_usd) || 0;
+
+    // Insert movement
+    const { error: mvError } = await supabase.from('inventory_movements').insert({
+      product_id: form.product_id,
+      movement_type: form.movement_type as any,
+      quantity: finalQty,
+      unit_cost_usd: costUsd,
+      notes: form.notes.trim() || null,
+    });
+
+    if (mvError) { toast.error('Error al registrar movimiento'); setSaving(false); return; }
+
+    // Update inventory
+    const { data: inv } = await supabase.from('inventory').select('id, quantity_on_hand').eq('product_id', form.product_id).maybeSingle();
+    if (inv) {
+      await supabase.from('inventory').update({
+        quantity_on_hand: Math.max(0, inv.quantity_on_hand + finalQty),
+      }).eq('id', inv.id);
+    } else {
+      await supabase.from('inventory').insert({
+        product_id: form.product_id,
+        quantity_on_hand: Math.max(0, finalQty),
+      });
+    }
+
+    // Auto-generate journal entry for inventory adjustments
+    if (form.movement_type === 'adjustment' && finalQty !== 0) {
+      const adjustmentValue = Math.abs(finalQty) * costUsd;
+      const inventoryAccountId = '90ddec52-5cac-4217-97de-351f864a3bd3'; // 13100 Inventarios
+      const adjustmentAccountId = '147bcb80-f2eb-4205-a82e-feab08b51503'; // 59900 Ajuste de Inventario
+      const prodName = products.find(p => p.id === form.product_id)?.name || '';
+      const desc = finalQty > 0
+        ? `Ajuste inventario (sobrante): +${finalQty} ${prodName}`
+        : `Ajuste inventario (faltante): ${finalQty} ${prodName}`;
+
+      const { data: je } = await supabase.from('journal_entries').insert({
+        description: desc,
+        total_debit_usd: adjustmentValue,
+        total_credit_usd: adjustmentValue,
+        notes: form.notes.trim() || null,
+      }).select('id').single();
+
+      if (je) {
+        const lines = finalQty > 0
+          ? [
+              { journal_entry_id: je.id, account_id: inventoryAccountId, debit_usd: adjustmentValue, credit_usd: 0, description: 'Aumento inventario por sobrante' },
+              { journal_entry_id: je.id, account_id: adjustmentAccountId, debit_usd: 0, credit_usd: adjustmentValue, description: 'Ajuste de inventario' },
+            ]
+          : [
+              { journal_entry_id: je.id, account_id: adjustmentAccountId, debit_usd: adjustmentValue, credit_usd: 0, description: 'Faltante de inventario' },
+              { journal_entry_id: je.id, account_id: inventoryAccountId, debit_usd: 0, credit_usd: adjustmentValue, description: 'Reducción inventario por faltante' },
+            ];
+        await supabase.from('journal_entry_lines').insert(lines);
+      }
+    }
+
     setSaving(false);
+    toast.success('Movimiento registrado — inventario actualizado');
+    queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries-finanzas'] });
+    onOpenChange(false);
+    setForm({ product_id: '', movement_type: 'receipt', quantity: '', unit_cost_usd: '', notes: '' });
   };
 
   const selectedType = MOVEMENT_TYPES[form.movement_type];

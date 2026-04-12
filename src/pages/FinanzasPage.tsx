@@ -137,19 +137,23 @@ export default function FinanzasPage() {
     },
   });
 
-  const { data: saleItems = [] } = useQuery({
-    queryKey: ['sale-items'],
+  const { data: journalEntries = [] } = useQuery({
+    queryKey: ['journal-entries-finanzas'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name, margin_list_pct, margin_architect_pct, margin_project_pct, margin_wholesale_pct)');
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('*, journal_entry_lines(*, chart_of_accounts(code, description))')
+        .order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 
-  const { data: journalEntries = [] } = useQuery({
-    queryKey: ['journal-entries-finanzas'],
+
+  const { data: saleItems = [] } = useQuery({
+    queryKey: ['sale-items'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('journal_entries').select('*, journal_entry_lines(*, chart_of_accounts(code, description, account_type))').order('date', { ascending: false });
+      const { data, error } = await supabase.from('sale_items').select('*, sales(date), products(name, margin_list_pct, margin_architect_pct, margin_project_pct, margin_wholesale_pct)');
       if (error) throw error;
       return data;
     },

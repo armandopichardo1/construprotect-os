@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,7 +34,6 @@ const defaultForm = {
   reorder_point: '10', dimensions: '', units_per_pack: '1', lead_time_days: '21',
   margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
   cbm_per_unit: '', weight_kg_per_unit: '', min_order_qty: '1', reorder_qty: '50',
-  notes: '',
 };
 
 function calcMargin(cost: number, price: number): string {
@@ -80,7 +78,6 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
         weight_kg_per_unit: String(product.weight_kg_per_unit ?? ''),
         min_order_qty: String(product.min_order_qty ?? '1'),
         reorder_qty: String(product.reorder_qty ?? '50'),
-        notes: product.notes || '',
       });
     } else {
       setForm(defaultForm);
@@ -158,7 +155,6 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
       weight_kg_per_unit: Number(form.weight_kg_per_unit) || 0,
       min_order_qty: Number(form.min_order_qty) || 1,
       reorder_qty: Number(form.reorder_qty) || 50,
-      notes: form.notes.trim() || null,
     };
 
     const { error } = isEdit
@@ -236,13 +232,6 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
           <div className="grid grid-cols-2 gap-2">
             <div><Label className="text-xs">CBM por unidad</Label><Input type="number" step="0.001" value={form.cbm_per_unit} onChange={e => set('cbm_per_unit', e.target.value)} className="h-8 text-xs mt-1" placeholder="0.035" /></div>
             <div><Label className="text-xs">Peso por unidad (kg)</Label><Input type="number" step="0.1" value={form.weight_kg_per_unit} onChange={e => set('weight_kg_per_unit', e.target.value)} className="h-8 text-xs mt-1" placeholder="2.5" /></div>
-          </div>
-
-          <p className="text-[10px] font-semibold text-muted-foreground pt-1">📝 Notas</p>
-          <div>
-            <Textarea value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Observaciones, instrucciones especiales, detalles del producto..."
-              className="text-xs min-h-[60px] resize-none" />
           </div>
 
           <Button onClick={handleSave} disabled={saving} className="w-full rounded-xl text-xs mt-2">
