@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { exportToExcel } from '@/lib/export-utils';
 import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend } from 'recharts';
 
 const TYPE_MAP: Record<string, { label: string; icon: string; color: string }> = {
   receipt: { label: 'Entrada', icon: '📥', color: '#3b82f6' },
