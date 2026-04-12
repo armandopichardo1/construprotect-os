@@ -257,6 +257,8 @@ export default function FinanzasPage() {
 
         {tab === 'Pricing' && <PricingTab />}
 
+        {tab === 'Órdenes' && <OrdenesTab />}
+
         {tab === 'Resumen' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
