@@ -89,7 +89,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 }) {
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
-  const [mode, setMode] = useState<Mode>('ai');
+  const [mode, setMode] = useState<Mode>('manual');
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
@@ -132,7 +132,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [history, setHistory] = useState<SessionEntry[]>([]);
 
   // Manual form state
-  const [manualType, setManualType] = useState<TxType>('expense');
+  const [manualType, setManualType] = useState<TxType>('journal');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [vendor, setVendor] = useState('');
@@ -730,15 +730,15 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       <div className="lg:col-span-2 space-y-5">
         {/* Mode toggle */}
         <div className="flex gap-1 rounded-xl bg-muted p-0.5 w-fit">
-          <button onClick={() => setMode('ai')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <Sparkles className="w-3.5 h-3.5" /> Con IA
-          </button>
           <button onClick={() => setMode('manual')}
             className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
               mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
             <FileText className="w-3.5 h-3.5" /> Manual
+          </button>
+          <button onClick={() => setMode('ai')}
+            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+            <Sparkles className="w-3.5 h-3.5" /> Con IA
           </button>
         </div>
 
@@ -855,7 +855,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
             {/* Type selector - scrollable row */}
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {(['sale', 'expense', 'cost', 'purchase', 'credit_note', 'journal'] as const).map(t => (
+              {(['journal', 'expense', 'cost', 'sale', 'purchase', 'credit_note'] as const).map(t => (
                 <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
                   className={cn(
                     'shrink-0 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap',
