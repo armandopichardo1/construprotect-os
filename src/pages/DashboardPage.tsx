@@ -622,15 +622,52 @@ export default function DashboardPage() {
             </div>
 
             {showPromptEditor && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Instrucciones personalizadas (se agregan al prompt del sistema)</label>
-                <Textarea
-                  value={reviewPrompt}
-                  onChange={e => setReviewPrompt(e.target.value)}
-                  placeholder="Ej: Enfócate más en el análisis de márgenes por categoría. Incluye recomendaciones de pricing. Analiza la estacionalidad de las ventas..."
-                  className="text-xs min-h-[80px] resize-y"
-                />
-                <p className="text-[10px] text-muted-foreground">💡 Tip: Sé específico sobre qué áreas quieres profundizar (financiero, operativo, ventas, inventario, etc.)</p>
+              <div className="space-y-3">
+                {/* Saved prompts */}
+                {savedPrompts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      <Star className="w-3 h-3" /> Prompts guardados
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {savedPrompts.map((p, i) => (
+                        <div key={i} className="group flex items-center gap-1 bg-muted/60 hover:bg-muted rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors">
+                          <button
+                            className="text-[11px] text-foreground/80 hover:text-foreground truncate max-w-[200px]"
+                            onClick={() => loadSavedPrompt(p)}
+                            title={p.prompt}
+                          >
+                            {p.name}
+                          </button>
+                          <button
+                            className="text-muted-foreground/50 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); deleteSavedPrompt(i); }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Instrucciones personalizadas</label>
+                    {reviewPrompt.trim() && (
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground" onClick={saveCurrentPrompt}>
+                        <BookmarkPlus className="w-3 h-3" /> Guardar prompt
+                      </Button>
+                    )}
+                  </div>
+                  <Textarea
+                    value={reviewPrompt}
+                    onChange={e => setReviewPrompt(e.target.value)}
+                    placeholder="Ej: Enfócate más en el análisis de márgenes por categoría. Incluye recomendaciones de pricing. Analiza la estacionalidad de las ventas..."
+                    className="text-xs min-h-[80px] resize-y"
+                  />
+                  <p className="text-[10px] text-muted-foreground">💡 Tip: Sé específico sobre qué áreas quieres profundizar (financiero, operativo, ventas, inventario, etc.)</p>
+                </div>
               </div>
             )}
           </div>
