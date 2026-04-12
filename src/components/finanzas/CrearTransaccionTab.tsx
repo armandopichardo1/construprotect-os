@@ -1406,14 +1406,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     </div>
                     {journalLines.map((line, i) => (
                       <div key={i} className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border/50 items-center">
-                        <Select value={line.account_id} onValueChange={v => updateJournalLine(i, 'account_id', v)}>
-                          <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                          <SelectContent>
-                            {leafAccounts.map(a => (
-                              <SelectItem key={a.id} value={a.id} className="text-xs">{a.code} — {a.description}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          value={line.account_id}
+                          onValueChange={v => updateJournalLine(i, 'account_id', v)}
+                          placeholder="Seleccionar cuenta"
+                          searchPlaceholder="Buscar cuenta..."
+                          emptyMessage="Cuenta no encontrada"
+                          options={leafAccounts.map(a => ({ value: a.id, label: `${a.code} — ${a.description}` }))}
+                          className="text-xs h-8"
+                        />
                         <Input type="number" min={0} step={0.01} value={line.debit || ''}
                           onChange={e => updateJournalLine(i, 'debit', parseFloat(e.target.value) || 0)}
                           className="text-xs h-8 text-right" placeholder="0.00" />
