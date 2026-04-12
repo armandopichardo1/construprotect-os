@@ -367,8 +367,8 @@ export function ReorderTab() {
           )}
 
           {/* AI Recommendations table */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <Table>
+          <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+            <Table wrapperClassName="overflow-visible">
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-[10px]">SKU</TableHead>
