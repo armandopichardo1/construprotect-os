@@ -1152,13 +1152,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="rounded-xl bg-muted/50 p-4 space-y-1">
-                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{formatUSD(subtotal)}</span></div>
-                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%)</span><span className="font-mono">{formatUSD(itbis)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? subtotal : subtotal * xr)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%)</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? itbis : itbis * xr)}</span></div>
                   <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/50">
                     <span>Total</span>
                     <div className="text-right">
-                      <span className="text-primary">{formatUSD(totalSale)}</span>
-                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {formatDOP(totalSale * xr)}</span>
+                      <span className="text-primary">{formatBase(currencyBase === 'USD' ? totalSale : totalSale * xr)}</span>
+                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {currencyBase === 'USD' ? formatDOP(totalSale * xr) : formatUSD(totalSale)}</span>
                     </div>
                   </div>
                 </div>
@@ -1238,8 +1238,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   <div className="flex justify-between text-sm font-bold">
                     <span>Total Compra</span>
                     <div className="text-right">
-                      <span className="text-primary">{formatUSD(purchaseTotal)}</span>
-                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {formatDOP(purchaseTotal * xr)}</span>
+                      <span className="text-primary">{formatBase(currencyBase === 'USD' ? purchaseTotal : purchaseTotal * xr)}</span>
+                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {currencyBase === 'USD' ? formatDOP(purchaseTotal * xr) : formatUSD(purchaseTotal)}</span>
                     </div>
                   </div>
                 </div>
