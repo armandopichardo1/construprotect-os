@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { AccountingPreview } from './AccountingPreview';
 
@@ -25,13 +25,13 @@ const EXAMPLES = [
   'Aduanas contenedor $1,200 USD',
 ];
 
-const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-  sale: { label: 'Venta', icon: '💰', color: 'bg-success/15 text-success border-success/30' },
-  expense: { label: 'Gasto', icon: '💸', color: 'bg-warning/15 text-warning border-warning/30' },
-  cost: { label: 'Costo', icon: '🏗️', color: 'bg-primary/15 text-primary border-primary/30' },
-  purchase: { label: 'Compra', icon: '📦', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  credit_note: { label: 'Nota Crédito', icon: '📝', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  journal: { label: 'Asiento', icon: '📖', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
+const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string; hint: string }> = {
+  sale: { label: 'Venta', icon: '💰', color: 'bg-success/15 text-success border-success/30', hint: 'Ingreso por producto o servicio' },
+  expense: { label: 'Gasto', icon: '💸', color: 'bg-warning/15 text-warning border-warning/30', hint: 'Gasto operativo de la empresa' },
+  cost: { label: 'Costo', icon: '🏗️', color: 'bg-primary/15 text-primary border-primary/30', hint: 'Costo directo de mercancía' },
+  purchase: { label: 'Compra', icon: '📦', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', hint: 'Compra de inventario a proveedor' },
+  credit_note: { label: 'Nota Crédito', icon: '📝', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', hint: 'Crédito o devolución de proveedor' },
+  journal: { label: 'Asiento', icon: '📖', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30', hint: 'Partida contable libre' },
 };
 
 const EXPENSE_CATEGORIES: Record<string, string> = {
@@ -61,6 +61,7 @@ interface SessionEntry {
 
 type Mode = 'ai' | 'manual';
 type TxType = 'expense' | 'cost' | 'sale' | 'journal' | 'purchase' | 'credit_note';
+type CurrencyBase = 'USD' | 'DOP';
 
 interface SaleItem {
   product_id: string;
@@ -90,6 +91,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const queryClient = useQueryClient();
   const xr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
+  const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('USD');
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
@@ -136,8 +138,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [vendor, setVendor] = useState('');
-  const [amountUsd, setAmountUsd] = useState('');
-  const [amountDop, setAmountDop] = useState('');
+  const [amount, setAmount] = useState(''); // single amount field in currencyBase
   const [manualDate, setManualDate] = useState<Date | undefined>();
   const [accountId, setAccountId] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
@@ -158,7 +159,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   // Credit note state
   const [cnSupplierId, setCnSupplierId] = useState('');
   const [cnSupplierName, setCnSupplierName] = useState('');
-  const [cnAmountUsd, setCnAmountUsd] = useState('');
+  const [cnAmount, setCnAmount] = useState(''); // in currencyBase
   const [cnReason, setCnReason] = useState('');
   const [cnNotes, setCnNotes] = useState('');
 
@@ -169,6 +170,23 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   ]);
   const [journalDescription, setJournalDescription] = useState('');
   const [journalNotes, setJournalNotes] = useState('');
+
+  // Currency conversion helpers
+  const toUsd = (val: number) => currencyBase === 'USD' ? val : val / xr;
+  const toDop = (val: number) => currencyBase === 'DOP' ? val : val * xr;
+  const currencySymbol = currencyBase === 'USD' ? '$' : 'RD$';
+  const formatBase = (val: number) => currencyBase === 'USD' ? formatUSD(val) : formatDOP(val);
+  const formatEquiv = (val: number) => currencyBase === 'USD' ? formatDOP(val * xr) : formatUSD(val / xr);
+
+  // Get USD value from amount field
+  const getAmountUsd = (raw: string) => {
+    const n = parseFloat(raw) || 0;
+    return currencyBase === 'USD' ? n : n / xr;
+  };
+  const getAmountDop = (raw: string) => {
+    const n = parseFloat(raw) || 0;
+    return currencyBase === 'DOP' ? n : n * xr;
+  };
 
   const addJournalLine = () => setJournalLines(prev => [...prev, { account_id: '', debit: 0, credit: 0, description: '' }]);
   const removeJournalLine = (i: number) => setJournalLines(prev => prev.filter((_, idx) => idx !== i));
@@ -218,18 +236,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     }
   };
 
-  // Currency auto-conversion
-  const handleUsdChange = (v: string) => {
-    setAmountUsd(v);
-    const n = parseFloat(v);
-    if (!isNaN(n) && n > 0) setAmountDop((n * xr).toFixed(0));
-  };
-  const handleDopChange = (v: string) => {
-    setAmountDop(v);
-    const n = parseFloat(v);
-    if (!isNaN(n) && n > 0) setAmountUsd((n / xr).toFixed(2));
-  };
-
   const handleClientChange = (id: string) => {
     setContactId(id);
     const contact = contacts.find((c: any) => c.id === id);
@@ -263,12 +269,17 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   // Account overrides from preview editing
   const [previewAccountOverrides, setPreviewAccountOverrides] = useState<Record<number, string>>({});
 
-  // Reset overrides when type changes
   const handleTypeChange = (t: TxType) => {
     setManualType(t);
     setCategory('');
     setPreviewAccountOverrides({});
   };
+
+  // Credit note USD amount (for preview/save)
+  const cnAmountUsd = useMemo(() => {
+    const n = parseFloat(cnAmount) || 0;
+    return currencyBase === 'USD' ? n : n / xr;
+  }, [cnAmount, currencyBase, xr]);
 
   // === Accounting Preview Lines ===
   const previewLines = useMemo(() => {
@@ -295,14 +306,13 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: purchaseTotal, credit: 0 });
       if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: 0, credit: purchaseTotal });
       else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: 0, credit: purchaseTotal });
-    } else if (manualType === 'credit_note' && parseFloat(cnAmountUsd) > 0) {
-      const amt = parseFloat(cnAmountUsd);
+    } else if (manualType === 'credit_note' && cnAmountUsd > 0) {
       const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
       const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
-      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: amt, credit: 0 });
-      else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: amt, credit: 0 });
-      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: 0, credit: amt });
-      else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: 0, credit: amt });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: cnAmountUsd, credit: 0 });
+      else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: cnAmountUsd, credit: 0 });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: 0, credit: cnAmountUsd });
+      else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: 0, credit: cnAmountUsd });
     } else if (manualType === 'sale' && totalSale > 0) {
       const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
@@ -310,13 +320,13 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
       if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, accountId: counterAcct.id, debit: totalSale, credit: 0 });
       if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, accountId: incomeAcct.id, debit: 0, credit: totalSale });
-    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amountUsd) > 0 || parseFloat(amountDop) > 0)) {
-      const amt = parseFloat(amountUsd) || (parseFloat(amountDop) || 0) / xr;
+    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amount) > 0)) {
+      const amtUsd = getAmountUsd(amount);
       const expAcct = accountId ? getAcct(accountId) : null;
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
-      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, accountId: expAcct.id, debit: amt, credit: 0 });
-      else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amt, credit: 0 });
-      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, accountId: cashAcct.id, debit: 0, credit: amt });
+      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, accountId: expAcct.id, debit: amtUsd, credit: 0 });
+      else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amtUsd, credit: 0 });
+      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, accountId: cashAcct.id, debit: 0, credit: amtUsd });
     }
 
     // Apply overrides
@@ -333,7 +343,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         accountId: overrideAcct.id,
       };
     });
-  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd, previewAccountOverrides]);
+  }, [manualType, journalLines, totalSale, paymentStatus, amount, accountId, accounts, xr, purchaseTotal, cnAmountUsd, previewAccountOverrides, currencyBase]);
 
   const handlePreviewAccountChange = (lineIndex: number, newAccountId: string) => {
     setPreviewAccountOverrides(prev => ({ ...prev, [lineIndex]: newAccountId }));
@@ -341,7 +351,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
-    setAmountUsd(''); setAmountDop(''); setManualDate(undefined);
+    setAmount(''); setManualDate(undefined);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
     setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
@@ -349,7 +359,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     setPurchaseItems([{ product_id: '', quantity: 1, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
     setCnSupplierId(''); setCnSupplierName('');
-    setCnAmountUsd(''); setCnReason(''); setCnNotes('');
+    setCnAmount(''); setCnReason(''); setCnNotes('');
     setJournalLines([
       { account_id: '', debit: 0, credit: 0, description: '' },
       { account_id: '', debit: 0, credit: 0, description: '' },
@@ -378,7 +388,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
     if (error || !entry) throw error || new Error('Error creando asiento');
 
-    // Match preview lines to accounts — use accountId if available from override
     const linesData = previewLines.map(pl => {
       const acctId = pl.accountId
         || accounts.find(a => a.code === pl.accountCode)?.id
@@ -454,7 +463,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       try {
         const desc = `Compra inventario — ${purchaseSupplierName || 'Proveedor'} — ${formatUSD(purchaseTotal)}`;
         
-        // Create shipment record
         const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
         const { data: shipment, error: shipErr } = await supabase.from('shipments').insert({
           supplier_id: purchaseSupplierId || null,
@@ -467,7 +475,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         }).select().single();
         if (shipErr || !shipment) throw shipErr || new Error('Error creando envío');
 
-        // Create shipment items
         const itemsData = purchaseItems.map(i => ({
           shipment_id: shipment.id,
           product_id: i.product_id,
@@ -477,7 +484,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         }));
         await supabase.from('shipment_items').insert(itemsData);
 
-        // Create journal entry
         await createJournalFromPreview(desc, purchaseNotes || null);
 
         toast.success('Compra de inventario registrada — envío creado en estado "Ordenado"');
@@ -495,20 +501,18 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     // ===== CREDIT NOTE =====
     if (manualType === 'credit_note') {
       if (!cnSupplierName.trim() && !cnSupplierId) { toast.error('Selecciona un proveedor'); return; }
-      const amt = parseFloat(cnAmountUsd);
-      if (!amt || amt <= 0) { toast.error('Ingresa el monto de la nota de crédito'); return; }
+      if (!cnAmountUsd || cnAmountUsd <= 0) { toast.error('Ingresa el monto de la nota de crédito'); return; }
       if (!cnReason.trim()) { toast.error('Ingresa la razón de la nota de crédito'); return; }
 
       setManualSaving(true);
       try {
-        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(amt)} — ${cnReason}`;
+        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(cnAmountUsd)} — ${cnReason}`;
 
-        // Create journal entry (Debit CxP, Credit Inventario)
         await createJournalFromPreview(desc, cnNotes || null);
 
         toast.success('Nota de crédito registrada en contabilidad');
 
-        setHistory(prev => [{ type: 'credit_note', description: desc, amount: formatUSD(amt), timestamp: new Date() }, ...prev].slice(0, 5));
+        setHistory(prev => [{ type: 'credit_note', description: desc, amount: formatUSD(cnAmountUsd), timestamp: new Date() }, ...prev].slice(0, 5));
         resetManualForm();
       } catch (e: any) {
         toast.error(e.message || 'Error al registrar nota de crédito');
@@ -518,7 +522,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     }
 
     if (manualType === 'sale') {
-      // Validate sale
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
       if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
 
@@ -570,13 +573,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     // Expense / Cost
     if (!description.trim()) { toast.error('Descripción requerida'); return; }
     if (!category) { toast.error('Selecciona una categoría'); return; }
-    const usd = parseFloat(amountUsd) || 0;
-    const dop = parseFloat(amountDop) || 0;
-    if (usd <= 0 && dop <= 0) { toast.error('Ingresa un monto'); return; }
+    const rawAmt = parseFloat(amount) || 0;
+    if (rawAmt <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
-    const finalUsd = usd > 0 ? usd : dop / xr;
-    const finalDop = dop > 0 ? dop : usd * xr;
+    const finalUsd = getAmountUsd(amount);
+    const finalDop = getAmountDop(amount);
     const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
 
     try {
@@ -747,8 +749,79 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const canSaveManual = () => {
     if (manualType === 'journal') return journalIsBalanced && journalDescription.trim().length > 0;
     if (manualType === 'purchase') return purchaseTotal > 0 && (purchaseSupplierId || purchaseSupplierName.trim());
-    if (manualType === 'credit_note') return parseFloat(cnAmountUsd) > 0 && cnReason.trim().length > 0 && (cnSupplierId || cnSupplierName.trim());
+    if (manualType === 'credit_note') return cnAmountUsd > 0 && cnReason.trim().length > 0 && (cnSupplierId || cnSupplierName.trim());
     return true;
+  };
+
+  // Shared header bar for manual mode
+  const SharedHeaderBar = () => (
+    <div className="rounded-xl bg-muted/50 border border-border p-3 flex flex-wrap items-center gap-4">
+      {/* Date */}
+      <div className="flex items-center gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm"
+              className={cn('h-8 justify-start text-left text-xs font-normal gap-1.5', !manualDate && 'text-muted-foreground')}>
+              <CalendarIcon className="w-3.5 h-3.5" />
+              {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Currency toggle */}
+      <div className="flex items-center gap-1 rounded-lg bg-background border border-border p-0.5">
+        <button
+          onClick={() => setCurrencyBase('USD')}
+          className={cn(
+            'rounded-md px-3 py-1 text-xs font-semibold transition-all',
+            currencyBase === 'USD' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          USD
+        </button>
+        <button
+          onClick={() => setCurrencyBase('DOP')}
+          className={cn(
+            'rounded-md px-3 py-1 text-xs font-semibold transition-all',
+            currencyBase === 'DOP' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          DOP
+        </button>
+      </div>
+
+      {/* Exchange rate */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto">
+        <ArrowLeftRight className="w-3.5 h-3.5" />
+        <span>1 USD = <span className="text-foreground font-semibold">RD${xr.toFixed(2)}</span></span>
+        {rate?.date && <span className="text-[10px]">({rate.date})</span>}
+      </div>
+    </div>
+  );
+
+  // Amount input component with auto-conversion display
+  const AmountInput = ({ value, onChange, label, required }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean }) => {
+    const numVal = parseFloat(value) || 0;
+    return (
+      <div className="space-y-1">
+        {label && <Label className="text-xs">{label}{required ? ' *' : ''}</Label>}
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">{currencySymbol}</span>
+          <Input type="number" min="0" step={currencyBase === 'USD' ? '0.01' : '1'} value={value}
+            onChange={e => onChange(e.target.value)} placeholder="0.00"
+            className={cn('text-sm', currencyBase === 'USD' ? 'pl-7' : 'pl-10')} />
+        </div>
+        {numVal > 0 && (
+          <p className="text-[10px] text-muted-foreground">
+            ≈ {formatEquiv(numVal)}
+          </p>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -880,17 +953,22 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <h2 className="text-base font-semibold text-foreground">Registrar Transacción Manual</h2>
             </div>
 
-            {/* Type selector - scrollable row */}
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            {/* Shared header: Date + Currency + Rate */}
+            <SharedHeaderBar />
+
+            {/* Type selector with descriptions */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {(['journal', 'expense', 'cost', 'sale', 'purchase', 'credit_note'] as const).map(t => (
                 <button key={t} onClick={() => handleTypeChange(t)}
                   className={cn(
-                    'shrink-0 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap',
+                    'rounded-xl border-2 px-2 py-2.5 text-center transition-all',
                     manualType === t
                       ? TYPE_CONFIG[t].color + ' border-current'
                       : 'border-border text-muted-foreground hover:border-primary/30'
                   )}>
-                  {TYPE_CONFIG[t].icon} {TYPE_CONFIG[t].label}
+                  <span className="text-lg block">{TYPE_CONFIG[t].icon}</span>
+                  <span className="text-[11px] font-semibold block mt-0.5">{TYPE_CONFIG[t].label}</span>
+                  <span className="text-[9px] block mt-0.5 opacity-70 leading-tight">{TYPE_CONFIG[t].hint}</span>
                 </button>
               ))}
             </div>
@@ -977,37 +1055,23 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%)</span><span className="font-mono">{formatUSD(itbis)}</span></div>
                   <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/50">
                     <span>Total</span>
-                    <span className="text-primary">{formatUSD(totalSale)} / {formatDOP(totalSale * xr)}</span>
+                    <div className="text-right">
+                      <span className="text-primary">{formatUSD(totalSale)}</span>
+                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {formatDOP(totalSale * xr)}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Estado de Pago</Label>
-                    <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PAYMENT_STATUSES).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Fecha (por defecto hoy)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm"
-                          className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
-                          <CalendarIcon className="w-4 h-4 mr-2" />
-                          {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Estado de Pago</Label>
+                  <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PAYMENT_STATUSES).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
@@ -1017,7 +1081,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground -mt-2">Registra una compra de inventario. Se crea el envío en estado "Ordenado" y el asiento contable automáticamente.</p>
                 
-                {/* Supplier */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
@@ -1034,9 +1097,8 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   )}
                 </div>
 
-                {/* Products */}
                 <div className="space-y-2">
-                  <Label className="text-xs">Productos *</Label>
+                  <Label className="text-xs">Productos * <span className="text-[10px] text-muted-foreground font-normal">(precios en USD)</span></Label>
                   {purchaseItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end">
                       <div className="flex-1">
@@ -1071,36 +1133,20 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Button>
                 </div>
 
-                {/* Total */}
                 <div className="rounded-xl bg-muted/50 p-4">
                   <div className="flex justify-between text-sm font-bold">
                     <span>Total Compra</span>
-                    <span className="text-primary">{formatUSD(purchaseTotal)} / {formatDOP(purchaseTotal * xr)}</span>
+                    <div className="text-right">
+                      <span className="text-primary">{formatUSD(purchaseTotal)}</span>
+                      <span className="text-xs text-muted-foreground font-normal ml-2">≈ {formatDOP(purchaseTotal * xr)}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Notes */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Notas (opcional)</Label>
                   <Textarea value={purchaseNotes} onChange={e => setPurchaseNotes(e.target.value)}
                     placeholder="Referencia de orden, comentarios..." className="min-h-[60px] text-sm resize-none" />
-                </div>
-
-                {/* Date */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha de Orden (por defecto hoy)</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm"
-                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
                 </div>
               </div>
             )}
@@ -1110,7 +1156,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground -mt-2">Registra una nota de crédito del proveedor. Reduce la cuenta por pagar y ajusta el costo de inventario.</p>
 
-                {/* Supplier */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
@@ -1127,48 +1172,23 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   )}
                 </div>
 
-                {/* Amount */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Monto USD *</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                    <Input type="number" min="0" step="0.01" value={cnAmountUsd}
-                      onChange={e => setCnAmountUsd(e.target.value)} placeholder="0.00" className="pl-7" />
-                  </div>
-                  {parseFloat(cnAmountUsd) > 0 && (
-                    <p className="text-[10px] text-muted-foreground">≈ {formatDOP(parseFloat(cnAmountUsd) * xr)}</p>
-                  )}
-                </div>
+                <AmountInput
+                  value={cnAmount}
+                  onChange={setCnAmount}
+                  label={`Monto (${currencyBase})`}
+                  required
+                />
 
-                {/* Reason */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Razón / Concepto *</Label>
                   <Input value={cnReason} onChange={e => setCnReason(e.target.value)}
                     placeholder="Ej: Descuento por volumen, producto defectuoso, ajuste de precio" maxLength={200} />
                 </div>
 
-                {/* Notes */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Notas (opcional)</Label>
                   <Textarea value={cnNotes} onChange={e => setCnNotes(e.target.value)}
                     placeholder="Detalles adicionales..." className="min-h-[60px] text-sm resize-none" />
-                </div>
-
-                {/* Date */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm"
-                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
                 </div>
               </div>
             )}
@@ -1212,41 +1232,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Monto USD *</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                      <Input type="number" min="0" step="0.01" value={amountUsd}
-                        onChange={e => handleUsdChange(e.target.value)} placeholder="0.00" className="pl-7" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Monto DOP</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">RD$</span>
-                      <Input type="number" min="0" step="1" value={amountDop}
-                        onChange={e => handleDopChange(e.target.value)} placeholder="0" className="pl-10" />
-                    </div>
-                  </div>
-                </div>
-                <p className="text-[10px] text-muted-foreground -mt-3">Tasa: 1 USD = RD${xr.toFixed(2)} — se auto-convierte al llenar un campo</p>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm"
-                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                <AmountInput
+                  value={amount}
+                  onChange={setAmount}
+                  label={`Monto (${currencyBase})`}
+                  required
+                />
               </div>
             )}
 
@@ -1260,7 +1251,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Líneas del Asiento</Label>
+                  <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en USD)</span></Label>
                   <div className="rounded-xl border border-border overflow-hidden">
                     <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
@@ -1288,10 +1279,16 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                         )}
                       </div>
                     ))}
-                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30 font-bold">
-                      <span className="text-xs">Totales</span>
-                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
-                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
+                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30">
+                      <span className="text-xs font-bold">Totales</span>
+                      <div className="text-right">
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalDebit * xr)}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalCredit * xr)}</span>
+                      </div>
                       <span />
                     </div>
                   </div>
@@ -1305,22 +1302,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   <Textarea value={journalNotes} onChange={e => setJournalNotes(e.target.value)}
                     placeholder="Notas adicionales..." className="min-h-[60px] text-sm resize-none" />
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm"
-                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
-                    </PopoverContent>
-                  </Popover>
-                </div>
               </div>
             )}
 
@@ -1330,6 +1311,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                 lines={previewLines}
                 accounts={accounts}
                 onAccountChange={handlePreviewAccountChange}
+                exchangeRate={xr}
                 description={
                   manualType === 'journal' ? journalDescription
                   : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
