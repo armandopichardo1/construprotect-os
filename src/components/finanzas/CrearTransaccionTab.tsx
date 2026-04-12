@@ -1216,12 +1216,16 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 1)}
                         className="w-16 text-xs" placeholder="Cant." />
                       <div className="relative w-24">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
-                        <Input type="number" min={0} step={0.01} value={item.unit_cost_usd}
-                          onChange={e => updatePurchaseItem(i, 'unit_cost_usd', parseFloat(e.target.value) || 0)}
-                          className="pl-5 text-xs" placeholder="Costo" />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
+                        <Input type="number" min={0} step={0.01}
+                          value={currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            updatePurchaseItem(i, 'unit_cost_usd', currencyBase === 'USD' ? val : val / xr);
+                          }}
+                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="Costo" />
                       </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatUSD(item.unit_cost_usd * item.quantity)}</span>
+                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatBase(currencyBase === 'USD' ? item.unit_cost_usd * item.quantity : item.unit_cost_usd * item.quantity * xr)}</span>
                       {purchaseItems.length > 1 && (
                         <button onClick={() => removePurchaseItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
                           <Trash2 className="w-3.5 h-3.5" />
