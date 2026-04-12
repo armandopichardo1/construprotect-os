@@ -990,7 +990,7 @@ function CuentasMaestra() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+      <div className="rounded-xl border border-border bg-card max-h-[calc(100vh-320px)] overflow-auto">
         <Table wrapperClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><TableRow>
             <TableHead className="w-8 px-2">
