@@ -30,6 +30,7 @@ import { CashFlowTab } from '@/components/finanzas/CashFlowTab';
 import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/DatePeriodFilter';
 import { LibroDiarioTab } from '@/components/finanzas/LibroDiarioTab';
+import { BalanceComprobacionTab } from '@/components/finanzas/BalanceComprobacionTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
 const tabs = ['Crear Transacción', 'Resumen', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
@@ -341,6 +342,7 @@ export default function FinanzasPage() {
           })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
+        {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} rate={Number(latestRate?.usd_sell || 60)} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
