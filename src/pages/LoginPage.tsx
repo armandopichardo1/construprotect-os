@@ -118,7 +118,7 @@ export default function LoginPage() {
           </Button>
         </form>
         <p className="text-center text-[10px] text-muted-foreground/60">
-          Usuarios: apichardo, lazar, dazar
+          © {new Date().getFullYear()} ConstruProtect
         </p>
       </div>
     </div>
