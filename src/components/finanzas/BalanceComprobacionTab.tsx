@@ -33,6 +33,7 @@ interface BalanceComprobacionTabProps {
   expenses: any[];
   costs: any[];
   saleItems: any[];
+  journalEntries?: any[];
   rate: number;
 }
 
@@ -47,7 +48,7 @@ interface AccountRow {
   saldo_acreedor: number;
 }
 
-export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate }: BalanceComprobacionTabProps) {
+export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: BalanceComprobacionTabProps) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [showEmpty, setShowEmpty] = useState(false);
 

@@ -47,7 +47,7 @@ interface Props {
   rate: number;
 }
 
-export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
+export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], rate }: Props) {
   const queryClient = useQueryClient();
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,8 +122,32 @@ export function LibroDiarioTab({ sales, expenses, costs, rate }: Props) {
       });
     });
 
+    // Journal entries (manual)
+    journalEntries.forEach((je: any) => {
+      const totalDebit = Number(je.total_debit_usd || 0);
+      const totalCredit = Number(je.total_credit_usd || 0);
+      const exRate = Number(je.exchange_rate) || rate;
+      all.push({
+        id: je.id,
+        date: je.date,
+        type: 'journal',
+        description: je.description,
+        category: 'Asiento Manual',
+        account_code: '',
+        account_name: je.journal_entry_lines?.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
+        debit_usd: totalDebit,
+        credit_usd: totalCredit,
+        debit_dop: totalDebit * exRate,
+        credit_dop: totalCredit * exRate,
+        exchange_rate: exRate,
+        vendor_client: '—',
+        ref: '',
+        raw: je,
+      });
+    });
+
     return all.sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales, expenses, costs, rate]);
+  }, [sales, expenses, costs, journalEntries, rate]);
 
   const filtered = useMemo(() => {
     let items = filterByDate(entries);
