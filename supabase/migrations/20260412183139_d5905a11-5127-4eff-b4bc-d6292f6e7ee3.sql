@@ -1,0 +1,1 @@
+DELETE FROM inventory WHERE product_id IN (SELECT id FROM products WHERE is_active = false);
