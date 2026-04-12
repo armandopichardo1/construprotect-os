@@ -35,6 +35,8 @@ export function MovimientosReportTab() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const [filterProduct, setFilterProduct] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
 
   const dateRange = useMemo(() => {
     if (period === 'custom' && dateFrom && dateTo) {
@@ -46,7 +48,7 @@ export function MovimientosReportTab() {
     return { from: from.toISOString().split('T')[0], to: now.toISOString().split('T')[0] };
   }, [period, dateFrom, dateTo]);
 
-  const { data: movements = [] } = useQuery({
+  const { data: rawMovements = [] } = useQuery({
     queryKey: ['inventory-movements-report', dateRange.from, dateRange.to],
     queryFn: async () => {
       const { data } = await supabase
@@ -58,6 +60,32 @@ export function MovimientosReportTab() {
       return data || [];
     },
   });
+
+  // Extract unique categories and products for filter dropdowns
+  const { categories, products: productOptions } = useMemo(() => {
+    const catSet = new Set<string>();
+    const prodMap = new Map<string, string>();
+    rawMovements.forEach((m: any) => {
+      if (m.products?.category) catSet.add(m.products.category);
+      if (m.product_id && m.products?.name) prodMap.set(m.product_id, `${m.products.sku} — ${m.products.name}`);
+    });
+    return {
+      categories: Array.from(catSet).sort(),
+      products: Array.from(prodMap.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label)),
+    };
+  }, [rawMovements]);
+
+  // Apply product/category filters
+  const movements = useMemo(() => {
+    let filtered = rawMovements;
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter((m: any) => m.products?.category === filterCategory);
+    }
+    if (filterProduct !== 'all') {
+      filtered = filtered.filter((m: any) => m.product_id === filterProduct);
+    }
+    return filtered;
+  }, [rawMovements, filterCategory, filterProduct]);
 
   // === Totals by type ===
   const typeSummary = useMemo(() => {
