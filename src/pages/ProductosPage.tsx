@@ -60,7 +60,7 @@ function MarginCell({ cost, price, targetPct, label, minMargin }: { cost: number
   );
 }
 
-export default function ProductosPage() {
+export function ProductosContent() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
@@ -107,9 +107,8 @@ export default function ProductosPage() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['products'] });
 
   return (
-    <AppLayout>
-      <div className="space-y-5">
-        <div className="flex items-center gap-3 flex-wrap">
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 flex-wrap">
           <Input
             placeholder="Buscar por nombre o SKU..."
             value={search}
@@ -288,7 +287,14 @@ export default function ProductosPage() {
           products={products}
           onSuccess={refresh}
         />
-      </div>
+    </div>
+  );
+}
+
+export default function ProductosPage() {
+  return (
+    <AppLayout>
+      <ProductosContent />
     </AppLayout>
   );
 }

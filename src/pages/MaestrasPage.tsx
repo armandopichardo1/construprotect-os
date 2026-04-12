@@ -1,4 +1,5 @@
 import { useState, useMemo, Fragment, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,11 +16,24 @@ import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, Fold
 import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { ProductosContent } from '@/pages/ProductosPage';
 
-const tabs = ['Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Productos', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+
+const TAB_MAP: Record<string, string> = {
+  productos: 'Productos',
+  proveedores: 'Proveedores',
+  marcas: 'Marcas',
+  servicios: 'Servicios',
+  cuentas: 'Cuentas Contables',
+};
 
 export default function MaestrasPage() {
-  const [tab, setTab] = useState('Proveedores');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => {
+    const urlTab = searchParams.get('tab');
+    return (urlTab && TAB_MAP[urlTab]) || 'Productos';
+  });
 
   return (
     <AppLayout>
@@ -39,8 +53,8 @@ export default function MaestrasPage() {
           ))}
         </div>
 
+        {tab === 'Productos' && <ProductosContent />}
         {tab === 'Proveedores' && <ProveedoresMaestra />}
-        
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
