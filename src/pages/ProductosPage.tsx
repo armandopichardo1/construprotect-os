@@ -508,6 +508,7 @@ export function ProductosContent() {
                 );
               })()}
             </Table>
+            </div>
           </div>
         )}
 
