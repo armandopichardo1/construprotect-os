@@ -654,12 +654,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <h2 className="text-base font-semibold text-foreground">Registrar Transacción Manual</h2>
             </div>
 
-            {/* Type selector - now includes sale */}
+            {/* Type selector */}
             <div className="flex gap-2">
-              {(['sale', 'expense', 'cost'] as const).map(t => (
+              {(['sale', 'expense', 'cost', 'journal'] as const).map(t => (
                 <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
                   className={cn(
-                    'flex-1 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all',
+                    'flex-1 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all',
                     manualType === t
                       ? TYPE_CONFIG[t].color + ' border-current'
                       : 'border-border text-muted-foreground hover:border-primary/30'
