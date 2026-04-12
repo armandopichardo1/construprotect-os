@@ -247,6 +247,10 @@ export function ProductosContent() {
       const product = products.find(p => p.id === productId);
       if (product) {
         const newCost = Number(value) || 0;
+        const taxes = Number(product.taxes_per_unit_usd) || 0;
+        const additional = Number(product.additional_costs_usd) || 0;
+        payload.total_unit_cost_usd = newCost + taxes + additional;
+        const totalCost = payload.total_unit_cost_usd;
         const prices = [
           { price: Number(product.price_list_usd), marginField: 'margin_list_pct' },
           { price: Number(product.price_architect_usd), marginField: 'margin_architect_pct' },
@@ -255,7 +259,7 @@ export function ProductosContent() {
         ];
         for (const { price, marginField } of prices) {
           if (price > 0) {
-            const m = calcRealMargin(newCost, price);
+            const m = calcRealMargin(totalCost, price);
             if (m !== null) payload[marginField] = Number(m.toFixed(1));
           }
         }
