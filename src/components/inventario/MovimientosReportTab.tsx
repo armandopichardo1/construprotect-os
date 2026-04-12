@@ -35,6 +35,8 @@ export function MovimientosReportTab() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const [filterProduct, setFilterProduct] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
 
   const dateRange = useMemo(() => {
     if (period === 'custom' && dateFrom && dateTo) {
@@ -46,7 +48,7 @@ export function MovimientosReportTab() {
     return { from: from.toISOString().split('T')[0], to: now.toISOString().split('T')[0] };
   }, [period, dateFrom, dateTo]);
 
-  const { data: movements = [] } = useQuery({
+  const { data: rawMovements = [] } = useQuery({
     queryKey: ['inventory-movements-report', dateRange.from, dateRange.to],
     queryFn: async () => {
       const { data } = await supabase
@@ -58,6 +60,32 @@ export function MovimientosReportTab() {
       return data || [];
     },
   });
+
+  // Extract unique categories and products for filter dropdowns
+  const { categories, products: productOptions } = useMemo(() => {
+    const catSet = new Set<string>();
+    const prodMap = new Map<string, string>();
+    rawMovements.forEach((m: any) => {
+      if (m.products?.category) catSet.add(m.products.category);
+      if (m.product_id && m.products?.name) prodMap.set(m.product_id, `${m.products.sku} — ${m.products.name}`);
+    });
+    return {
+      categories: Array.from(catSet).sort(),
+      products: Array.from(prodMap.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label)),
+    };
+  }, [rawMovements]);
+
+  // Apply product/category filters
+  const movements = useMemo(() => {
+    let filtered = rawMovements;
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter((m: any) => m.products?.category === filterCategory);
+    }
+    if (filterProduct !== 'all') {
+      filtered = filtered.filter((m: any) => m.product_id === filterProduct);
+    }
+    return filtered;
+  }, [rawMovements, filterCategory, filterProduct]);
 
   // === Totals by type ===
   const typeSummary = useMemo(() => {
@@ -211,6 +239,28 @@ export function MovimientosReportTab() {
             </div>
           </>
         )}
+        <div>
+          <Label className="text-xs text-muted-foreground">Categoría</Label>
+          <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterProduct('all'); }}>
+            <SelectTrigger className="mt-1 w-[180px] h-9 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todas las categorías</SelectItem>
+              {categories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Producto</Label>
+          <Select value={filterProduct} onValueChange={setFilterProduct}>
+            <SelectTrigger className="mt-1 w-[220px] h-9 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todos los productos</SelectItem>
+              {productOptions
+                .filter(p => filterCategory === 'all' || rawMovements.some((m: any) => m.product_id === p.id && m.products?.category === filterCategory))
+                .map(p => <SelectItem key={p.id} value={p.id} className="text-xs truncate">{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <Button size="sm" variant="outline" onClick={handleExport} disabled={movements.length === 0} className="h-9">
           <Download className="w-3.5 h-3.5 mr-1" /> Exportar Excel
         </Button>
