@@ -29,6 +29,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }
   sale: { label: 'Venta', icon: '💰', color: 'bg-success/15 text-success border-success/30' },
   expense: { label: 'Gasto', icon: '💸', color: 'bg-warning/15 text-warning border-warning/30' },
   cost: { label: 'Costo', icon: '🏗️', color: 'bg-primary/15 text-primary border-primary/30' },
+  purchase: { label: 'Compra', icon: '📦', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  credit_note: { label: 'Nota Crédito', icon: '📝', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
   journal: { label: 'Asiento', icon: '📖', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
 };
 
@@ -58,12 +60,18 @@ interface SessionEntry {
 }
 
 type Mode = 'ai' | 'manual';
-type TxType = 'expense' | 'cost' | 'sale' | 'journal';
+type TxType = 'expense' | 'cost' | 'sale' | 'journal' | 'purchase' | 'credit_note';
 
 interface SaleItem {
   product_id: string;
   quantity: number;
   unit_price_usd: number;
+}
+
+interface PurchaseItem {
+  product_id: string;
+  quantity: number;
+  unit_cost_usd: number;
 }
 
 interface JournalLine {
@@ -109,6 +117,14 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     },
   });
 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
   // AI state
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -133,6 +149,19 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
 
+  // Purchase-specific state
+  const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
+  const [purchaseSupplierName, setPurchaseSupplierName] = useState('');
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([{ product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+  const [purchaseNotes, setPurchaseNotes] = useState('');
+
+  // Credit note state
+  const [cnSupplierId, setCnSupplierId] = useState('');
+  const [cnSupplierName, setCnSupplierName] = useState('');
+  const [cnAmountUsd, setCnAmountUsd] = useState('');
+  const [cnReason, setCnReason] = useState('');
+  const [cnNotes, setCnNotes] = useState('');
+
   // Journal entry state
   const [journalLines, setJournalLines] = useState<JournalLine[]>([
     { account_id: '', debit: 0, credit: 0, description: '' },
@@ -150,6 +179,35 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const journalTotalDebit = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
   const journalTotalCredit = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
   const journalIsBalanced = Math.abs(journalTotalDebit - journalTotalCredit) < 0.01;
+
+  // Purchase computed
+  const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
+
+  const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+  const removePurchaseItem = (i: number) => setPurchaseItems(prev => prev.filter((_, idx) => idx !== i));
+  const updatePurchaseItem = (i: number, field: string, value: any) => {
+    setPurchaseItems(prev => prev.map((item, idx) => {
+      if (idx !== i) return item;
+      const updated = { ...item, [field]: value };
+      if (field === 'product_id') {
+        const prod = products.find((p: any) => p.id === value);
+        updated.unit_cost_usd = Number(prod?.unit_cost_usd || 0);
+      }
+      return updated;
+    }));
+  };
+
+  const handlePurchaseSupplier = (id: string) => {
+    setPurchaseSupplierId(id);
+    const s = suppliers.find((s: any) => s.id === id);
+    setPurchaseSupplierName(s?.name || '');
+  };
+
+  const handleCnSupplier = (id: string) => {
+    setCnSupplierId(id);
+    const s = suppliers.find((s: any) => s.id === id);
+    setCnSupplierName(s?.name || '');
+  };
 
   const getPriceForTier = (prod: any, tier: string) => {
     switch (tier) {
@@ -219,8 +277,24 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           credit: jl.credit || 0,
         });
       });
+    } else if (manualType === 'purchase' && purchaseTotal > 0) {
+      // Purchase: Debit Inventario/Mercancía, Credit CxP Proveedor
+      const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
+      const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: purchaseTotal, credit: 0 });
+      else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: purchaseTotal, credit: 0 });
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: 0, credit: purchaseTotal });
+      else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: 0, credit: purchaseTotal });
+    } else if (manualType === 'credit_note' && parseFloat(cnAmountUsd) > 0) {
+      const amt = parseFloat(cnAmountUsd);
+      // Credit Note: Debit CxP (reduce debt), Credit Inventario/Costo (reduce cost)
+      const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
+      const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
+      if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, debit: amt, credit: 0 });
+      else lines.push({ accountName: 'Cuentas por Pagar Proveedores', accountType: 'Pasivo', debit: amt, credit: 0 });
+      if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, debit: 0, credit: amt });
+      else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: 0, credit: amt });
     } else if (manualType === 'sale' && totalSale > 0) {
-      // Sale: Debit cash/CxC, Credit income
       const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
       const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
@@ -237,7 +311,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     }
 
     return lines;
-  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr]);
+  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr, purchaseTotal, cnAmountUsd]);
 
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
@@ -245,12 +319,57 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
     setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+    setPurchaseSupplierId(''); setPurchaseSupplierName('');
+    setPurchaseItems([{ product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+    setPurchaseNotes('');
+    setCnSupplierId(''); setCnSupplierName('');
+    setCnAmountUsd(''); setCnReason(''); setCnNotes('');
     setJournalLines([
       { account_id: '', debit: 0, credit: 0, description: '' },
       { account_id: '', debit: 0, credit: 0, description: '' },
     ]);
     setJournalDescription('');
     setJournalNotes('');
+  };
+
+  // Helper to create journal entry from computed preview lines
+  const createJournalFromPreview = async (desc: string, notes?: string) => {
+    if (previewLines.length < 2) return;
+    const totalD = previewLines.reduce((s, l) => s + l.debit, 0);
+    const totalC = previewLines.reduce((s, l) => s + l.credit, 0);
+    
+    const entryPayload: any = {
+      description: desc,
+      total_debit_usd: totalD,
+      total_credit_usd: totalC,
+      exchange_rate: xr,
+      notes: notes || null,
+    };
+    const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
+    if (dateStr) entryPayload.date = dateStr;
+
+    const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
+    if (error || !entry) throw error || new Error('Error creando asiento');
+
+    // Match preview lines to accounts
+    const linesData = previewLines.map(pl => {
+      const acct = pl.accountCode
+        ? accounts.find(a => a.code === pl.accountCode)
+        : accounts.find(a => a.description === pl.accountName);
+      return {
+        journal_entry_id: entry.id,
+        account_id: acct?.id || accounts[0]?.id,
+        debit_usd: pl.debit || 0,
+        credit_usd: pl.credit || 0,
+        description: desc,
+      };
+    }).filter(l => l.account_id);
+
+    if (linesData.length > 0) {
+      await supabase.from('journal_entry_lines').insert(linesData);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
   };
 
   // ===== MANUAL SAVE =====
@@ -293,6 +412,79 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         resetManualForm();
       } catch (e: any) {
         toast.error(e.message || 'Error al registrar asiento');
+      }
+      setManualSaving(false);
+      return;
+    }
+
+    // ===== PURCHASE =====
+    if (manualType === 'purchase') {
+      if (!purchaseSupplierName.trim() && !purchaseSupplierId) { toast.error('Selecciona un proveedor'); return; }
+      if (purchaseItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
+      if (purchaseTotal <= 0) { toast.error('El total debe ser mayor a 0'); return; }
+
+      setManualSaving(true);
+      try {
+        const desc = `Compra inventario — ${purchaseSupplierName || 'Proveedor'} — ${formatUSD(purchaseTotal)}`;
+        
+        // Create shipment record
+        const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
+        const { data: shipment, error: shipErr } = await supabase.from('shipments').insert({
+          supplier_id: purchaseSupplierId || null,
+          supplier_name: purchaseSupplierName || 'Proveedor',
+          po_number: `PO-${Date.now().toString(36).toUpperCase()}`,
+          order_date: dateStr,
+          total_cost_usd: purchaseTotal,
+          status: 'ordered' as any,
+          notes: purchaseNotes || null,
+        }).select().single();
+        if (shipErr || !shipment) throw shipErr || new Error('Error creando envío');
+
+        // Create shipment items
+        const itemsData = purchaseItems.map(i => ({
+          shipment_id: shipment.id,
+          product_id: i.product_id,
+          quantity_ordered: i.quantity,
+          quantity_received: 0,
+          unit_cost_usd: i.unit_cost_usd,
+        }));
+        await supabase.from('shipment_items').insert(itemsData);
+
+        // Create journal entry
+        await createJournalFromPreview(desc, purchaseNotes || null);
+
+        toast.success('Compra de inventario registrada — envío creado en estado "Ordenado"');
+        queryClient.invalidateQueries({ queryKey: ['shipments'] });
+
+        setHistory(prev => [{ type: 'purchase', description: desc, amount: formatUSD(purchaseTotal), timestamp: new Date() }, ...prev].slice(0, 5));
+        resetManualForm();
+      } catch (e: any) {
+        toast.error(e.message || 'Error al registrar compra');
+      }
+      setManualSaving(false);
+      return;
+    }
+
+    // ===== CREDIT NOTE =====
+    if (manualType === 'credit_note') {
+      if (!cnSupplierName.trim() && !cnSupplierId) { toast.error('Selecciona un proveedor'); return; }
+      const amt = parseFloat(cnAmountUsd);
+      if (!amt || amt <= 0) { toast.error('Ingresa el monto de la nota de crédito'); return; }
+      if (!cnReason.trim()) { toast.error('Ingresa la razón de la nota de crédito'); return; }
+
+      setManualSaving(true);
+      try {
+        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(amt)} — ${cnReason}`;
+
+        // Create journal entry (Debit CxP, Credit Inventario)
+        await createJournalFromPreview(desc, cnNotes || null);
+
+        toast.success('Nota de crédito registrada en contabilidad');
+
+        setHistory(prev => [{ type: 'credit_note', description: desc, amount: formatUSD(amt), timestamp: new Date() }, ...prev].slice(0, 5));
+        resetManualForm();
+      } catch (e: any) {
+        toast.error(e.message || 'Error al registrar nota de crédito');
       }
       setManualSaving(false);
       return;
@@ -525,6 +717,13 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
   const currentCategories = manualType === 'expense' ? EXPENSE_CATEGORIES : COST_CATEGORIES;
 
+  const canSaveManual = () => {
+    if (manualType === 'journal') return journalIsBalanced && journalDescription.trim().length > 0;
+    if (manualType === 'purchase') return purchaseTotal > 0 && (purchaseSupplierId || purchaseSupplierName.trim());
+    if (manualType === 'credit_note') return parseFloat(cnAmountUsd) > 0 && cnReason.trim().length > 0 && (cnSupplierId || cnSupplierName.trim());
+    return true;
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Main input area */}
@@ -654,12 +853,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <h2 className="text-base font-semibold text-foreground">Registrar Transacción Manual</h2>
             </div>
 
-            {/* Type selector */}
-            <div className="flex gap-2">
-              {(['sale', 'expense', 'cost', 'journal'] as const).map(t => (
+            {/* Type selector - scrollable row */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {(['sale', 'expense', 'cost', 'purchase', 'credit_note', 'journal'] as const).map(t => (
                 <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
                   className={cn(
-                    'flex-1 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all',
+                    'shrink-0 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap',
                     manualType === t
                       ? TYPE_CONFIG[t].color + ' border-current'
                       : 'border-border text-muted-foreground hover:border-primary/30'
@@ -672,7 +871,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
             {/* ===== SALE FORM ===== */}
             {manualType === 'sale' && (
               <div className="space-y-4">
-                {/* Client */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Cliente *</Label>
                   <Select value={contactId} onValueChange={handleClientChange}>
@@ -685,7 +883,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Select>
                 </div>
 
-                {/* Invoice ref */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Ref. Factura</Label>
@@ -712,7 +909,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </div>
                 </div>
 
-                {/* Products */}
                 <div className="space-y-2">
                   <Label className="text-xs">Productos *</Label>
                   {saleItems.map((item, i) => (
@@ -749,7 +945,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Button>
                 </div>
 
-                {/* Totals */}
                 <div className="rounded-xl bg-muted/50 p-4 space-y-1">
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{formatUSD(subtotal)}</span></div>
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%)</span><span className="font-mono">{formatUSD(itbis)}</span></div>
@@ -759,7 +954,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </div>
                 </div>
 
-                {/* Payment status */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Estado de Pago</Label>
@@ -791,17 +985,176 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               </div>
             )}
 
+            {/* ===== PURCHASE FORM ===== */}
+            {manualType === 'purchase' && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground -mt-2">Registra una compra de inventario. Se crea el envío en estado "Ordenado" y el asiento contable automáticamente.</p>
+                
+                {/* Supplier */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Proveedor *</Label>
+                  {suppliers.length > 0 ? (
+                    <Select value={purchaseSupplierId} onValueChange={handlePurchaseSupplier}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={purchaseSupplierName} onChange={e => setPurchaseSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
+                  )}
+                </div>
+
+                {/* Products */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Productos *</Label>
+                  {purchaseItems.map((item, i) => (
+                    <div key={i} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Select value={item.product_id} onValueChange={v => updatePurchaseItem(i, 'product_id', v)}>
+                          <SelectTrigger className="text-xs"><SelectValue placeholder="Producto" /></SelectTrigger>
+                          <SelectContent>
+                            {products.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id} className="text-xs">{p.sku} — {p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Input type="number" min={1} value={item.quantity}
+                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 1)}
+                        className="w-16 text-xs" placeholder="Cant." />
+                      <div className="relative w-24">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
+                        <Input type="number" min={0} step={0.01} value={item.unit_cost_usd}
+                          onChange={e => updatePurchaseItem(i, 'unit_cost_usd', parseFloat(e.target.value) || 0)}
+                          className="pl-5 text-xs" placeholder="Costo" />
+                      </div>
+                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatUSD(item.unit_cost_usd * item.quantity)}</span>
+                      {purchaseItems.length > 1 && (
+                        <button onClick={() => removePurchaseItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={addPurchaseItem} className="gap-1 text-xs">
+                    <Plus className="w-3 h-3" /> Agregar Producto
+                  </Button>
+                </div>
+
+                {/* Total */}
+                <div className="rounded-xl bg-muted/50 p-4">
+                  <div className="flex justify-between text-sm font-bold">
+                    <span>Total Compra</span>
+                    <span className="text-primary">{formatUSD(purchaseTotal)} / {formatDOP(purchaseTotal * xr)}</span>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notas (opcional)</Label>
+                  <Textarea value={purchaseNotes} onChange={e => setPurchaseNotes(e.target.value)}
+                    placeholder="Referencia de orden, comentarios..." className="min-h-[60px] text-sm resize-none" />
+                </div>
+
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha de Orden (por defecto hoy)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm"
+                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+
+            {/* ===== CREDIT NOTE FORM ===== */}
+            {manualType === 'credit_note' && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground -mt-2">Registra una nota de crédito del proveedor. Reduce la cuenta por pagar y ajusta el costo de inventario.</p>
+
+                {/* Supplier */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Proveedor *</Label>
+                  {suppliers.length > 0 ? (
+                    <Select value={cnSupplierId} onValueChange={handleCnSupplier}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={cnSupplierName} onChange={e => setCnSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
+                  )}
+                </div>
+
+                {/* Amount */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Monto USD *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                    <Input type="number" min="0" step="0.01" value={cnAmountUsd}
+                      onChange={e => setCnAmountUsd(e.target.value)} placeholder="0.00" className="pl-7" />
+                  </div>
+                  {parseFloat(cnAmountUsd) > 0 && (
+                    <p className="text-[10px] text-muted-foreground">≈ {formatDOP(parseFloat(cnAmountUsd) * xr)}</p>
+                  )}
+                </div>
+
+                {/* Reason */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Razón / Concepto *</Label>
+                  <Input value={cnReason} onChange={e => setCnReason(e.target.value)}
+                    placeholder="Ej: Descuento por volumen, producto defectuoso, ajuste de precio" maxLength={200} />
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notas (opcional)</Label>
+                  <Textarea value={cnNotes} onChange={e => setCnNotes(e.target.value)}
+                    placeholder="Detalles adicionales..." className="min-h-[60px] text-sm resize-none" />
+                </div>
+
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm"
+                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+
             {/* ===== EXPENSE / COST FORM ===== */}
             {(manualType === 'expense' || manualType === 'cost') && (
               <div className="space-y-4">
-                {/* Description */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Descripción *</Label>
                   <Input value={description} onChange={e => setDescription(e.target.value)}
                     placeholder="Ej: Pago de flete contenedor marzo" maxLength={200} />
                 </div>
 
-                {/* Category */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Categoría *</Label>
                   <Select value={category} onValueChange={setCategory}>
@@ -814,14 +1167,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Select>
                 </div>
 
-                {/* Vendor */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor / Fuente</Label>
                   <Input value={vendor} onChange={e => setVendor(e.target.value)}
                     placeholder="Ej: DHL, Aduanas, etc." maxLength={100} />
                 </div>
 
-                {/* Account */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Cuenta Contable</Label>
                   <Select value={accountId} onValueChange={setAccountId}>
@@ -834,7 +1185,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                   </Select>
                 </div>
 
-                {/* Amounts */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Monto USD *</Label>
@@ -855,7 +1205,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                 </div>
                 <p className="text-[10px] text-muted-foreground -mt-3">Tasa: 1 USD = RD${xr.toFixed(2)} — se auto-convierte al llenar un campo</p>
 
-                {/* Date */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Fecha (por defecto hoy)</Label>
                   <Popover>
@@ -883,7 +1232,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                     placeholder="Ej: Ingreso de efectivo por accionista" maxLength={200} />
                 </div>
 
-                {/* Journal lines */}
                 <div className="space-y-2">
                   <Label className="text-xs">Líneas del Asiento</Label>
                   <div className="rounded-xl border border-border overflow-hidden">
@@ -931,7 +1279,6 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
                     placeholder="Notas adicionales..." className="min-h-[60px] text-sm resize-none" />
                 </div>
 
-                {/* Date */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Fecha (por defecto hoy)</Label>
                   <Popover>
@@ -952,11 +1299,16 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
             {/* Accounting Preview */}
             {mode === 'manual' && previewLines.length > 0 && (
-              <AccountingPreview lines={previewLines} description={manualType === 'journal' ? journalDescription : description} />
+              <AccountingPreview lines={previewLines} description={
+                manualType === 'journal' ? journalDescription
+                : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
+                : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
+                : description
+              } />
             )}
 
             {/* Submit */}
-            <Button onClick={saveManual} disabled={manualSaving || (manualType === 'journal' && !journalIsBalanced)} className="w-full gap-2">
+            <Button onClick={saveManual} disabled={manualSaving || !canSaveManual()} className="w-full gap-2">
               {manualSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {manualSaving ? 'Registrando...' : `Registrar ${TYPE_CONFIG[manualType].label}`}
             </Button>
@@ -1003,11 +1355,11 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               </>
             ) : (
               <>
-                <p>1️⃣ Selecciona tipo: Venta, Gasto o Costo</p>
-                <p>2️⃣ Llena los datos correspondientes</p>
-                <p>3️⃣ Los montos se convierten automáticamente</p>
-                <p>4️⃣ Click en "Registrar" para guardar</p>
-                <p className="text-[10px] text-muted-foreground/70 pt-1">Las ventas alimentan el P&L, Balance y Flujo de Caja. Los gastos y costos se reflejan en todas las vistas financieras.</p>
+                <p>📦 <strong>Compra:</strong> Registra compra + crea envío + asiento contable</p>
+                <p>📝 <strong>Nota Crédito:</strong> Reduce deuda con proveedor</p>
+                <p>💰 <strong>Venta:</strong> Registra ingreso + deduce inventario</p>
+                <p>📖 <strong>Asiento:</strong> Partida libre débito/crédito</p>
+                <p className="text-[10px] text-muted-foreground/70 pt-1">Todas las transacciones generan un preview contable antes de registrar.</p>
               </>
             )}
           </div>
