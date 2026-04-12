@@ -130,10 +130,10 @@ interface EditableCellProps {
   productId: string;
   onSave: (productId: string, field: string, value: string) => Promise<void>;
   className?: string;
-  // For margin cells: linked price/cost fields
   linkedField?: string;
   cost?: number;
   displayValue?: React.ReactNode;
+  minMargin?: number;
 }
 
 function EditableCell({ value, type, field, productId, onSave, className, linkedField, cost, displayValue }: EditableCellProps) {
