@@ -87,7 +87,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const { data: accounts = [] } = useQuery({
     queryKey: ['chart-of-accounts'],
     queryFn: async () => {
-      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id').eq('is_active', true).order('code');
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id, account_type').eq('is_active', true).order('code');
       return data || [];
     },
   });
