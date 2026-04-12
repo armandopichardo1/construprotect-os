@@ -13,15 +13,17 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, FolderInput } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ProductosContent } from '@/pages/ProductosPage';
 
-const tabs = ['Productos', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
 
 const TAB_MAP: Record<string, string> = {
   productos: 'Productos',
+  clientes: 'Clientes',
   proveedores: 'Proveedores',
   marcas: 'Marcas',
   servicios: 'Servicios',
@@ -54,6 +56,7 @@ export default function MaestrasPage() {
         </div>
 
         {tab === 'Productos' && <ProductosContent />}
+        {tab === 'Clientes' && <ClientesMaestra />}
         {tab === 'Proveedores' && <ProveedoresMaestra />}
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
@@ -77,6 +80,191 @@ function useSearch(data: any[], keys: string[]) {
 
 
 
+
+// ============ CLIENTES ============
+
+function ClientesMaestra() {
+  const queryClient = useQueryClient();
+  const { data: contacts = [], isLoading } = useQuery({
+    queryKey: ['maestras-contacts'],
+    queryFn: async () => { const { data } = await supabase.from('contacts').select('*').order('contact_name'); return data || []; },
+  });
+  const { search, setSearch, filtered } = useSearch(contacts, ['contact_name', 'company_name', 'email', 'phone', 'segment', 'territory']);
+  const [editing, setEditing] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
+
+  const handleSave = async (formData: any) => {
+    const payload: any = {
+      contact_name: formData.contact_name,
+      company_name: formData.company_name || null,
+      rnc: formData.rnc || null,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      whatsapp: formData.whatsapp || null,
+      segment: formData.segment || null,
+      territory: formData.territory || null,
+      address: formData.address || null,
+      source: formData.source || null,
+      price_tier: formData.price_tier || 'list',
+      notes: formData.notes || null,
+      is_active: formData.is_active ?? true,
+    };
+    if (formData.id) {
+      const { error } = await supabase.from('contacts').update(payload).eq('id', formData.id);
+      if (error) { toast.error('Error al actualizar'); return; }
+    } else {
+      const { error } = await supabase.from('contacts').insert(payload);
+      if (error) { toast.error('Error al crear'); return; }
+    }
+    toast.success(formData.id ? 'Cliente actualizado' : 'Cliente creado');
+    queryClient.invalidateQueries({ queryKey: ['maestras-contacts'] });
+    setEditing(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    const { error } = await supabase.from('contacts').delete().eq('id', deleting.id);
+    if (error) { toast.error('No se puede eliminar, tiene registros asociados'); return; }
+    toast.success('Cliente eliminado');
+    queryClient.invalidateQueries({ queryKey: ['maestras-contacts'] });
+    setDeleting(null);
+  };
+
+  const newClient = () => setEditing({
+    contact_name: '', company_name: '', rnc: '', email: '', phone: '', whatsapp: '',
+    segment: '', territory: '', address: '', source: '', price_tier: 'list', notes: '', is_active: true,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente..." className="pl-9 h-9" />
+        </div>
+        <span className="text-xs text-muted-foreground">{filtered.length} registros</span>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(contacts.map(c => ({
+            Nombre: c.contact_name, Empresa: c.company_name || '', RNC: c.rnc || '',
+            Email: c.email || '', Teléfono: c.phone || '', WhatsApp: c.whatsapp || '',
+            Segmento: c.segment || '', Territorio: c.territory || '', 'Nivel Precio': c.price_tier || '',
+            Estado: c.is_active ? 'Activo' : 'Inactivo',
+          })), 'clientes', 'Clientes')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
+          <Button size="sm" onClick={newClient}><Plus className="w-3.5 h-3.5 mr-1" />Nuevo</Button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs">Nombre / Empresa</TableHead>
+              <TableHead className="text-xs">Teléfono</TableHead>
+              <TableHead className="text-xs">Email</TableHead>
+              <TableHead className="text-xs">Segmento</TableHead>
+              <TableHead className="text-xs">Nivel Precio</TableHead>
+              <TableHead className="text-xs">Estado</TableHead>
+              <TableHead className="text-xs w-20"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((c: any) => (
+              <TableRow key={c.id}>
+                <TableCell className="text-xs">
+                  <div className="font-medium">{c.contact_name}</div>
+                  {c.company_name && <div className="text-muted-foreground text-[10px]">{c.company_name}</div>}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{c.phone || '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{c.email || '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{c.segment || '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{c.price_tier || '—'}</TableCell>
+                <TableCell>
+                  <span className={cn('text-[10px] px-2 py-0.5 rounded-full',
+                    c.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
+                    {c.is_active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(c)}><Pencil className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(c)}><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">
+                {isLoading ? 'Cargando...' : 'Sin registros'}
+              </TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {editing && (
+        <Dialog open onOpenChange={() => setEditing(null)}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>{editing.id ? 'Editar Cliente' : 'Nuevo Cliente'}</DialogTitle></DialogHeader>
+            <ClientForm initial={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+          </DialogContent>
+        </Dialog>
+      )}
+      <DeleteConfirmDialog open={!!deleting} onOpenChange={() => setDeleting(null)} onConfirm={handleDelete}
+        title="Eliminar Cliente" description={`¿Eliminar "${deleting?.contact_name}"? Esta acción no se puede deshacer.`} />
+    </div>
+  );
+}
+
+function ClientForm({ initial, onSave, onCancel }: { initial: any; onSave: (d: any) => Promise<void>; onCancel: () => void }) {
+  const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
+  const submit = async () => {
+    if (!form.contact_name?.trim()) { toast.error('Nombre es requerido'); return; }
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  };
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label className="text-xs">Nombre *</Label><Input value={form.contact_name} onChange={e => set('contact_name', e.target.value)} className="mt-1" /></div>
+        <div><Label className="text-xs">Empresa</Label><Input value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} className="mt-1" /></div>
+      </div>
+      <div><Label className="text-xs">RNC</Label><Input value={form.rnc || ''} onChange={e => set('rnc', e.target.value)} className="mt-1" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label className="text-xs">Email</Label><Input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} className="mt-1" /></div>
+        <div><Label className="text-xs">Teléfono</Label><Input value={form.phone || ''} onChange={e => set('phone', e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label className="text-xs">WhatsApp</Label><Input value={form.whatsapp || ''} onChange={e => set('whatsapp', e.target.value)} className="mt-1" /></div>
+        <div>
+          <Label className="text-xs">Nivel de Precio</Label>
+          <Select value={form.price_tier || 'list'} onValueChange={v => set('price_tier', v)}>
+            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="list">Lista</SelectItem>
+              <SelectItem value="architect">Arquitecto</SelectItem>
+              <SelectItem value="project">Proyecto</SelectItem>
+              <SelectItem value="wholesale">Mayorista</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><Label className="text-xs">Segmento</Label><Input value={form.segment || ''} onChange={e => set('segment', e.target.value)} className="mt-1" /></div>
+        <div><Label className="text-xs">Territorio</Label><Input value={form.territory || ''} onChange={e => set('territory', e.target.value)} className="mt-1" /></div>
+      </div>
+      <div><Label className="text-xs">Dirección</Label><Input value={form.address || ''} onChange={e => set('address', e.target.value)} className="mt-1" /></div>
+      <div><Label className="text-xs">Fuente</Label><Input value={form.source || ''} onChange={e => set('source', e.target.value)} className="mt-1" placeholder="Referido, web, feria..." /></div>
+      <div><Label className="text-xs">Notas</Label><Textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} className="mt-1" rows={2} /></div>
+      <div className="flex gap-2 pt-2">
+        <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
+        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
 
 // ============ PROVEEDORES ============
 
