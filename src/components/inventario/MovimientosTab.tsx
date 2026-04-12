@@ -176,10 +176,42 @@ function MovementFormDialog({ open, onOpenChange, queryClient }: { open: boolean
       });
     }
 
+    // Auto-generate journal entry for inventory adjustments
+    if (form.movement_type === 'adjustment' && finalQty !== 0) {
+      const adjustmentValue = Math.abs(finalQty) * costUsd;
+      const inventoryAccountId = '90ddec52-5cac-4217-97de-351f864a3bd3'; // 13100 Inventarios
+      const adjustmentAccountId = '147bcb80-f2eb-4205-a82e-feab08b51503'; // 59900 Ajuste de Inventario
+      const prodName = products.find(p => p.id === form.product_id)?.name || '';
+      const desc = finalQty > 0
+        ? `Ajuste inventario (sobrante): +${finalQty} ${prodName}`
+        : `Ajuste inventario (faltante): ${finalQty} ${prodName}`;
+
+      const { data: je } = await supabase.from('journal_entries').insert({
+        description: desc,
+        total_debit_usd: adjustmentValue,
+        total_credit_usd: adjustmentValue,
+        notes: form.notes.trim() || null,
+      }).select('id').single();
+
+      if (je) {
+        const lines = finalQty > 0
+          ? [
+              { journal_entry_id: je.id, account_id: inventoryAccountId, debit_usd: adjustmentValue, credit_usd: 0, description: 'Aumento inventario por sobrante' },
+              { journal_entry_id: je.id, account_id: adjustmentAccountId, debit_usd: 0, credit_usd: adjustmentValue, description: 'Ajuste de inventario' },
+            ]
+          : [
+              { journal_entry_id: je.id, account_id: adjustmentAccountId, debit_usd: adjustmentValue, credit_usd: 0, description: 'Faltante de inventario' },
+              { journal_entry_id: je.id, account_id: inventoryAccountId, debit_usd: 0, credit_usd: adjustmentValue, description: 'Reducción inventario por faltante' },
+            ];
+        await supabase.from('journal_entry_lines').insert(lines);
+      }
+    }
+
     setSaving(false);
     toast.success('Movimiento registrado — inventario actualizado');
     queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries-finanzas'] });
     onOpenChange(false);
     setForm({ product_id: '', movement_type: 'receipt', quantity: '', unit_cost_usd: '', notes: '' });
   };
