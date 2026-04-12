@@ -435,7 +435,7 @@ export default function MasPage() {
         )}
 
         {tab === 'alerts' && <AlertsConfigSection />}
-        {tab === 'historial' && <AlertHistorySection />}
+        {tab === 'historial' && <AuditLogSection />}
         {tab === 'requests' && <ProductRequestsSection requests={productRequests} refetch={refetchRequests} />}
       </div>
     </AppLayout>
