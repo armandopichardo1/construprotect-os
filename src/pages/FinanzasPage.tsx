@@ -32,7 +32,7 @@ import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/Dat
 import { LibroDiarioTab } from '@/components/finanzas/LibroDiarioTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 
-const tabs = ['Crear Transacción', 'Resumen', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Resumen', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
