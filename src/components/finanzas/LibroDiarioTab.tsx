@@ -17,7 +17,7 @@ import { exportToExcel } from '@/lib/export-utils';
 interface JournalEntry {
   id: string;
   date: string;
-  type: 'sale' | 'expense' | 'cost';
+  type: 'sale' | 'expense' | 'cost' | 'journal';
   description: string;
   category: string;
   account_code: string;
