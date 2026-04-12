@@ -217,9 +217,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+        <Table wrapperClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs">Mes</TableHead>
               <TableHead className="text-xs text-right">Entradas</TableHead>
@@ -331,9 +331,9 @@ export function CashFlowTab({ sales, expenses }: Props) {
         </ResponsiveContainer>
 
         {/* Projection table with scenarios */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
+        <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
+          <Table wrapperClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
               <TableRow>
                 <TableHead className="text-xs">Mes</TableHead>
                 <TableHead className="text-xs text-right">Cobros</TableHead>
