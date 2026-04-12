@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const EXAMPLES = [
@@ -44,6 +44,10 @@ const COST_CATEGORIES: Record<string, string> = {
   warehousing: '🏭 Almacenaje', insurance: '🛡️ Seguro', other: '📎 Otro',
 };
 
+const PAYMENT_STATUSES: Record<string, string> = {
+  pending: '⏳ Pendiente', paid: '✅ Pagado', partial: '🔄 Parcial', overdue: '⚠️ Vencido',
+};
+
 interface SessionEntry {
   type: string;
   description: string;
@@ -52,18 +56,13 @@ interface SessionEntry {
 }
 
 type Mode = 'ai' | 'manual';
+type TxType = 'expense' | 'cost' | 'sale';
 
-// ---- Manual form defaults ----
-const defaultManual = {
-  type: 'expense' as 'expense' | 'cost',
-  description: '',
-  category: '',
-  vendor: '',
-  amountUsd: '',
-  amountDop: '',
-  date: undefined as Date | undefined,
-  accountId: '',
-};
+interface SaleItem {
+  product_id: string;
+  quantity: number;
+  unit_price_usd: number;
+}
 
 export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
   rate: any;
@@ -75,7 +74,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const xr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('ai');
 
-  // Fetch chart of accounts for selector
+  // Shared data queries
   const { data: accounts = [] } = useQuery({
     queryKey: ['chart-of-accounts'],
     queryFn: async () => {
@@ -83,78 +82,199 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       return data || [];
     },
   });
-  // Only leaf accounts (no children) for selection
   const leafAccounts = accounts.filter(a => !accounts.some(b => b.parent_id === a.id));
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['sale-contacts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('id, contact_name, company_name, price_tier');
+      return data || [];
+    },
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data } = await supabase.from('products').select('*').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
+  // AI state
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [history, setHistory] = useState<SessionEntry[]>([]);
 
   // Manual form state
-  const [manual, setManual] = useState(defaultManual);
+  const [manualType, setManualType] = useState<TxType>('expense');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [vendor, setVendor] = useState('');
+  const [amountUsd, setAmountUsd] = useState('');
+  const [amountDop, setAmountDop] = useState('');
+  const [manualDate, setManualDate] = useState<Date | undefined>();
+  const [accountId, setAccountId] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
 
-  const updateManual = (field: string, value: any) => setManual(prev => ({ ...prev, [field]: value }));
+  // Sale-specific manual state
+  const [contactId, setContactId] = useState('');
+  const [invoiceRef, setInvoiceRef] = useState('');
+  const [priceTier, setPriceTier] = useState('list');
+  const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
 
-  // Auto-calculate the other currency
-  const manualUsd = parseFloat(manual.amountUsd) || 0;
-  const manualDop = parseFloat(manual.amountDop) || 0;
+  const getPriceForTier = (prod: any, tier: string) => {
+    switch (tier) {
+      case 'architect': return Number(prod?.price_architect_usd || prod?.price_list_usd || 0);
+      case 'project': return Number(prod?.price_project_usd || prod?.price_list_usd || 0);
+      case 'wholesale': return Number(prod?.price_wholesale_usd || prod?.price_list_usd || 0);
+      default: return Number(prod?.price_list_usd || 0);
+    }
+  };
 
+  // Currency auto-conversion
   const handleUsdChange = (v: string) => {
-    updateManual('amountUsd', v);
+    setAmountUsd(v);
     const n = parseFloat(v);
-    if (!isNaN(n) && n > 0) updateManual('amountDop', (n * xr).toFixed(0));
+    if (!isNaN(n) && n > 0) setAmountDop((n * xr).toFixed(0));
   };
   const handleDopChange = (v: string) => {
-    updateManual('amountDop', v);
+    setAmountDop(v);
     const n = parseFloat(v);
-    if (!isNaN(n) && n > 0) updateManual('amountUsd', (n / xr).toFixed(2));
+    if (!isNaN(n) && n > 0) setAmountUsd((n / xr).toFixed(2));
   };
 
+  const handleClientChange = (id: string) => {
+    setContactId(id);
+    const contact = contacts.find((c: any) => c.id === id);
+    const tier = contact?.price_tier || 'list';
+    setPriceTier(tier);
+    setSaleItems(prev => prev.map(item => {
+      if (!item.product_id) return item;
+      const prod = products.find((p: any) => p.id === item.product_id);
+      return { ...item, unit_price_usd: getPriceForTier(prod, tier) };
+    }));
+  };
+
+  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 1, unit_price_usd: 0 }]);
+  const removeSaleItem = (i: number) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
+  const updateSaleItem = (i: number, field: string, value: any) => {
+    setSaleItems(prev => prev.map((item, idx) => {
+      if (idx !== i) return item;
+      const updated = { ...item, [field]: value };
+      if (field === 'product_id') {
+        const prod = products.find((p: any) => p.id === value);
+        updated.unit_price_usd = getPriceForTier(prod, priceTier);
+      }
+      return updated;
+    }));
+  };
+
+  const subtotal = saleItems.reduce((s, i) => s + i.unit_price_usd * i.quantity, 0);
+  const itbis = subtotal * 0.18;
+  const totalSale = subtotal + itbis;
+
+  const resetManualForm = () => {
+    setDescription(''); setCategory(''); setVendor('');
+    setAmountUsd(''); setAmountDop(''); setManualDate(undefined);
+    setAccountId(''); setContactId(''); setInvoiceRef('');
+    setPriceTier('list'); setPaymentStatus('pending');
+    setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+  };
+
+  // ===== MANUAL SAVE =====
   const saveManual = async () => {
-    if (!manual.description.trim()) { toast.error('Descripción requerida'); return; }
-    if (!manual.category) { toast.error('Selecciona una categoría'); return; }
-    if (!manual.accountId) { toast.error('Selecciona una cuenta contable'); return; }
-    if (manualUsd <= 0 && manualDop <= 0) { toast.error('Ingresa un monto'); return; }
+    if (manualType === 'sale') {
+      // Validate sale
+      if (!contactId) { toast.error('Selecciona un cliente'); return; }
+      if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
+
+      setManualSaving(true);
+      const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
+      try {
+        const salePayload: any = {
+          contact_id: contactId,
+          invoice_ref: invoiceRef || null,
+          subtotal_usd: subtotal,
+          itbis_usd: itbis,
+          total_usd: totalSale,
+          total_dop: totalSale * xr,
+          exchange_rate: xr,
+          payment_status: paymentStatus as any,
+        };
+        if (dateStr) salePayload.date = dateStr;
+        if (paymentStatus === 'paid') salePayload.payment_date = dateStr || new Date().toISOString().split('T')[0];
+
+        const { data: sale, error } = await supabase.from('sales').insert(salePayload).select().single();
+        if (error || !sale) throw error || new Error('Error creando venta');
+
+        const itemsData = saleItems.map(i => {
+          const prod = products.find((p: any) => p.id === i.product_id);
+          const costUsd = Number(prod?.unit_cost_usd || 0);
+          return {
+            sale_id: sale.id, product_id: i.product_id, quantity: i.quantity,
+            unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
+            line_total_usd: i.unit_price_usd * i.quantity,
+            margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
+          };
+        });
+        await supabase.from('sale_items').insert(itemsData);
+
+        toast.success('Venta registrada');
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sale-items'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+
+        setHistory(prev => [{ type: 'sale', description: contacts.find(c => c.id === contactId)?.contact_name || 'Venta', amount: formatUSD(totalSale), timestamp: new Date() }, ...prev].slice(0, 5));
+        resetManualForm();
+      } catch (e: any) {
+        toast.error(e.message || 'Error al registrar venta');
+      }
+      setManualSaving(false);
+      return;
+    }
+
+    // Expense / Cost
+    if (!description.trim()) { toast.error('Descripción requerida'); return; }
+    if (!category) { toast.error('Selecciona una categoría'); return; }
+    const usd = parseFloat(amountUsd) || 0;
+    const dop = parseFloat(amountDop) || 0;
+    if (usd <= 0 && dop <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
-    const finalUsd = manualUsd > 0 ? manualUsd : manualDop / xr;
-    const finalDop = manualDop > 0 ? manualDop : manualUsd * xr;
-    const dateStr = manual.date ? format(manual.date, 'yyyy-MM-dd') : undefined;
+    const finalUsd = usd > 0 ? usd : dop / xr;
+    const finalDop = dop > 0 ? dop : usd * xr;
+    const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
 
     try {
-      const table = manual.type === 'expense' ? 'expenses' : 'costs';
+      const table = manualType === 'expense' ? 'expenses' : 'costs';
       const row: any = {
-        description: manual.description.trim(),
-        category: manual.category,
-        vendor: manual.vendor.trim() || null,
+        description: description.trim(),
+        category,
+        vendor: vendor.trim() || null,
         amount_usd: finalUsd,
         amount_dop: finalDop,
         exchange_rate: xr,
-        account_id: manual.accountId || null,
+        account_id: accountId || null,
       };
       if (dateStr) row.date = dateStr;
 
       const { error } = await supabase.from(table).insert(row);
       if (error) throw error;
 
-      toast.success(manual.type === 'expense' ? 'Gasto registrado' : 'Costo registrado');
-      queryClient.invalidateQueries({ queryKey: [table === 'expenses' ? 'expenses' : 'costs'] });
+      toast.success(manualType === 'expense' ? 'Gasto registrado' : 'Costo registrado');
+      queryClient.invalidateQueries({ queryKey: [table] });
 
-      setHistory(prev => [{
-        type: manual.type,
-        description: manual.description,
-        amount: formatUSD(finalUsd),
-        timestamp: new Date(),
-      }, ...prev].slice(0, 5));
-
-      setManual(defaultManual);
+      setHistory(prev => [{ type: manualType, description, amount: formatUSD(finalUsd), timestamp: new Date() }, ...prev].slice(0, 5));
+      resetManualForm();
     } catch (e: any) {
       toast.error(e.message || 'Error al registrar');
     }
     setManualSaving(false);
   };
 
+  // ===== AI CLASSIFY =====
   const classify = async () => {
     if (!input.trim() || loading) return;
     setLoading(true);
@@ -187,12 +307,13 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     }
   };
 
+  // ===== AI APPROVE =====
   const approve = async () => {
     if (!preview) return;
     setLoading(true);
     try {
       if (preview.type === 'expense') {
-        await supabase.from('expenses').insert({
+        const { error } = await supabase.from('expenses').insert({
           description: preview.data.description,
           category: preview.data.category as any,
           vendor: preview.data.vendor || null,
@@ -201,10 +322,11 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           exchange_rate: preview.data.exchange_rate || xr,
           account_id: preview.data.account_id || null,
         });
+        if (error) throw error;
         toast.success('Gasto registrado');
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
       } else if (preview.type === 'cost') {
-        await supabase.from('costs').insert({
+        const { error } = await supabase.from('costs').insert({
           description: preview.data.description,
           category: preview.data.category as any,
           vendor: preview.data.vendor || null,
@@ -213,10 +335,11 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           exchange_rate: preview.data.exchange_rate || xr,
           account_id: preview.data.account_id || null,
         });
+        if (error) throw error;
         toast.success('Costo registrado');
         queryClient.invalidateQueries({ queryKey: ['costs'] });
       } else if (preview.type === 'sale') {
-        const { data: sale } = await supabase.from('sales').insert({
+        const salePayload: any = {
           contact_id: preview.data.contact_id || null,
           subtotal_usd: preview.data.subtotal_usd,
           itbis_usd: preview.data.itbis_usd,
@@ -224,8 +347,10 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
           total_dop: preview.data.total_dop,
           exchange_rate: preview.data.exchange_rate || xr,
           payment_status: 'pending' as any,
-        }).select().single();
-        if (sale && preview.data.items) {
+        };
+        const { data: sale, error } = await supabase.from('sales').insert(salePayload).select().single();
+        if (error || !sale) throw error || new Error('Error creando venta');
+        if (preview.data.items) {
           await supabase.from('sale_items').insert(preview.data.items.map((i: any) => ({
             sale_id: sale.id, product_id: i.product_id || null, quantity: i.quantity,
             unit_price_usd: i.unit_price_usd, unit_cost_usd: i.unit_cost_usd || 0,
@@ -235,6 +360,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
         toast.success('Venta registrada');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
       }
 
       setHistory(prev => [{
@@ -246,8 +372,8 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
       setPreview(null);
       setInput('');
-    } catch {
-      toast.error('Error al registrar');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar');
     }
     setLoading(false);
   };
@@ -284,7 +410,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     ? COST_CATEGORIES[preview.data.category] || preview.data.category
     : null;
 
-  const categories = manual.type === 'expense' ? EXPENSE_CATEGORIES : COST_CATEGORIES;
+  const currentCategories = manualType === 'expense' ? EXPENSE_CATEGORIES : COST_CATEGORIES;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -415,13 +541,13 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <h2 className="text-base font-semibold text-foreground">Registrar Transacción Manual</h2>
             </div>
 
-            {/* Type selector */}
+            {/* Type selector - now includes sale */}
             <div className="flex gap-2">
-              {(['expense', 'cost'] as const).map(t => (
-                <button key={t} onClick={() => { updateManual('type', t); updateManual('category', ''); }}
+              {(['sale', 'expense', 'cost'] as const).map(t => (
+                <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
                   className={cn(
                     'flex-1 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all',
-                    manual.type === t
+                    manualType === t
                       ? TYPE_CONFIG[t].color + ' border-current'
                       : 'border-border text-muted-foreground hover:border-primary/30'
                   )}>
@@ -430,110 +556,215 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               ))}
             </div>
 
-            {/* Description */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Descripción *</Label>
-              <Input
-                value={manual.description}
-                onChange={e => updateManual('description', e.target.value)}
-                placeholder="Ej: Pago de flete contenedor marzo"
-                maxLength={200}
-              />
-            </div>
-
-            {/* Category */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Categoría *</Label>
-              <Select value={manual.category} onValueChange={v => updateManual('category', v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(categories).map(([k, label]) => (
-                    <SelectItem key={k} value={k}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Vendor */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Proveedor / Fuente</Label>
-              <Input
-                value={manual.vendor}
-                onChange={e => updateManual('vendor', e.target.value)}
-                placeholder="Ej: DHL, Aduanas, etc."
-                maxLength={100}
-              />
-            </div>
-
-            {/* Account */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Cuenta Contable *</Label>
-              <Select value={manual.accountId} onValueChange={v => updateManual('accountId', v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
-                <SelectContent>
-                  {leafAccounts.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Amounts side by side */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Monto USD *</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={manual.amountUsd}
-                    onChange={e => handleUsdChange(e.target.value)}
-                    placeholder="0.00"
-                    className="pl-7"
-                  />
+            {/* ===== SALE FORM ===== */}
+            {manualType === 'sale' && (
+              <div className="space-y-4">
+                {/* Client */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cliente *</Label>
+                  <Select value={contactId} onValueChange={handleClientChange}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                    <SelectContent>
+                      {contacts.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.contact_name}{c.company_name ? ` — ${c.company_name}` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Monto DOP</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">RD$</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={manual.amountDop}
-                    onChange={e => handleDopChange(e.target.value)}
-                    placeholder="0"
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-[10px] text-muted-foreground -mt-3">Tasa: 1 USD = RD${xr.toFixed(2)} — se auto-convierte al llenar un campo</p>
 
-            {/* Date */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Fecha (por defecto hoy)</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm"
-                    className={cn('w-full justify-start text-left text-sm font-normal', !manual.date && 'text-muted-foreground')}>
-                    <CalendarIcon className="w-4 h-4 mr-2" />
-                    {manual.date ? format(manual.date, 'dd/MM/yyyy') : 'Hoy'}
+                {/* Invoice ref */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Ref. Factura</Label>
+                    <Input value={invoiceRef} onChange={e => setInvoiceRef(e.target.value)} placeholder="Ej: FAC-001" maxLength={50} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Tier de Precio</Label>
+                    <Select value={priceTier} onValueChange={v => {
+                      setPriceTier(v);
+                      setSaleItems(prev => prev.map(item => {
+                        if (!item.product_id) return item;
+                        const prod = products.find((p: any) => p.id === item.product_id);
+                        return { ...item, unit_price_usd: getPriceForTier(prod, v) };
+                      }));
+                    }}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="list">Lista</SelectItem>
+                        <SelectItem value="architect">Arquitecto</SelectItem>
+                        <SelectItem value="project">Proyecto</SelectItem>
+                        <SelectItem value="wholesale">Mayorista</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Products */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Productos *</Label>
+                  {saleItems.map((item, i) => (
+                    <div key={i} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Select value={item.product_id} onValueChange={v => updateSaleItem(i, 'product_id', v)}>
+                          <SelectTrigger className="text-xs"><SelectValue placeholder="Producto" /></SelectTrigger>
+                          <SelectContent>
+                            {products.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id} className="text-xs">{p.sku} — {p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Input type="number" min={1} value={item.quantity}
+                        onChange={e => updateSaleItem(i, 'quantity', parseInt(e.target.value) || 1)}
+                        className="w-16 text-xs" />
+                      <div className="relative w-24">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
+                        <Input type="number" min={0} step={0.01} value={item.unit_price_usd}
+                          onChange={e => updateSaleItem(i, 'unit_price_usd', parseFloat(e.target.value) || 0)}
+                          className="pl-5 text-xs" />
+                      </div>
+                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatUSD(item.unit_price_usd * item.quantity)}</span>
+                      {saleItems.length > 1 && (
+                        <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={addSaleItem} className="gap-1 text-xs">
+                    <Plus className="w-3 h-3" /> Agregar Producto
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={manual.date} onSelect={d => updateManual('date', d)} initialFocus className={cn('p-3 pointer-events-auto')} />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
+
+                {/* Totals */}
+                <div className="rounded-xl bg-muted/50 p-4 space-y-1">
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal</span><span className="font-mono">{formatUSD(subtotal)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%)</span><span className="font-mono">{formatUSD(itbis)}</span></div>
+                  <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/50">
+                    <span>Total</span>
+                    <span className="text-primary">{formatUSD(totalSale)} / {formatDOP(totalSale * xr)}</span>
+                  </div>
+                </div>
+
+                {/* Payment status */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Estado de Pago</Label>
+                    <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PAYMENT_STATUSES).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fecha (por defecto hoy)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm"
+                          className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== EXPENSE / COST FORM ===== */}
+            {(manualType === 'expense' || manualType === 'cost') && (
+              <div className="space-y-4">
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Descripción *</Label>
+                  <Input value={description} onChange={e => setDescription(e.target.value)}
+                    placeholder="Ej: Pago de flete contenedor marzo" maxLength={200} />
+                </div>
+
+                {/* Category */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Categoría *</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(currentCategories).map(([k, label]) => (
+                        <SelectItem key={k} value={k}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Vendor */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Proveedor / Fuente</Label>
+                  <Input value={vendor} onChange={e => setVendor(e.target.value)}
+                    placeholder="Ej: DHL, Aduanas, etc." maxLength={100} />
+                </div>
+
+                {/* Account */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cuenta Contable</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
+                    <SelectContent>
+                      {leafAccounts.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Amounts */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Monto USD *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                      <Input type="number" min="0" step="0.01" value={amountUsd}
+                        onChange={e => handleUsdChange(e.target.value)} placeholder="0.00" className="pl-7" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Monto DOP</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">RD$</span>
+                      <Input type="number" min="0" step="1" value={amountDop}
+                        onChange={e => handleDopChange(e.target.value)} placeholder="0" className="pl-10" />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground -mt-3">Tasa: 1 USD = RD${xr.toFixed(2)} — se auto-convierte al llenar un campo</p>
+
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm"
+                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
 
             {/* Submit */}
             <Button onClick={saveManual} disabled={manualSaving} className="w-full gap-2">
               {manualSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              {manualSaving ? 'Registrando...' : `Registrar ${TYPE_CONFIG[manual.type].label}`}
+              {manualSaving ? 'Registrando...' : `Registrar ${TYPE_CONFIG[manualType].label}`}
             </Button>
           </div>
         )}
@@ -578,10 +809,11 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               </>
             ) : (
               <>
-                <p>1️⃣ Selecciona tipo: Gasto o Costo</p>
-                <p>2️⃣ Llena descripción, categoría y monto</p>
-                <p>3️⃣ El monto se convierte automáticamente</p>
+                <p>1️⃣ Selecciona tipo: Venta, Gasto o Costo</p>
+                <p>2️⃣ Llena los datos correspondientes</p>
+                <p>3️⃣ Los montos se convierten automáticamente</p>
                 <p>4️⃣ Click en "Registrar" para guardar</p>
+                <p className="text-[10px] text-muted-foreground/70 pt-1">Las ventas alimentan el P&L, Balance y Flujo de Caja. Los gastos y costos se reflejan en todas las vistas financieras.</p>
               </>
             )}
           </div>
