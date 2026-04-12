@@ -1,13 +1,25 @@
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/business-ai`;
 
+export const AI_MODELS = [
+  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash (rápido)" },
+  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (mejor)" },
+  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (nuevo)" },
+  { id: "openai/gpt-5-mini", label: "GPT-5 Mini" },
+  { id: "openai/gpt-5", label: "GPT-5 (premium)" },
+] as const;
+
 export async function streamBusinessAI({
   action,
   payload,
+  model,
+  customPrompt,
   onDelta,
   onDone,
 }: {
   action: "review" | "deal-plan" | "weekly-agenda" | "po-recommender" | "pitch" | "cross-sell" | "reorder-recommendations";
   payload?: any;
+  model?: string;
+  customPrompt?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
 }) {
@@ -17,7 +29,7 @@ export async function streamBusinessAI({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ action, payload }),
+    body: JSON.stringify({ action, payload, model, customPrompt }),
   });
 
   if (!resp.ok || !resp.body) {
