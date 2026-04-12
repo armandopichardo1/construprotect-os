@@ -94,8 +94,19 @@ REGLAS DE CLASIFICACIÓN:
 Si el monto está en DOP, convierte a USD usando la tasa. Si está en USD, convierte a DOP.
 Calcula el ITBIS (18%) sobre el subtotal para ventas.
 Para ventas, usa el precio de lista por defecto salvo que se mencione un tier específico.
-Siempre sugiere la cuenta contable más apropiada del catálogo. Si no hay coincidencia clara, deja account_id como null.
-Responde SOLO con el JSON, sin markdown ni explicaciones adicionales.` 
+
+REGLAS DE CUENTAS CONTABLES (MUY IMPORTANTE):
+- SIEMPRE debes asignar una cuenta contable del catálogo proporcionado. Busca la cuenta que mejor se ajuste por tipo (Activo, Pasivo, Ingreso, Gasto, Costo) y por descripción.
+- Si encuentras una cuenta apropiada, incluye account_id, account_code y account_name con los datos exactos del catálogo.
+- Si NO existe una cuenta apropiada en el catálogo, deja account_id como null y agrega un campo adicional:
+  "missing_account_suggestion": { "code": "código sugerido", "description": "nombre sugerido", "account_type": "tipo sugerido (Activo/Pasivo/Ingreso/Gasto/Costo)", "classification": "clasificación sugerida" }
+  Y en el campo "explanation" indica claramente: "⚠️ No se encontró una cuenta contable apropiada en el catálogo. Se recomienda crear: [nombre sugerido]".
+- Para gastos operativos → busca cuentas tipo "Gasto" o "Gastos Operativos".
+- Para costos directos → busca cuentas tipo "Costo" o "Costo de Ventas".
+- Para ventas → busca cuentas tipo "Ingreso".
+- Para movimientos de efectivo → busca cuentas tipo "Activo" como Caja o Bancos.
+
+Responde SOLO con el JSON, sin markdown ni explicaciones adicionales.`
     : `Eres un asesor financiero experto para ConstruProtect OS, una empresa de distribución de materiales de construcción en República Dominicana.
 
 TASA DE CAMBIO: Compra ${rate?.usd_buy || 60} / Venta ${rate?.usd_sell || 60.76} DOP/USD
