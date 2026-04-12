@@ -243,7 +243,7 @@ export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
     toast.success(`${successCount} producto(s) ajustado(s) — inventario y contabilidad actualizados`);
     queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-    queryClient.invalidateQueries({ queryKey: ['journal-entries-finanzas'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     queryClient.invalidateQueries({ queryKey: ['products-with-stock'] });
     onOpenChange(false);
   };
