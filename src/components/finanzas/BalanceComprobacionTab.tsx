@@ -77,59 +77,83 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate
   const cxcAccount = findAccount('121') || findAccount('12');
   const cogsAccount = findAccount('50') || accounts.find((a: any) => a.account_type === 'Costo');
   const inventoryAccount = findAccount('131') || findAccount('13');
+  const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
+  const cxpAccount = findAccount('201') || findAccount('20');
 
   const rows = useMemo(() => {
     const accMap: Record<string, { debits: number; credits: number }> = {};
     const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
 
-    // Sales → Credit to income account
+    // === VENTAS (partida doble completa) ===
     filteredSales.forEach((s: any) => {
-      const accId = s.account_id || incomeAccount?.id;
-      if (!accId) return;
-      ensure(accId);
-      accMap[accId].credits += Number(s.total_usd || 0);
+      const incId = s.account_id || incomeAccount?.id;
+      const amount = Number(s.total_usd || 0);
+      if (!incId || amount === 0) return;
 
-      // Accounts Receivable: unpaid → debit CxC
-      if (cxcAccount && ['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        ensure(cxcAccount.id);
-        accMap[cxcAccount.id].debits += Number(s.total_usd || 0);
-      } else if (cxcAccount && s.payment_status === 'paid') {
-        // Paid sales: debit cash (we skip cash for simplicity, credit CxC if it was pending)
+      // Credit: Ingreso
+      ensure(incId);
+      accMap[incId].credits += amount;
+
+      if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
+        // Debit: CxC (venta pendiente de cobro)
+        if (cxcAccount) {
+          ensure(cxcAccount.id);
+          accMap[cxcAccount.id].debits += amount;
+        }
+      } else if (s.payment_status === 'paid') {
+        // Debit: Caja/Banco (venta cobrada)
+        if (cashAccount) {
+          ensure(cashAccount.id);
+          accMap[cashAccount.id].debits += amount;
+        }
       }
     });
 
-    // Sale Items → COGS debit
+    // === COGS / Inventario (partida doble) ===
     filteredSaleItems.forEach((si: any) => {
-      const accId = cogsAccount?.id;
-      if (!accId) return;
-      ensure(accId);
-      accMap[accId].debits += Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+      const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
+      if (cogsAmt === 0) return;
+      // Debit: Costo de Ventas
+      if (cogsAccount) {
+        ensure(cogsAccount.id);
+        accMap[cogsAccount.id].debits += cogsAmt;
+      }
+      // Credit: Inventarios
+      if (inventoryAccount) {
+        ensure(inventoryAccount.id);
+        accMap[inventoryAccount.id].credits += cogsAmt;
+      }
     });
 
-    // Inventory credit (contra COGS)
-    if (inventoryAccount) {
-      const totalCogs = filteredSaleItems.reduce((s: number, si: any) =>
-        s + Number(si.unit_cost_usd || 0) * Number(si.quantity || 0), 0);
-      if (totalCogs > 0) {
-        ensure(inventoryAccount.id);
-        accMap[inventoryAccount.id].credits += totalCogs;
-      }
-    }
-
-    // Expenses → Debit
+    // === GASTOS (partida doble: Debit Gasto, Credit Caja/Banco) ===
     filteredExpenses.forEach((e: any) => {
       const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
-      if (!accId) return;
+      const amount = Number(e.amount_usd || 0);
+      if (!accId || amount === 0) return;
+      // Debit: Gasto
       ensure(accId);
-      accMap[accId].debits += Number(e.amount_usd || 0);
+      accMap[accId].debits += amount;
+      // Credit: Caja/Banco (salida de efectivo)
+      if (cashAccount) {
+        ensure(cashAccount.id);
+        accMap[cashAccount.id].credits += amount;
+      }
     });
 
-    // Costs → Debit
+    // === COSTOS (partida doble: Debit Costo, Credit CxP o Caja) ===
     filteredCosts.forEach((c: any) => {
       const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
-      if (!accId) return;
+      const amount = Number(c.amount_usd || 0);
+      if (!accId || amount === 0) return;
+      // Debit: Costo
       ensure(accId);
-      accMap[accId].debits += Number(c.amount_usd || 0);
+      accMap[accId].debits += amount;
+      // Credit: Cuentas por Pagar o Caja/Banco
+      const counterAcct = cxpAccount || cashAccount;
+      if (counterAcct) {
+        ensure(counterAcct.id);
+        accMap[counterAcct.id].credits += amount;
+      }
     });
 
     // Build rows
