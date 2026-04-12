@@ -874,8 +874,89 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               </div>
             )}
 
+            {/* ===== JOURNAL ENTRY FORM ===== */}
+            {manualType === 'journal' && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Descripción del Asiento *</Label>
+                  <Input value={journalDescription} onChange={e => setJournalDescription(e.target.value)}
+                    placeholder="Ej: Ingreso de efectivo por accionista" maxLength={200} />
+                </div>
+
+                {/* Journal lines */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Líneas del Asiento</Label>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
+                    </div>
+                    {journalLines.map((line, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border/50 items-center">
+                        <Select value={line.account_id} onValueChange={v => updateJournalLine(i, 'account_id', v)}>
+                          <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                          <SelectContent>
+                            {leafAccounts.map(a => (
+                              <SelectItem key={a.id} value={a.id} className="text-xs">{a.code} — {a.description}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input type="number" min={0} step={0.01} value={line.debit || ''}
+                          onChange={e => updateJournalLine(i, 'debit', parseFloat(e.target.value) || 0)}
+                          className="text-xs h-8 text-right" placeholder="0.00" />
+                        <Input type="number" min={0} step={0.01} value={line.credit || ''}
+                          onChange={e => updateJournalLine(i, 'credit', parseFloat(e.target.value) || 0)}
+                          className="text-xs h-8 text-right" placeholder="0.00" />
+                        {journalLines.length > 2 && (
+                          <button onClick={() => removeJournalLine(i)} className="p-1 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30 font-bold">
+                      <span className="text-xs">Totales</span>
+                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
+                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
+                      <span />
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={addJournalLine} className="gap-1 text-xs">
+                    <Plus className="w-3 h-3" /> Agregar Línea
+                  </Button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notas (opcional)</Label>
+                  <Textarea value={journalNotes} onChange={e => setJournalNotes(e.target.value)}
+                    placeholder="Notas adicionales..." className="min-h-[60px] text-sm resize-none" />
+                </div>
+
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm"
+                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+
+            {/* Accounting Preview */}
+            {mode === 'manual' && previewLines.length > 0 && (
+              <AccountingPreview lines={previewLines} description={manualType === 'journal' ? journalDescription : description} />
+            )}
+
             {/* Submit */}
-            <Button onClick={saveManual} disabled={manualSaving} className="w-full gap-2">
+            <Button onClick={saveManual} disabled={manualSaving || (manualType === 'journal' && !journalIsBalanced)} className="w-full gap-2">
               {manualSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {manualSaving ? 'Registrando...' : `Registrar ${TYPE_CONFIG[manualType].label}`}
             </Button>
