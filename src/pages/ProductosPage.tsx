@@ -150,19 +150,19 @@ export default function ProductosPage() {
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">SKU</TableHead>
-                  <TableHead className="text-xs">Nombre</TableHead>
-                  <TableHead className="text-xs">Marca</TableHead>
-                  <TableHead className="text-xs">Categoría</TableHead>
-                  <TableHead className="text-xs text-right">Costo</TableHead>
-                  <TableHead className="text-xs text-right">P. Lista</TableHead>
-                  <TableHead className="text-xs text-center">M. Lista</TableHead>
-                  <TableHead className="text-xs text-center">M. Arq.</TableHead>
-                  <TableHead className="text-xs text-center">M. Proy.</TableHead>
-                  <TableHead className="text-xs">Dimensiones</TableHead>
-                  <TableHead className="text-xs w-[80px]">Acciones</TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead className="text-xs">SKU</TableHead>
+                   <TableHead className="text-xs">Nombre</TableHead>
+                   <TableHead className="text-xs">Marca</TableHead>
+                   <TableHead className="text-xs">Categoría</TableHead>
+                   <TableHead className="text-xs text-right">Costo Unitario</TableHead>
+                   <TableHead className="text-xs text-right">Precio Lista</TableHead>
+                   <TableHead className="text-xs text-center">Margen Lista</TableHead>
+                   <TableHead className="text-xs text-center">Margen Arquitecto</TableHead>
+                   <TableHead className="text-xs text-center">Margen Proyecto</TableHead>
+                   <TableHead className="text-xs">Dimensiones</TableHead>
+                   <TableHead className="text-xs w-[80px]">Acciones</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
