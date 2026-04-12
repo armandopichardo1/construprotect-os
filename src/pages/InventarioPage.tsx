@@ -486,7 +486,8 @@ export default function InventarioPage() {
         )}
 
         {tab === 'Envíos' && <ShipmentsTab />}
-        
+
+        {tab === 'Reportes' && <MovimientosReportTab />}
 
         {tab === 'ABC' && (
           <div className="space-y-4">
