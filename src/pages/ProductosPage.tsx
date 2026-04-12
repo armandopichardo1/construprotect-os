@@ -262,7 +262,7 @@ export function ProductosContent() {
       }
     }
 
-    const { error } = await supabase.from('products').update(payload).eq('id', productId);
+    const { error } = await supabase.from('products').update(payload as any).eq('id', productId);
     if (error) {
       toast.error(`Error: ${error.message}`);
       throw error;
