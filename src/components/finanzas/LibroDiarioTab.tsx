@@ -237,6 +237,38 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!deleteEntry) return;
+    setDeleting(true);
+    try {
+      if (deleteEntry.type === 'sale') {
+        await supabase.from('sale_items').delete().eq('sale_id', deleteEntry.id);
+        const { error } = await supabase.from('sales').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sale-items'] });
+      } else if (deleteEntry.type === 'expense') {
+        const { error } = await supabase.from('expenses').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      } else if (deleteEntry.type === 'cost') {
+        const { error } = await supabase.from('costs').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['costs'] });
+      } else if (deleteEntry.type === 'journal') {
+        await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', deleteEntry.id);
+        const { error } = await supabase.from('journal_entries').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      }
+      toast.success('Registro eliminado');
+      setDeleteEntry(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar');
+    }
+    setDeleting(false);
+  };
+
   const handleExport = () => {
     exportToExcel(filtered.map(e => ({
       Fecha: e.date,
