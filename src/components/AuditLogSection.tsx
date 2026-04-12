@@ -81,6 +81,7 @@ export function AuditLogSection() {
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
   const [selectedRow, setSelectedRow] = useState<AuditRow | null>(null);
 
   const { data: logs = [], isLoading } = useQuery({
