@@ -792,7 +792,7 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
 }
 
 function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editExpense;
@@ -817,10 +817,10 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
         vendor: editExpense.vendor || '',
         amount_usd: String(editExpense.amount_usd || ''),
         amount_dop: String(editExpense.amount_dop || ''),
-        account_id: editExpense.account_id || '',
+        account_id: editExpense.account_id || 'none',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
     }
   }, [editExpense, open]);
 
@@ -1003,7 +1003,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
 }
 
 function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editCost;
@@ -1027,10 +1027,10 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
         vendor: editCost.vendor || '',
         amount_usd: String(editCost.amount_usd || ''),
         amount_dop: String(editCost.amount_dop || ''),
-        account_id: editCost.account_id || '',
+        account_id: editCost.account_id || 'none',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
     }
   }, [editCost, open]);
 
