@@ -379,7 +379,7 @@ export default function InventarioPage() {
                               {ropMismatch && ropDiff > 0 && <p className="text-warning mt-1">⚠ Reorden actual ({item.reorder}) menor al recomendado</p>}
                               {ropMismatch && ropDiff < 0 && <p className="text-primary mt-1">ℹ Reorden actual ({item.reorder}) mayor al recomendado</p>}
                             </TooltipContent>
-                          </Tooltip>
+                          </UITooltip>
                         </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
@@ -409,7 +409,7 @@ export default function InventarioPage() {
                   <ResponsiveContainer width={160} height={160}>
                     <PieChart><Pie data={categoryValues} innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {categoryValues.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie><Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
+                    </Pie><RechartsTooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} /></PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-2">
                     {categoryValues.map(c => (
@@ -464,7 +464,7 @@ export default function InventarioPage() {
                     <XAxis dataKey="x" name="Velocidad/mes" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
                     <YAxis dataKey="y" name="Stock" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} />
                     <ZAxis dataKey="z" range={[40, 400]} name="Valor" />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
+                    <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
                       if (name === 'Valor') return formatUSD(v);
                       return v;
                     }} labelFormatter={() => ''} />
