@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Search, ClipboardCheck, Loader2 } from 'lucide-react';
+import { Search, ClipboardCheck, Loader2, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/export-utils';
+import * as XLSX from 'xlsx';
 
 interface CountRow {
   product_id: string;
@@ -98,6 +100,69 @@ export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
     changedRows.reduce((sum, r) => sum + (Number(r.counted_qty) - r.system_qty), 0),
     [changedRows]
   );
+
+  const exportReport = () => {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    
+    // All rows report (counted and uncounted)
+    const allData = rows.map(r => {
+      const counted = r.counted_qty !== '' ? Number(r.counted_qty) : null;
+      const diff = counted !== null ? counted - r.system_qty : null;
+      const adjustValue = diff !== null ? Math.abs(diff) * r.unit_cost_usd : 0;
+      return {
+        'SKU': r.sku,
+        'Producto': r.name,
+        'Qty Sistema': r.system_qty,
+        'Qty Conteo': counted ?? '',
+        'Diferencia': diff ?? '',
+        'Tipo': diff === null ? 'No contado' : diff === 0 ? 'Sin diferencia' : diff > 0 ? 'Sobrante' : 'Faltante',
+        'Costo Unitario USD': r.unit_cost_usd,
+        'Valor Ajuste USD': diff !== null && diff !== 0 ? adjustValue : 0,
+      };
+    });
+
+    // Summary
+    const sobrantes = changedRows.filter(r => Number(r.counted_qty) > r.system_qty);
+    const faltantes = changedRows.filter(r => Number(r.counted_qty) < r.system_qty);
+    const totalSobrante = sobrantes.reduce((s, r) => s + (Number(r.counted_qty) - r.system_qty) * r.unit_cost_usd, 0);
+    const totalFaltante = faltantes.reduce((s, r) => s + (r.system_qty - Number(r.counted_qty)) * r.unit_cost_usd, 0);
+
+    const summaryData = [
+      { 'Concepto': 'Fecha del conteo', 'Valor': dateStr },
+      { 'Concepto': 'Total productos', 'Valor': rows.length },
+      { 'Concepto': 'Productos contados', 'Valor': rows.filter(r => r.counted_qty !== '').length },
+      { 'Concepto': 'Con diferencia', 'Valor': changedRows.length },
+      { 'Concepto': 'Sobrantes', 'Valor': sobrantes.length },
+      { 'Concepto': 'Faltantes', 'Valor': faltantes.length },
+      { 'Concepto': 'Valor sobrantes USD', 'Valor': totalSobrante.toFixed(2) },
+      { 'Concepto': 'Valor faltantes USD', 'Valor': totalFaltante.toFixed(2) },
+      { 'Concepto': 'Ajuste neto USD', 'Valor': (totalSobrante - totalFaltante).toFixed(2) },
+      { 'Concepto': 'Notas', 'Valor': notes || '—' },
+    ];
+
+    // Build multi-sheet workbook
+    const wb = XLSX.utils.book_new();
+    
+    const wsDetail = XLSX.utils.json_to_sheet(allData);
+    wsDetail['!cols'] = [{ wch: 12 }, { wch: 35 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle Conteo');
+
+    // Only differences
+    const diffData = allData.filter(r => r['Diferencia'] !== '' && r['Diferencia'] !== 0);
+    if (diffData.length > 0) {
+      const wsDiff = XLSX.utils.json_to_sheet(diffData);
+      wsDiff['!cols'] = wsDetail['!cols'];
+      XLSX.utils.book_append_sheet(wb, wsDiff, 'Diferencias');
+    }
+
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    wsSummary['!cols'] = [{ wch: 22 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+
+    XLSX.writeFile(wb, `Conteo_Fisico_${dateStr}.xlsx`);
+    toast.success('Reporte exportado a Excel');
+  };
 
   const handleSave = async () => {
     if (changedRows.length === 0) {
@@ -207,6 +272,9 @@ export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
               {changedRows.length} diferencia(s) · {totalDifference > 0 ? '+' : ''}{totalDifference} uds
             </Badge>
           )}
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={exportReport} disabled={rows.length === 0}>
+            <Download className="w-3.5 h-3.5" /> Exportar Excel
+          </Button>
         </div>
 
         <div className="flex-1 overflow-auto rounded-lg border border-border bg-card min-h-0">
