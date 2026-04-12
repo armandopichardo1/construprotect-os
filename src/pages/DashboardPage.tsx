@@ -404,14 +404,16 @@ export default function DashboardPage() {
                     </>
                   )}
                   <Bar yAxisId="left" dataKey="revenue" fill="hsl(217, 91%, 60%)" radius={[6, 6, 0, 0]} name="Ingresos">
-                    <LabelList dataKey="revenue" position="top" formatter={(v: number) => v > 0 ? `RD$${(v * rate / 1000).toFixed(1)}k` : ''} style={{ fill: 'hsl(220, 12%, 60%)', fontSize: 9 }} />
+                    <LabelList dataKey="revenue" position="top" offset={8} formatter={(v: number) => v > 0 ? `RD$${(v * rate / 1000).toFixed(0)}k` : ''} style={{ fill: 'hsl(217, 91%, 70%)', fontSize: 10, fontWeight: 600 }} />
                   </Bar>
-                  <Bar yAxisId="left" dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos" />
+                  <Bar yAxisId="left" dataKey="cogs" fill="hsl(222, 20%, 25%)" radius={[6, 6, 0, 0]} name="Costos">
+                    <LabelList dataKey="cogs" position="top" offset={8} formatter={(v: number) => v > 0 ? `RD$${(v * rate / 1000).toFixed(0)}k` : ''} style={{ fill: 'hsl(222, 20%, 50%)', fontSize: 10, fontWeight: 600 }} />
+                  </Bar>
                   <Line yAxisId="right" type="monotone" dataKey="grossMargin" stroke="hsl(160, 84%, 39%)" strokeWidth={2} dot={{ r: 3, fill: 'hsl(160, 84%, 39%)' }} name="Margen Bruto">
-                    <LabelList dataKey="grossMargin" position="top" formatter={(v: number) => v > 0 ? `${v}%` : ''} style={{ fill: 'hsl(160, 84%, 50%)', fontSize: 9 }} />
+                    <LabelList dataKey="grossMargin" position="top" offset={6} formatter={(v: number) => v > 0 ? `${v}%` : ''} style={{ fill: 'hsl(160, 84%, 50%)', fontSize: 10, fontWeight: 600 }} />
                   </Line>
                   <Line yAxisId="right" type="monotone" dataKey="netMargin" stroke="hsl(38, 92%, 50%)" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: 'hsl(38, 92%, 50%)' }} name="Margen Neto">
-                    <LabelList dataKey="netMargin" position="bottom" formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 9 }} />
+                    <LabelList dataKey="netMargin" position="bottom" offset={6} formatter={(v: number) => v !== 0 ? `${v}%` : ''} style={{ fill: 'hsl(38, 92%, 60%)', fontSize: 10, fontWeight: 600 }} />
                   </Line>
                 </ComposedChart>
               </ResponsiveContainer>
