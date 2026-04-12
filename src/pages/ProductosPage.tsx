@@ -531,7 +531,7 @@ export function ProductosContent() {
                     <TableCell>
                       <div className="flex items-center gap-0.5">
                         <button
-                          onClick={() => setEditProduct(p)}
+                          onClick={() => { setEditProduct(p); setDialogOpen(true); }}
                           className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10"
                           title="Editar producto completo"
                         >
