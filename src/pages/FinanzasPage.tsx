@@ -151,6 +151,7 @@ export default function FinanzasPage() {
     },
   });
 
+        {tab === 'Pricing' && <PricingTab />}
 
   const { data: saleItems = [] } = useQuery({
     queryKey: ['sale-items'],
