@@ -48,6 +48,40 @@ const COST_CATEGORIES: Record<string, string> = {
   warehousing: '🏭 Almacenaje', insurance: '🛡️ Seguro', other: '📎 Otro',
 };
 
+// Map expense categories → account code prefixes for auto-assignment
+const EXPENSE_ACCOUNT_MAP: Record<string, string[]> = {
+  purchases: ['50100', '50000'],
+  warehouse: ['63600', '63000'],
+  payroll: ['60100', '60000'],
+  rent: ['63100', '63000'],
+  utilities: ['63200', '63300', '63000'],
+  insurance: ['64000'],
+  maintenance: ['63600', '63700', '63000'],
+  software: ['64200', '64300', '64400', '64500'],
+  accounting: ['64100'],
+  marketing: ['62100', '62200', '62000'],
+  shipping: ['50700', '50200'],
+  customs: ['50300', '50400'],
+  travel: ['62300', '61000'],
+  samples: ['50100'],
+  office: ['63400', '63000'],
+  bank_fees: ['80100', '80700', '80000'],
+  other: ['63000'],
+};
+
+// Map cost categories → account code prefixes for auto-assignment
+const COST_ACCOUNT_MAP: Record<string, string[]> = {
+  freight: ['50200', '50000'],
+  customs: ['50300', '50400', '50000'],
+  raw_materials: ['50100', '50000'],
+  packaging: ['50500', '50000'],
+  labor: ['50600', '50000'],
+  logistics: ['50700', '50200', '50000'],
+  warehousing: ['50500', '50000'],
+  insurance: ['50500', '50000'],
+  other: ['50000'],
+};
+
 const PAYMENT_STATUSES: Record<string, string> = {
   pending: '⏳ Pendiente', paid: '✅ Pagado', partial: '🔄 Parcial', overdue: '⚠️ Vencido',
 };
