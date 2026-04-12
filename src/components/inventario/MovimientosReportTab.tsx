@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { exportToExcel } from '@/lib/export-utils';
 import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend } from 'recharts';
 
 const TYPE_MAP: Record<string, { label: string; icon: string; color: string }> = {
   receipt: { label: 'Entrada', icon: '📥', color: '#3b82f6' },
@@ -97,6 +97,20 @@ export function MovimientosReportTab() {
     value: s.totalValue,
     fill: s.color,
   })), [typeSummary]);
+
+  // Daily trend data
+  const dailyTrend = useMemo(() => {
+    const map: Record<string, { date: string; entries: number; exits: number; net: number }> = {};
+    movements.forEach((m: any) => {
+      const day = new Date(m.created_at).toISOString().split('T')[0];
+      if (!map[day]) map[day] = { date: day, entries: 0, exits: 0, net: 0 };
+      if (m.quantity > 0) map[day].entries += m.quantity;
+      else map[day].exits += Math.abs(m.quantity);
+    });
+    return Object.values(map)
+      .map(d => ({ ...d, net: d.entries - d.exits }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [movements]);
 
   // Grand totals
   const totals = useMemo(() => ({
@@ -262,7 +276,43 @@ export function MovimientosReportTab() {
         </div>
       </div>
 
-      {/* Top Products */}
+      {/* Daily Trend Chart */}
+      {dailyTrend.length > 1 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="text-sm font-semibold mb-3">Tendencia Diaria — Entradas vs Salidas</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={dailyTrend}>
+              <defs>
+                <linearGradient id="gradIn" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradOut" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(222,20%,18%)" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: 'hsl(222,10%,55%)' }}
+                tickFormatter={(v: string) => {
+                  const d = new Date(v + 'T12:00:00');
+                  return d.toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
+                }}
+              />
+              <YAxis tick={{ fontSize: 10, fill: 'hsl(222,10%,55%)' }} />
+              <Tooltip
+                contentStyle={{ background: 'hsl(222,20%,10%)', border: '1px solid hsl(222,20%,20%)', borderRadius: 8, fontSize: 12 }}
+                labelFormatter={(v: string) => new Date(v + 'T12:00:00').toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Area type="monotone" dataKey="entries" name="Entradas" stroke="#10b981" fill="url(#gradIn)" strokeWidth={2} />
+              <Area type="monotone" dataKey="exits" name="Salidas" stroke="#ef4444" fill="url(#gradOut)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
       {topProducts.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4">
           <h3 className="text-sm font-semibold mb-3">Productos con Mayor Movimiento</h3>
