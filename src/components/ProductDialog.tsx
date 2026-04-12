@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
-import { cn } from '@/lib/utils';
 
 const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
@@ -20,33 +19,13 @@ interface ProductDialogProps {
   onSuccess: () => void;
 }
 
-const tiers = [
-  { price: 'price_list_usd', margin: 'margin_list_pct', labelPrice: 'Precio Lista', labelMargin: 'Margen Lista %' },
-  { price: 'price_architect_usd', margin: 'margin_architect_pct', labelPrice: 'Precio Arquitecto', labelMargin: 'Margen Arq %' },
-  { price: 'price_project_usd', margin: 'margin_project_pct', labelPrice: 'Precio Proyecto', labelMargin: 'Margen Proy %' },
-  { price: 'price_wholesale_usd', margin: 'margin_wholesale_pct', labelPrice: 'Precio Mayoreo', labelMargin: 'Margen May %' },
-] as const;
-
 const defaultForm = {
   sku: '', name: '', brand: '', category: '',
-  unit_cost_usd: '', price_list_usd: '', price_architect_usd: '',
-  price_project_usd: '', price_wholesale_usd: '', coverage_m2: '',
-  reorder_point: '10', dimensions: '', units_per_pack: '1', lead_time_days: '21',
-  margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
-  cbm_per_unit: '', weight_kg_per_unit: '', min_order_qty: '1', reorder_qty: '50',
+  coverage_m2: '', reorder_point: '10', dimensions: '',
+  units_per_pack: '1', lead_time_days: '21',
+  cbm_per_unit: '', weight_kg_per_unit: '',
+  min_order_qty: '1', reorder_qty: '50',
 };
-
-function calcMargin(cost: number, price: number): string {
-  if (!price || price <= 0) return '';
-  const m = ((price - cost) / price) * 100;
-  return m.toFixed(1);
-}
-
-function calcPrice(cost: number, margin: number): string {
-  if (margin >= 100 || margin < 0) return '';
-  if (!cost) return '';
-  return (cost / (1 - margin / 100)).toFixed(2);
-}
 
 export function ProductDialog({ open, onOpenChange, product, onSuccess }: ProductDialogProps) {
   const [form, setForm] = useState(defaultForm);
@@ -60,20 +39,11 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
         name: product.name || '',
         brand: product.brand || '',
         category: product.category || '',
-        unit_cost_usd: String(product.unit_cost_usd ?? ''),
-        price_list_usd: String(product.price_list_usd ?? ''),
-        price_architect_usd: String(product.price_architect_usd ?? ''),
-        price_project_usd: String(product.price_project_usd ?? ''),
-        price_wholesale_usd: String(product.price_wholesale_usd ?? ''),
         coverage_m2: String(product.coverage_m2 ?? ''),
         reorder_point: String(product.reorder_point ?? '10'),
         dimensions: product.dimensions || '',
         units_per_pack: String(product.units_per_pack ?? '1'),
         lead_time_days: String(product.lead_time_days ?? '21'),
-        margin_list_pct: String(product.margin_list_pct ?? ''),
-        margin_architect_pct: String(product.margin_architect_pct ?? ''),
-        margin_project_pct: String(product.margin_project_pct ?? ''),
-        margin_wholesale_pct: String(product.margin_wholesale_pct ?? ''),
         cbm_per_unit: String(product.cbm_per_unit ?? ''),
         weight_kg_per_unit: String(product.weight_kg_per_unit ?? ''),
         min_order_qty: String(product.min_order_qty ?? '1'),
@@ -86,76 +56,41 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 
-  const handleCostChange = (newCostStr: string) => {
-    const cost = Number(newCostStr);
-    const updates: Record<string, string> = { unit_cost_usd: newCostStr };
-    if (cost > 0) {
-      for (const t of tiers) {
-        const price = Number(form[t.price]);
-        if (price > 0) {
-          updates[t.margin] = calcMargin(cost, price);
-        }
-      }
-    }
-    setForm(f => ({ ...f, ...updates }));
-  };
-
-  const handlePriceChange = (priceKey: string, marginKey: string, newPriceStr: string) => {
-    const cost = Number(form.unit_cost_usd);
-    const price = Number(newPriceStr);
-    const updates: Record<string, string> = { [priceKey]: newPriceStr };
-    if (cost > 0 && price > 0) {
-      updates[marginKey] = calcMargin(cost, price);
-    }
-    setForm(f => ({ ...f, ...updates }));
-  };
-
-  const handleMarginChange = (priceKey: string, marginKey: string, newMarginStr: string) => {
-    const cost = Number(form.unit_cost_usd);
-    const margin = Number(newMarginStr);
-    const updates: Record<string, string> = { [marginKey]: newMarginStr };
-    if (cost > 0 && margin < 100) {
-      const p = calcPrice(cost, margin);
-      if (p) updates[priceKey] = p;
-    }
-    setForm(f => ({ ...f, ...updates }));
-  };
-
-  const marginWarning = (val: string) => {
-    const n = Number(val);
-    return val !== '' && (n < 5 || n < 0);
-  };
-
   const handleSave = async () => {
     if (!form.sku.trim() || !form.name.trim()) {
       toast.error('SKU y Nombre son requeridos');
       return;
     }
     setSaving(true);
-    const payload = {
+    const payload: Record<string, any> = {
       sku: form.sku.trim(),
       name: form.name.trim(),
       brand: form.brand.trim() || null,
       category: form.category || null,
-      unit_cost_usd: Number(form.unit_cost_usd) || 0,
-      price_list_usd: Number(form.price_list_usd) || 0,
-      price_architect_usd: Number(form.price_architect_usd) || 0,
-      price_project_usd: Number(form.price_project_usd) || 0,
-      price_wholesale_usd: Number(form.price_wholesale_usd) || 0,
       coverage_m2: Number(form.coverage_m2) || null,
       reorder_point: Number(form.reorder_point) || 10,
       dimensions: form.dimensions.trim() || null,
       units_per_pack: Number(form.units_per_pack) || 1,
       lead_time_days: Number(form.lead_time_days) || 21,
-      margin_list_pct: Number(form.margin_list_pct) || 0,
-      margin_architect_pct: Number(form.margin_architect_pct) || 0,
-      margin_project_pct: Number(form.margin_project_pct) || 0,
-      margin_wholesale_pct: Number(form.margin_wholesale_pct) || 0,
       cbm_per_unit: Number(form.cbm_per_unit) || 0,
       weight_kg_per_unit: Number(form.weight_kg_per_unit) || 0,
       min_order_qty: Number(form.min_order_qty) || 1,
       reorder_qty: Number(form.reorder_qty) || 50,
     };
+
+    // New products start with 0 cost/prices
+    if (!isEdit) {
+      payload.unit_cost_usd = 0;
+      payload.total_unit_cost_usd = 0;
+      payload.price_list_usd = 0;
+      payload.price_architect_usd = 0;
+      payload.price_project_usd = 0;
+      payload.price_wholesale_usd = 0;
+      payload.margin_list_pct = 0;
+      payload.margin_architect_pct = 0;
+      payload.margin_project_pct = 0;
+      payload.margin_wholesale_pct = 0;
+    }
 
     const { error } = isEdit
       ? await supabase.from('products').update(payload).eq('id', product!.id)
@@ -187,35 +122,6 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
               </Select>
             </div>
           </div>
-
-          <p className="text-[10px] font-semibold text-muted-foreground pt-1">💰 Costo y Precios (USD)</p>
-          <div>
-            <Label className="text-xs">Costo Unitario</Label>
-            <Input type="number" step="0.01" value={form.unit_cost_usd} onChange={e => handleCostChange(e.target.value)} className="h-8 text-xs mt-1" />
-          </div>
-
-          {tiers.map(t => (
-            <div key={t.price} className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">{t.labelPrice}</Label>
-                <Input
-                  type="number" step="0.01"
-                  value={form[t.price]}
-                  onChange={e => handlePriceChange(t.price, t.margin, e.target.value)}
-                  className="h-8 text-xs mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs">{t.labelMargin}</Label>
-                <Input
-                  type="number" step="0.1"
-                  value={form[t.margin]}
-                  onChange={e => handleMarginChange(t.price, t.margin, e.target.value)}
-                  className={cn("h-8 text-xs mt-1", marginWarning(form[t.margin]) && "border-destructive text-destructive")}
-                />
-              </div>
-            </div>
-          ))}
 
           <p className="text-[10px] font-semibold text-muted-foreground pt-1">📦 Inventario & Specs</p>
           <div className="grid grid-cols-2 gap-2">
