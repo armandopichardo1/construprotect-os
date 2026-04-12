@@ -177,16 +177,21 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [manualDate, setManualDate] = useState<Date | undefined>();
   const [accountId, setAccountId] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
+  const [customRate, setCustomRate] = useState<string>(''); // user override for exchange rate
+  const [editingRate, setEditingRate] = useState(false);
 
-  // Use historical rate when a past date is selected
-  const xr = useMemo(() => {
+  // Use historical rate when a past date is selected, or custom override
+  const autoXr = useMemo(() => {
     if (manualDate && rateForMonth) {
       const ym = `${manualDate.getFullYear()}-${String(manualDate.getMonth() + 1).padStart(2, '0')}`;
       return rateForMonth(ym);
     }
     return latestXr;
   }, [manualDate, rateForMonth, latestXr]);
-  const isHistoricalRate = xr !== latestXr;
+
+  const xr = customRate ? (parseFloat(customRate) || autoXr) : autoXr;
+  const isHistoricalRate = autoXr !== latestXr && !customRate;
+  const isCustomRate = !!customRate && parseFloat(customRate) !== autoXr;
   // Sale-specific manual state
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
@@ -431,7 +436,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
-    setAmount(''); setManualDate(undefined);
+    setAmount(''); setManualDate(undefined); setCustomRate(''); setEditingRate(false);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
     setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
@@ -878,11 +883,43 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         </button>
       </div>
 
-      {/* Exchange rate */}
+      {/* Exchange rate - editable */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto">
         <ArrowLeftRight className="w-3.5 h-3.5" />
-        <span>1 USD = <span className={cn("font-semibold", isHistoricalRate ? "text-amber-400" : "text-foreground")}>RD${xr.toFixed(2)}</span></span>
-        {isHistoricalRate ? (
+        <span>1 USD =</span>
+        {editingRate ? (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px]">RD$</span>
+            <Input
+              type="number"
+              step="0.01"
+              min="1"
+              value={customRate || xr.toFixed(2)}
+              onChange={e => setCustomRate(e.target.value)}
+              onBlur={() => setEditingRate(false)}
+              onKeyDown={e => { if (e.key === 'Enter') setEditingRate(false); if (e.key === 'Escape') { setCustomRate(''); setEditingRate(false); } }}
+              className="h-6 w-20 text-xs px-1.5 font-mono"
+              autoFocus
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => { setCustomRate(xr.toFixed(2)); setEditingRate(true); }}
+            className={cn(
+              "font-semibold hover:underline cursor-pointer transition-colors",
+              isCustomRate ? "text-primary" : isHistoricalRate ? "text-amber-400" : "text-foreground"
+            )}
+            title="Click para editar la tasa"
+          >
+            RD${xr.toFixed(2)}
+          </button>
+        )}
+        {isCustomRate ? (
+          <span className="flex items-center gap-1">
+            <span className="text-[10px] text-primary">(tasa manual)</span>
+            <button onClick={() => setCustomRate('')} className="text-[10px] text-muted-foreground hover:text-destructive">✕</button>
+          </span>
+        ) : isHistoricalRate ? (
           <span className="text-[10px] text-amber-400/80">(tasa histórica {manualDate?.toLocaleDateString('es-DO', { month: 'short', year: 'numeric' })})</span>
         ) : (
           rate?.date && <span className="text-[10px]">({rate.date})</span>
