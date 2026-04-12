@@ -389,16 +389,6 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
     // Revert inventory for each sale item before deleting
     if (deleteSale.sale_items?.length) {
       for (const si of deleteSale.sale_items) {
-        if (si.product_id) {
-          await supabase.rpc('', {}).then(() => {}); // no-op placeholder
-          // Add back to inventory
-          await supabase.from('inventory').update({
-            quantity_on_hand: supabase.rpc as any, // handled below
-          });
-        }
-      }
-      // Revert inventory quantities
-      for (const si of deleteSale.sale_items) {
         if (si.product_id && si.quantity) {
           const { data: inv } = await supabase.from('inventory').select('quantity_on_hand').eq('product_id', si.product_id).maybeSingle();
           if (inv) {
@@ -408,7 +398,7 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
           await supabase.from('inventory_movements').insert({
             product_id: si.product_id,
             quantity: si.quantity,
-            movement_type: 'adjustment',
+            movement_type: 'adjustment' as any,
             unit_cost_usd: si.unit_cost_usd || 0,
             reference_id: deleteSale.id,
             reference_type: 'sale_reversal',
