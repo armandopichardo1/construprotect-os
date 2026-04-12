@@ -19,7 +19,7 @@ import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ProductosContent } from '@/pages/ProductosPage';
 
-const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables', 'Tasas de Cambio'];
 
 const TAB_MAP: Record<string, string> = {
   productos: 'Productos',
@@ -28,6 +28,7 @@ const TAB_MAP: Record<string, string> = {
   marcas: 'Marcas',
   servicios: 'Servicios',
   cuentas: 'Cuentas Contables',
+  tasas: 'Tasas de Cambio',
 };
 
 export default function MaestrasPage() {
@@ -61,6 +62,7 @@ export default function MaestrasPage() {
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
+        {tab === 'Tasas de Cambio' && <TasasCambioMaestra />}
       </div>
     </AppLayout>
   );
@@ -1180,6 +1182,191 @@ function CuentasMaestra() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+// ============ TASAS DE CAMBIO ============
+
+const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function TasasCambioMaestra() {
+  const qc = useQueryClient();
+  const [editRow, setEditRow] = useState<{ id?: string; date: string; usd_buy: string; usd_sell: string; source: string } | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const { data: rates = [], isLoading } = useQuery({
+    queryKey: ['exchange-rates-all'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('exchange_rates')
+        .select('*')
+        .order('date', { ascending: false });
+      return data || [];
+    },
+  });
+
+  // Group by year
+  const grouped = useMemo(() => {
+    const map: Record<string, typeof rates> = {};
+    rates.forEach(r => {
+      const year = r.date.slice(0, 4);
+      if (!map[year]) map[year] = [];
+      map[year].push(r);
+    });
+    return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
+  }, [rates]);
+
+  const handleSave = async () => {
+    if (!editRow) return;
+    const buy = parseFloat(editRow.usd_buy);
+    const sell = parseFloat(editRow.usd_sell);
+    if (isNaN(buy) || isNaN(sell) || buy <= 0 || sell <= 0) {
+      toast.error('Ingresa tasas válidas');
+      return;
+    }
+    if (editRow.id) {
+      const { error } = await supabase.from('exchange_rates').update({
+        date: editRow.date, usd_buy: buy, usd_sell: sell, source: editRow.source || 'manual',
+      }).eq('id', editRow.id);
+      if (error) { toast.error('Error actualizando'); return; }
+      toast.success('Tasa actualizada');
+    } else {
+      const { error } = await supabase.from('exchange_rates').insert({
+        date: editRow.date, usd_buy: buy, usd_sell: sell, source: editRow.source || 'manual',
+      });
+      if (error) { toast.error('Error creando'); return; }
+      toast.success('Tasa registrada');
+    }
+    setEditRow(null);
+    qc.invalidateQueries({ queryKey: ['exchange-rates-all'] });
+    qc.invalidateQueries({ queryKey: ['all-exchange-rates'] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    await supabase.from('exchange_rates').delete().eq('id', deleteId);
+    toast.success('Tasa eliminada');
+    setDeleteId(null);
+    qc.invalidateQueries({ queryKey: ['exchange-rates-all'] });
+    qc.invalidateQueries({ queryKey: ['all-exchange-rates'] });
+  };
+
+  const openNew = () => {
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    setEditRow({ date: dateStr, usd_buy: '', usd_sell: '', source: 'manual' });
+  };
+
+  if (isLoading) return <p className="text-xs text-muted-foreground py-8 text-center">Cargando tasas...</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Historial de Tasas USD/DOP</h2>
+          <p className="text-xs text-muted-foreground">Tasas mensuales para transacciones históricas. Al registrar transacciones pasadas se usará la tasa del período correspondiente.</p>
+        </div>
+        <Button size="sm" className="h-8 text-xs gap-1" onClick={openNew}>
+          <Plus className="w-3.5 h-3.5" /> Agregar Tasa
+        </Button>
+      </div>
+
+      {grouped.map(([year, yearRates]) => (
+        <div key={year} className="space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{year}</h3>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="max-h-[calc(100vh-350px)] overflow-auto">
+              <Table wrapperClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                  <TableRow>
+                    <TableHead className="text-xs">Mes</TableHead>
+                    <TableHead className="text-xs">Fecha</TableHead>
+                    <TableHead className="text-xs text-right">Compra (USD)</TableHead>
+                    <TableHead className="text-xs text-right">Venta (USD)</TableHead>
+                    <TableHead className="text-xs">Fuente</TableHead>
+                    <TableHead className="text-xs w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {yearRates.map(r => {
+                    const month = parseInt(r.date.slice(5, 7), 10);
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs font-medium">{MONTHS_ES[month - 1]} {year}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono">{r.date}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold">{Number(r.usd_buy).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold">{Number(r.usd_sell).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.source || '—'}</TableCell>
+                        <TableCell className="text-xs">
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditRow({
+                              id: r.id, date: r.date, usd_buy: String(r.usd_buy), usd_sell: String(r.usd_sell), source: r.source || 'manual',
+                            })}>
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => setDeleteId(r.id)}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {rates.length === 0 && (
+        <p className="text-center text-sm text-muted-foreground py-8">No hay tasas registradas. Agrega la primera tasa.</p>
+      )}
+
+      {/* Edit/Create Dialog */}
+      <Dialog open={!!editRow} onOpenChange={() => setEditRow(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{editRow?.id ? 'Editar Tasa' : 'Nueva Tasa de Cambio'}</DialogTitle>
+          </DialogHeader>
+          {editRow && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Fecha (primer día del mes)</Label>
+                <Input type="date" value={editRow.date} onChange={e => setEditRow({ ...editRow, date: e.target.value })} className="text-xs h-8" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Compra (RD$ por 1 USD)</Label>
+                  <Input type="number" step="0.01" value={editRow.usd_buy} onChange={e => setEditRow({ ...editRow, usd_buy: e.target.value })}
+                    placeholder="59.00" className="text-xs h-8 font-mono" />
+                </div>
+                <div>
+                  <Label className="text-xs">Venta (RD$ por 1 USD)</Label>
+                  <Input type="number" step="0.01" value={editRow.usd_sell} onChange={e => setEditRow({ ...editRow, usd_sell: e.target.value })}
+                    placeholder="60.00" className="text-xs h-8 font-mono" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Fuente</Label>
+                <Input value={editRow.source} onChange={e => setEditRow({ ...editRow, source: e.target.value })}
+                  placeholder="BanReservas, manual, etc." className="text-xs h-8" />
+              </div>
+              <Button onClick={handleSave} className="w-full text-xs h-8">{editRow.id ? 'Actualizar' : 'Guardar'}</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <DeleteConfirmDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Eliminar Tasa"
+        description="¿Estás seguro de eliminar esta tasa de cambio? Las transacciones que la usen podrían verse afectadas."
+      />
     </div>
   );
 }

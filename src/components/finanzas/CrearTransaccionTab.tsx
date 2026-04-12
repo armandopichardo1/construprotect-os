@@ -82,14 +82,15 @@ interface JournalLine {
   description: string;
 }
 
-export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
+export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpense, onEditCost }: {
   rate: any;
+  rateForMonth?: (yearMonth: string) => number;
   onEditSale?: (data: any) => void;
   onEditExpense?: (data: any) => void;
   onEditCost?: (data: any) => void;
 }) {
   const queryClient = useQueryClient();
-  const xr = Number(rate?.usd_sell) || 60.76;
+  const latestXr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
   const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('USD');
 
@@ -143,6 +144,15 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [accountId, setAccountId] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
 
+  // Use historical rate when a past date is selected
+  const xr = useMemo(() => {
+    if (manualDate && rateForMonth) {
+      const ym = `${manualDate.getFullYear()}-${String(manualDate.getMonth() + 1).padStart(2, '0')}`;
+      return rateForMonth(ym);
+    }
+    return latestXr;
+  }, [manualDate, rateForMonth, latestXr]);
+  const isHistoricalRate = xr !== latestXr;
   // Sale-specific manual state
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
@@ -797,8 +807,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
       {/* Exchange rate */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto">
         <ArrowLeftRight className="w-3.5 h-3.5" />
-        <span>1 USD = <span className="text-foreground font-semibold">RD${xr.toFixed(2)}</span></span>
-        {rate?.date && <span className="text-[10px]">({rate.date})</span>}
+        <span>1 USD = <span className={cn("font-semibold", isHistoricalRate ? "text-amber-400" : "text-foreground")}>RD${xr.toFixed(2)}</span></span>
+        {isHistoricalRate ? (
+          <span className="text-[10px] text-amber-400/80">(tasa histórica {manualDate?.toLocaleDateString('es-DO', { month: 'short', year: 'numeric' })})</span>
+        ) : (
+          rate?.date && <span className="text-[10px]">({rate.date})</span>
+        )}
       </div>
     </div>
   );
