@@ -377,14 +377,14 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
     if (error || !entry) throw error || new Error('Error creando asiento');
 
-    // Match preview lines to accounts
+    // Match preview lines to accounts — use accountId if available from override
     const linesData = previewLines.map(pl => {
-      const acct = pl.accountCode
-        ? accounts.find(a => a.code === pl.accountCode)
-        : accounts.find(a => a.description === pl.accountName);
+      const acctId = pl.accountId
+        || accounts.find(a => a.code === pl.accountCode)?.id
+        || accounts.find(a => a.description === pl.accountName)?.id;
       return {
         journal_entry_id: entry.id,
-        account_id: acct?.id || accounts[0]?.id,
+        account_id: acctId || accounts[0]?.id,
         debit_usd: pl.debit || 0,
         credit_usd: pl.credit || 0,
         description: desc,
