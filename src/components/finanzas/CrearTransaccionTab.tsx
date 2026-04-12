@@ -1301,7 +1301,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Categoría *</Label>
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={category} onValueChange={handleCategoryChange}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(currentCategories).map(([k, label]) => (
@@ -1318,7 +1318,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Cuenta Contable</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Cuenta Contable</Label>
+                    {accountId && category && (
+                      <span className="text-[9px] text-success bg-success/10 px-1.5 py-0.5 rounded">✓ Auto-asignada</span>
+                    )}
+                  </div>
                   <Select value={accountId} onValueChange={setAccountId}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar cuenta contable" /></SelectTrigger>
                     <SelectContent>
