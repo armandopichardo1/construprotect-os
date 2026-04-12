@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
+import { AccountingPreview } from './AccountingPreview';
 
 const EXAMPLES = [
   'Pagué flete DHL $350 USD',
@@ -28,6 +29,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }
   sale: { label: 'Venta', icon: '💰', color: 'bg-success/15 text-success border-success/30' },
   expense: { label: 'Gasto', icon: '💸', color: 'bg-warning/15 text-warning border-warning/30' },
   cost: { label: 'Costo', icon: '🏗️', color: 'bg-primary/15 text-primary border-primary/30' },
+  journal: { label: 'Asiento', icon: '📖', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
 };
 
 const EXPENSE_CATEGORIES: Record<string, string> = {
@@ -56,12 +58,19 @@ interface SessionEntry {
 }
 
 type Mode = 'ai' | 'manual';
-type TxType = 'expense' | 'cost' | 'sale';
+type TxType = 'expense' | 'cost' | 'sale' | 'journal';
 
 interface SaleItem {
   product_id: string;
   quantity: number;
   unit_price_usd: number;
+}
+
+interface JournalLine {
+  account_id: string;
+  debit: number;
+  credit: number;
+  description: string;
 }
 
 export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
@@ -78,7 +87,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const { data: accounts = [] } = useQuery({
     queryKey: ['chart-of-accounts'],
     queryFn: async () => {
-      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id').eq('is_active', true).order('code');
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, parent_id, account_type').eq('is_active', true).order('code');
       return data || [];
     },
   });
@@ -123,6 +132,24 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [priceTier, setPriceTier] = useState('list');
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+
+  // Journal entry state
+  const [journalLines, setJournalLines] = useState<JournalLine[]>([
+    { account_id: '', debit: 0, credit: 0, description: '' },
+    { account_id: '', debit: 0, credit: 0, description: '' },
+  ]);
+  const [journalDescription, setJournalDescription] = useState('');
+  const [journalNotes, setJournalNotes] = useState('');
+
+  const addJournalLine = () => setJournalLines(prev => [...prev, { account_id: '', debit: 0, credit: 0, description: '' }]);
+  const removeJournalLine = (i: number) => setJournalLines(prev => prev.filter((_, idx) => idx !== i));
+  const updateJournalLine = (i: number, field: string, value: any) => {
+    setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
+  };
+
+  const journalTotalDebit = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
+  const journalTotalCredit = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
+  const journalIsBalanced = Math.abs(journalTotalDebit - journalTotalCredit) < 0.01;
 
   const getPriceForTier = (prod: any, tier: string) => {
     switch (tier) {
@@ -175,16 +202,102 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
+  // === Accounting Preview Lines ===
+  const previewLines = useMemo(() => {
+    const getAcct = (id: string) => accounts.find((a: any) => a.id === id);
+    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number }[] = [];
+
+    if (manualType === 'journal') {
+      journalLines.forEach(jl => {
+        if (!jl.account_id || (jl.debit === 0 && jl.credit === 0)) return;
+        const acct = getAcct(jl.account_id);
+        lines.push({
+          accountCode: acct?.code || '',
+          accountName: acct?.description || 'Sin asignar',
+          accountType: acct?.account_type || '',
+          debit: jl.debit || 0,
+          credit: jl.credit || 0,
+        });
+      });
+    } else if (manualType === 'sale' && totalSale > 0) {
+      // Sale: Debit cash/CxC, Credit income
+      const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
+      const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
+      const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
+      const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
+      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, debit: totalSale, credit: 0 });
+      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, debit: 0, credit: totalSale });
+    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amountUsd) > 0 || parseFloat(amountDop) > 0)) {
+      const amt = parseFloat(amountUsd) || (parseFloat(amountDop) || 0) / xr;
+      const expAcct = accountId ? getAcct(accountId) : null;
+      const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
+      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, debit: amt, credit: 0 });
+      else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amt, credit: 0 });
+      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, debit: 0, credit: amt });
+    }
+
+    return lines;
+  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr]);
+
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
     setAmountUsd(''); setAmountDop(''); setManualDate(undefined);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
     setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+    setJournalLines([
+      { account_id: '', debit: 0, credit: 0, description: '' },
+      { account_id: '', debit: 0, credit: 0, description: '' },
+    ]);
+    setJournalDescription('');
+    setJournalNotes('');
   };
 
   // ===== MANUAL SAVE =====
   const saveManual = async () => {
+    // ===== JOURNAL ENTRY =====
+    if (manualType === 'journal') {
+      if (!journalDescription.trim()) { toast.error('Descripción requerida'); return; }
+      const validLines = journalLines.filter(l => l.account_id && (l.debit > 0 || l.credit > 0));
+      if (validLines.length < 2) { toast.error('Se requieren al menos 2 líneas con cuentas y montos'); return; }
+      if (!journalIsBalanced) { toast.error('Los débitos y créditos deben cuadrar'); return; }
+
+      setManualSaving(true);
+      const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
+      try {
+        const entryPayload: any = {
+          description: journalDescription.trim(),
+          total_debit_usd: journalTotalDebit,
+          total_credit_usd: journalTotalCredit,
+          exchange_rate: xr,
+          notes: journalNotes.trim() || null,
+        };
+        if (dateStr) entryPayload.date = dateStr;
+
+        const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
+        if (error || !entry) throw error || new Error('Error creando asiento');
+
+        const linesData = validLines.map(l => ({
+          journal_entry_id: entry.id,
+          account_id: l.account_id,
+          debit_usd: l.debit || 0,
+          credit_usd: l.credit || 0,
+          description: l.description || null,
+        }));
+        await supabase.from('journal_entry_lines').insert(linesData);
+
+        toast.success('Asiento contable registrado');
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+
+        setHistory(prev => [{ type: 'journal', description: journalDescription, amount: formatUSD(journalTotalDebit), timestamp: new Date() }, ...prev].slice(0, 5));
+        resetManualForm();
+      } catch (e: any) {
+        toast.error(e.message || 'Error al registrar asiento');
+      }
+      setManualSaving(false);
+      return;
+    }
+
     if (manualType === 'sale') {
       // Validate sale
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
@@ -541,12 +654,12 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               <h2 className="text-base font-semibold text-foreground">Registrar Transacción Manual</h2>
             </div>
 
-            {/* Type selector - now includes sale */}
+            {/* Type selector */}
             <div className="flex gap-2">
-              {(['sale', 'expense', 'cost'] as const).map(t => (
+              {(['sale', 'expense', 'cost', 'journal'] as const).map(t => (
                 <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
                   className={cn(
-                    'flex-1 rounded-xl border-2 px-4 py-3 text-sm font-medium transition-all',
+                    'flex-1 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all',
                     manualType === t
                       ? TYPE_CONFIG[t].color + ' border-current'
                       : 'border-border text-muted-foreground hover:border-primary/30'
@@ -761,8 +874,89 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
               </div>
             )}
 
+            {/* ===== JOURNAL ENTRY FORM ===== */}
+            {manualType === 'journal' && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Descripción del Asiento *</Label>
+                  <Input value={journalDescription} onChange={e => setJournalDescription(e.target.value)}
+                    placeholder="Ej: Ingreso de efectivo por accionista" maxLength={200} />
+                </div>
+
+                {/* Journal lines */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Líneas del Asiento</Label>
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
+                    </div>
+                    {journalLines.map((line, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border/50 items-center">
+                        <Select value={line.account_id} onValueChange={v => updateJournalLine(i, 'account_id', v)}>
+                          <SelectTrigger className="text-xs h-8"><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                          <SelectContent>
+                            {leafAccounts.map(a => (
+                              <SelectItem key={a.id} value={a.id} className="text-xs">{a.code} — {a.description}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input type="number" min={0} step={0.01} value={line.debit || ''}
+                          onChange={e => updateJournalLine(i, 'debit', parseFloat(e.target.value) || 0)}
+                          className="text-xs h-8 text-right" placeholder="0.00" />
+                        <Input type="number" min={0} step={0.01} value={line.credit || ''}
+                          onChange={e => updateJournalLine(i, 'credit', parseFloat(e.target.value) || 0)}
+                          className="text-xs h-8 text-right" placeholder="0.00" />
+                        {journalLines.length > 2 && (
+                          <button onClick={() => removeJournalLine(i)} className="p-1 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30 font-bold">
+                      <span className="text-xs">Totales</span>
+                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
+                      <span className={cn('text-xs text-right font-mono', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
+                      <span />
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={addJournalLine} className="gap-1 text-xs">
+                    <Plus className="w-3 h-3" /> Agregar Línea
+                  </Button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notas (opcional)</Label>
+                  <Textarea value={journalNotes} onChange={e => setJournalNotes(e.target.value)}
+                    placeholder="Notas adicionales..." className="min-h-[60px] text-sm resize-none" />
+                </div>
+
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha (por defecto hoy)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm"
+                        className={cn('w-full justify-start text-left text-sm font-normal', !manualDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        {manualDate ? format(manualDate, 'dd/MM/yyyy') : 'Hoy'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={manualDate} onSelect={setManualDate} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+
+            {/* Accounting Preview */}
+            {mode === 'manual' && previewLines.length > 0 && (
+              <AccountingPreview lines={previewLines} description={manualType === 'journal' ? journalDescription : description} />
+            )}
+
             {/* Submit */}
-            <Button onClick={saveManual} disabled={manualSaving} className="w-full gap-2">
+            <Button onClick={saveManual} disabled={manualSaving || (manualType === 'journal' && !journalIsBalanced)} className="w-full gap-2">
               {manualSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {manualSaving ? 'Registrando...' : `Registrar ${TYPE_CONFIG[manualType].label}`}
             </Button>
