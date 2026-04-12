@@ -443,6 +443,32 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteEntry} onOpenChange={v => { if (!v) setDeleteEntry(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteEntry && (
+                <>
+                  <strong>{TYPE_LABELS[deleteEntry.type]?.emoji} {TYPE_LABELS[deleteEntry.type]?.label}</strong>: {deleteEntry.description}
+                  <br />
+                  Monto: {formatUSD(deleteEntry.debit_usd || deleteEntry.credit_usd)}
+                  <br /><br />
+                  Esta acción no se puede deshacer.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
