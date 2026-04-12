@@ -938,3 +938,117 @@ function AlertHistorySection() {
     </div>
   );
 }
+
+// ---- Users Section with Invite ----
+function UsersSection({ profiles, queryClient }: { profiles: any[]; queryClient: any }) {
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState('viewer');
+  const [sending, setSending] = useState(false);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) { toast.error('Ingresa un email'); return; }
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { email: inviteEmail.trim(), role: inviteRole, full_name: inviteName.trim() || undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Invitación enviada a ${inviteEmail}`);
+      setShowInvite(false);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteRole('viewer');
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al enviar invitación');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const ROLE_LABELS: Record<string, { label: string; color: string }> = {
+    admin: { label: 'Admin', color: 'bg-primary/15 text-primary' },
+    editor: { label: 'Editor', color: 'bg-warning/15 text-warning' },
+    viewer: { label: 'Viewer', color: 'bg-muted text-muted-foreground' },
+  };
+
+  return (
+    <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">Usuarios</h2>
+        <Button variant="outline" size="sm" onClick={() => setShowInvite(true)}>
+          <Mail className="w-3.5 h-3.5 mr-1.5" /> Invitar
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {profiles.map(p => {
+          const roleInfo = ROLE_LABELS[p.role] || ROLE_LABELS.viewer;
+          return (
+            <div key={p.id} className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">{p.full_name}</p>
+                <Badge variant="outline" className={cn('text-[10px] mt-0.5', roleInfo.color)}>{roleInfo.label}</Badge>
+              </div>
+              <span className="h-2.5 w-2.5 rounded-full bg-success" />
+            </div>
+          );
+        })}
+        {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
+      </div>
+
+      {/* Invite Dialog */}
+      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Mail className="w-4 h-4" /> Invitar Usuario
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Email *</Label>
+              <Input
+                type="email"
+                placeholder="usuario@ejemplo.com"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                className="h-8 text-xs mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Nombre completo</Label>
+              <Input
+                placeholder="Nombre del usuario"
+                value={inviteName}
+                onChange={e => setInviteName(e.target.value)}
+                className="h-8 text-xs mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Rol *</Label>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger className="h-8 text-xs mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin — Acceso completo</SelectItem>
+                  <SelectItem value="editor">Editor — Puede crear y editar</SelectItem>
+                  <SelectItem value="viewer">Viewer — Solo lectura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" size="sm" onClick={handleInvite} disabled={sending}>
+              {sending ? '⏳ Enviando...' : '📧 Enviar Invitación'}
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center">
+              Se enviará un email con enlace para crear su cuenta
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
