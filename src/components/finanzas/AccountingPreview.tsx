@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { formatUSD } from '@/lib/format';
+import { useMemo } from 'react';
+import { formatUSD, formatDOP } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { ArrowRight, TrendingUp, TrendingDown, Scale, BookOpen, ChevronDown } from 'lucide-react';
+import { ArrowRight, TrendingUp, TrendingDown, Scale, BookOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface JournalLine {
@@ -26,6 +26,7 @@ interface AccountingPreviewProps {
   description?: string;
   accounts?: Account[];
   onAccountChange?: (lineIndex: number, accountId: string) => void;
+  exchangeRate?: number;
 }
 
 const IMPACT_ICONS: Record<string, React.ReactNode> = {
@@ -46,43 +47,35 @@ const IMPACT_COLORS: Record<string, string> = {
   'Costo': 'text-warning',
 };
 
-export function AccountingPreview({ lines, description, accounts = [], onAccountChange }: AccountingPreviewProps) {
+export function AccountingPreview({ lines, description, accounts = [], onAccountChange, exchangeRate }: AccountingPreviewProps) {
   const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
   const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
   const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
   const hasData = totalDebit > 0 || totalCredit > 0;
+  const xr = exchangeRate || 0;
 
-  // For each line, find sub-accounts of its parent
   const getSubAccounts = (line: JournalLine): Account[] => {
     if (accounts.length === 0) return [];
-    // Find the current account by code
     const currentAcct = line.accountCode
       ? accounts.find(a => a.code === line.accountCode)
       : accounts.find(a => a.description === line.accountName);
     if (!currentAcct) return [];
-
-    // Get siblings: accounts with the same parent_id
     const parentId = currentAcct.parent_id;
     if (!parentId) {
-      // This IS a parent — show its children
       const children = accounts.filter(a => a.parent_id === currentAcct.id);
       return children.length > 0 ? [currentAcct, ...children] : [];
     }
-    // Show all siblings (same parent) including self
     const siblings = accounts.filter(a => a.parent_id === parentId);
-    // Also include the parent itself
     const parent = accounts.find(a => a.id === parentId);
     return parent ? [parent, ...siblings] : siblings;
   };
 
   const impacts = useMemo(() => {
     const result: { label: string; effect: string; type: string; amount: number }[] = [];
-
     lines.forEach(l => {
       const type = l.accountType || '';
       const net = l.debit - l.credit;
       if (Math.abs(net) < 0.01) return;
-
       if (type === 'Activo') {
         result.push({ label: l.accountName, effect: net > 0 ? 'Aumenta' : 'Disminuye', type: 'Activo', amount: Math.abs(net) });
       } else if (type === 'Pasivo' || type === 'Capital') {
@@ -95,7 +88,6 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
         result.push({ label: l.accountName, effect: net > 0 ? 'Aumenta costo' : 'Disminuye costo', type: 'Costo', amount: Math.abs(net) });
       }
     });
-
     return result;
   }, [lines]);
 
@@ -107,13 +99,11 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
     const hasAsset = lines.some(l => l.accountType === 'Activo');
     const hasLiability = lines.some(l => l.accountType === 'Pasivo');
     const hasEquity = lines.some(l => l.accountType === 'Capital');
-
     if (hasIncome || hasExpense || hasCost) effects.push('📊 Estado de Resultados (P&L)');
     if (hasAsset || hasLiability || hasEquity) effects.push('📋 Balance General');
     if (lines.some(l => l.accountType === 'Activo' && (l.accountCode?.startsWith('10') || l.accountCode?.startsWith('11')))) {
       effects.push('💵 Flujo de Caja');
     }
-
     return effects;
   }, [lines]);
 
@@ -152,7 +142,10 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
         ) : (
           <span className="text-xs truncate">{l.accountCode ? `${l.accountCode} ` : ''}{l.accountName}</span>
         )}
-        <span className="text-xs font-mono font-medium shrink-0">{formatUSD(amount)}</span>
+        <div className="flex flex-col items-end shrink-0">
+          <span className="text-xs font-mono font-medium">{formatUSD(amount)}</span>
+          {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(amount * xr)}</span>}
+        </div>
       </div>
     );
   };
@@ -186,7 +179,10 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           {lines.filter(l => l.debit > 0).map((l, i) => renderAccountLine(l, i, 'debit'))}
           <div className="border-t border-border pt-1 mt-1 flex justify-between">
             <span className="text-[10px] font-bold text-muted-foreground">Total</span>
-            <span className="text-xs font-mono font-bold">{formatUSD(totalDebit)}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-mono font-bold">{formatUSD(totalDebit)}</span>
+              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(totalDebit * xr)}</span>}
+            </div>
           </div>
         </div>
         <div className="bg-card p-3 space-y-1">
@@ -194,7 +190,10 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           {lines.filter(l => l.credit > 0).map((l, i) => renderAccountLine(l, i, 'credit'))}
           <div className="border-t border-border pt-1 mt-1 flex justify-between">
             <span className="text-[10px] font-bold text-muted-foreground">Total</span>
-            <span className="text-xs font-mono font-bold">{formatUSD(totalCredit)}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-mono font-bold">{formatUSD(totalCredit)}</span>
+              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(totalCredit * xr)}</span>}
+            </div>
           </div>
         </div>
       </div>
