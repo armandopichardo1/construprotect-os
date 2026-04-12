@@ -444,13 +444,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
         if (error || !entry) throw error || new Error('Error creando asiento');
 
-        const linesData = validLines.map(l => ({
-          journal_entry_id: entry.id,
-          account_id: l.account_id,
-          debit_usd: l.debit || 0,
-          credit_usd: l.credit || 0,
-          description: l.description || null,
-        }));
+        const linesData = validLines.map(l => {
+          const debitUsd = currencyBase === 'DOP' ? (l.debit || 0) / xr : (l.debit || 0);
+          const creditUsd = currencyBase === 'DOP' ? (l.credit || 0) / xr : (l.credit || 0);
+          return {
+            journal_entry_id: entry.id,
+            account_id: l.account_id,
+            debit_usd: Math.round(debitUsd * 100) / 100,
+            credit_usd: Math.round(creditUsd * 100) / 100,
+            description: l.description || null,
+          };
+        });
         await supabase.from('journal_entry_lines').insert(linesData);
 
         toast.success('Asiento contable registrado');
