@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { setGlobalExchangeRate } from '@/lib/format';
 
 interface RateRow {
   date: string;
