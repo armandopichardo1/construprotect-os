@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Upload, FileText, X, ExternalLink } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Upload, FileText, ExternalLink } from 'lucide-react';
 
 interface Props {
   expenseId: string;
@@ -27,25 +25,30 @@ export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
     const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: true });
     if (error) { toast.error('Error al subir archivo'); setUploading(false); return; }
 
-    // Store the storage path (not a public URL) since bucket is private
-    const storagePath = path;
+    // Store the storage path (bucket is private, use signed URLs to view)
+    await supabase.from('expenses').update({ receipt_url: path }).eq('id', expenseId);
 
-    // Update expense record with the storage path
-    await supabase.from('expenses').update({ receipt_url: storagePath }).eq('id', expenseId);
-
-    onUploaded(storagePath);
+    onUploaded(path);
     toast.success('Recibo subido');
     setUploading(false);
+  };
+
+  const handleViewReceipt = async () => {
+    if (!currentUrl) return;
+    const { data, error } = await supabase.storage.from('receipts').createSignedUrl(currentUrl, 3600);
+    if (error || !data?.signedUrl) { toast.error('Error al obtener enlace'); return; }
+    window.open(data.signedUrl, '_blank');
   };
 
   return (
     <div className="flex items-center gap-2">
       <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleUpload} />
       {currentUrl ? (
-        <a href={currentUrl} target="_blank" rel="noopener noreferrer"
+        <button
+          onClick={handleViewReceipt}
           className="flex items-center gap-1 text-xs text-primary hover:underline">
           <FileText className="w-3 h-3" /> Ver recibo <ExternalLink className="w-2.5 h-2.5" />
-        </a>
+        </button>
       ) : (
         <button
           onClick={() => fileRef.current?.click()}
