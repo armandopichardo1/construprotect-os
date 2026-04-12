@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { KpiCard } from '@/components/KpiCard';
 import { useAuth } from '@/hooks/useAuth';
