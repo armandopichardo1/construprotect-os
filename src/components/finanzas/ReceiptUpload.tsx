@@ -33,7 +33,7 @@ export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
     // Update expense record with the storage path
     await supabase.from('expenses').update({ receipt_url: storagePath }).eq('id', expenseId);
 
-    onUploaded(publicUrl);
+    onUploaded(storagePath);
     toast.success('Recibo subido');
     setUploading(false);
   };
