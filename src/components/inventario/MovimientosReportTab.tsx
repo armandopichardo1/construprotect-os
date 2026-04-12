@@ -141,12 +141,17 @@ export function MovimientosReportTab() {
   }, [movements]);
 
   // Grand totals
-  const totals = useMemo(() => ({
-    movements: movements.length,
-    entries: movements.filter((m: any) => m.quantity > 0).reduce((s: number, m: any) => s + m.quantity, 0),
-    exits: movements.filter((m: any) => m.quantity < 0).reduce((s: number, m: any) => s + Math.abs(m.quantity), 0),
-    totalValue: movements.reduce((s: number, m: any) => s + Math.abs(m.quantity) * (Number(m.unit_cost_usd) || 0), 0),
-  }), [movements]);
+  const totals = useMemo(() => {
+    let entries = 0, exits = 0, totalValue = 0, netValue = 0;
+    movements.forEach((m: any) => {
+      const cost = Number(m.unit_cost_usd) || 0;
+      if (m.quantity > 0) entries += m.quantity;
+      else exits += Math.abs(m.quantity);
+      totalValue += Math.abs(m.quantity) * cost;
+      netValue += m.quantity * cost;
+    });
+    return { movements: movements.length, entries, exits, totalValue, netQty: entries - exits, netValue };
+  }, [movements]);
 
   // Filtered detail
   const filteredMovements = useMemo(() => {
