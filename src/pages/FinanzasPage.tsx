@@ -1182,7 +1182,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
   const yoy = useMemo(() => calcPeriodTotals(sales, saleItems, expenses, yoyRange.start, yoyRange.end, costs), [sales, saleItems, expenses, costs, yoyRange]);
 
   const trendData = useMemo(() => {
-    const months: { month: string; revenue: number; profit: number; revenuePY: number; profitPY: number }[] = [];
+    const months: { month: string; revenue: number; cogs: number; directCosts: number; grossProfit: number; totalExpenses: number; profit: number; revenuePY: number; profitPY: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const dEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
@@ -1191,7 +1191,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
       const pyS = new Date(d); pyS.setFullYear(pyS.getFullYear() - 1);
       const pyE = new Date(dEnd); pyE.setFullYear(pyE.getFullYear() - 1);
       const py = calcPeriodTotals(sales, saleItems, expenses, f(pyS), f(pyE), costs);
-      months.push({ month: d.toLocaleDateString('es-DO', { month: 'short' }), revenue: t.revenue, profit: t.netIncome, revenuePY: py.revenue, profitPY: py.netIncome });
+      months.push({ month: d.toLocaleDateString('es-DO', { month: 'short' }), revenue: t.revenue, cogs: t.cogs, directCosts: t.directCosts, grossProfit: t.grossProfit, totalExpenses: t.totalExpenses, profit: t.netIncome, revenuePY: py.revenue, profitPY: py.netIncome });
     }
     return months;
   }, [sales, saleItems, expenses, costs, now]);
@@ -1590,19 +1590,29 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">📋 Estado de Resultados Mensual</h2>
           <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => {
-            const rows = ['Ingresos', 'COGS', 'Costos Directos', 'Utilidad Bruta', 'Gastos Operativos', 'Utilidad Neta', 'Margen Bruto %', 'Margen Neto %'];
-            const exportData = rows.map(concept => {
+            const concepts = ['Ingresos', 'COGS', 'Costos Directos', 'Utilidad Bruta', 'Gastos Operativos', 'Utilidad Neta', 'Margen Bruto %', 'Margen Neto %'];
+            const exportData = concepts.map(concept => {
               const row: Record<string, any> = { Concepto: concept };
+              let total = 0;
               trendData.forEach(m => {
-                const totalCosts = m.revenue - m.profit;
-                const cogs = totalCosts * 0.6; // approximation from trend data
-                if (concept === 'Ingresos') row[m.month] = m.revenue;
-                else if (concept === 'COGS') row[m.month] = m.revenue > 0 ? m.revenue - m.profit - (totalCosts - (m.revenue - m.profit)) : 0;
-                else if (concept === 'Utilidad Bruta') row[m.month] = m.revenue > 0 ? m.revenue * 0.6 : 0;
-                else if (concept === 'Gastos Operativos') row[m.month] = totalCosts > 0 ? totalCosts * 0.4 : 0;
-                else if (concept === 'Utilidad Neta') row[m.month] = m.profit;
-                else if (concept === 'Margen Neto %') row[m.month] = m.revenue > 0 ? `${(m.profit / m.revenue * 100).toFixed(1)}%` : '0%';
+                let val = 0;
+                if (concept === 'Ingresos') val = m.revenue;
+                else if (concept === 'COGS') val = m.cogs;
+                else if (concept === 'Costos Directos') val = m.directCosts;
+                else if (concept === 'Utilidad Bruta') val = m.grossProfit;
+                else if (concept === 'Gastos Operativos') val = m.totalExpenses;
+                else if (concept === 'Utilidad Neta') val = m.profit;
+                else if (concept === 'Margen Bruto %') { row[m.month] = m.revenue > 0 ? `${(m.grossProfit / m.revenue * 100).toFixed(1)}%` : '0%'; return; }
+                else if (concept === 'Margen Neto %') { row[m.month] = m.revenue > 0 ? `${(m.profit / m.revenue * 100).toFixed(1)}%` : '0%'; return; }
+                row[m.month] = Number(val.toFixed(2));
+                total += val;
               });
+              if (!concept.includes('%')) row['Total'] = Number(total.toFixed(2));
+              else {
+                const totalRev = trendData.reduce((s, m) => s + m.revenue, 0);
+                if (concept === 'Margen Bruto %') row['Total'] = totalRev > 0 ? `${(trendData.reduce((s, m) => s + m.grossProfit, 0) / totalRev * 100).toFixed(1)}%` : '0%';
+                else row['Total'] = totalRev > 0 ? `${(trendData.reduce((s, m) => s + m.profit, 0) / totalRev * 100).toFixed(1)}%` : '0%';
+              }
               return row;
             });
             exportToExcel(exportData, 'PL_Mensual', 'P&L Mensual');
@@ -1628,16 +1638,31 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
                 {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-primary">{formatUSD(m.revenue)}</TableCell>)}
                 <TableCell className="text-xs text-right font-mono font-bold text-primary">{formatUSD(trendData.reduce((s, m) => s + m.revenue, 0))}</TableCell>
               </TableRow>
-              {/* Total Costs */}
+              {/* COGS */}
               <TableRow>
-                <TableCell className="text-xs sticky left-0 bg-card z-10">(-) Costos y Gastos</TableCell>
-                {trendData.map(m => {
-                  const tc = m.revenue - m.profit;
-                  return <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">-{formatUSD(tc)}</TableCell>;
-                })}
-                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + (m.revenue - m.profit), 0))}</TableCell>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) COGS</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.cogs > 0 ? `-${formatUSD(m.cogs)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.cogs, 0))}</TableCell>
               </TableRow>
-              {/* Separator */}
+              {/* Direct Costs */}
+              <TableRow>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) Costos Directos</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.directCosts > 0 ? `-${formatUSD(m.directCosts)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.directCosts, 0))}</TableCell>
+              </TableRow>
+              {/* Gross Profit */}
+              <TableRow className="border-t border-border/50 font-semibold">
+                <TableCell className="text-xs sticky left-0 bg-card z-10">Utilidad Bruta</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className={cn('text-xs text-right font-mono', m.grossProfit >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(m.grossProfit)}</TableCell>)}
+                <TableCell className={cn('text-xs text-right font-mono font-bold', trendData.reduce((s, m) => s + m.grossProfit, 0) >= 0 ? 'text-success' : 'text-destructive')}>{formatUSD(trendData.reduce((s, m) => s + m.grossProfit, 0))}</TableCell>
+              </TableRow>
+              {/* Operating Expenses */}
+              <TableRow>
+                <TableCell className="text-xs sticky left-0 bg-card z-10 text-muted-foreground">(-) Gastos Operativos</TableCell>
+                {trendData.map(m => <TableCell key={m.month} className="text-xs text-right font-mono text-destructive">{m.totalExpenses > 0 ? `-${formatUSD(m.totalExpenses)}` : '—'}</TableCell>)}
+                <TableCell className="text-xs text-right font-mono font-bold text-destructive">-{formatUSD(trendData.reduce((s, m) => s + m.totalExpenses, 0))}</TableCell>
+              </TableRow>
+              {/* Net Income */}
               <TableRow className="border-t-2 border-border">
                 <TableCell className="text-xs font-bold sticky left-0 bg-card z-10">Utilidad Neta</TableCell>
                 {trendData.map(m => (
