@@ -393,6 +393,7 @@ export default function InventarioPage() {
                   })}
                 </TableBody>
               </Table>
+              </div>
               {sorted.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Sin productos en inventario</p>}
             </div>
           </div>
