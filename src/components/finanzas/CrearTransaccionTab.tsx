@@ -356,6 +356,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
     ]);
     setJournalDescription('');
     setJournalNotes('');
+    setPreviewAccountOverrides({});
   };
 
   // Helper to create journal entry from computed preview lines
