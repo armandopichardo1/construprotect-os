@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     ]);
 
     const rate = rates?.[0];
-    const productList = (products || []).map(p => `${p.name} (SKU:${p.sku}, costo:$${p.unit_cost_usd}, lista:$${p.price_list_usd}, arq:$${p.price_architect_usd})`).join("\n");
+    const productList = (products || []).map(p => `${p.name} (ID:${p.id}, SKU:${p.sku}, costo:$${p.unit_cost_usd}, lista:$${p.price_list_usd}, arq:$${p.price_architect_usd})`).join("\n");
     const clientList = (clients || []).map(c => `${c.contact_name} - ${c.company_name || 'Sin empresa'} (ID:${c.id})`).join("\n");
     const accountList = (accounts || []).map(a => `${a.code} - ${a.description} [${a.account_type}/${a.classification || ''}] (ID:${a.id})`).join("\n");
 
