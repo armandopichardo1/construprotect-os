@@ -239,6 +239,28 @@ export function MovimientosReportTab() {
             </div>
           </>
         )}
+        <div>
+          <Label className="text-xs text-muted-foreground">Categoría</Label>
+          <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterProduct('all'); }}>
+            <SelectTrigger className="mt-1 w-[180px] h-9 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todas las categorías</SelectItem>
+              {categories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Producto</Label>
+          <Select value={filterProduct} onValueChange={setFilterProduct}>
+            <SelectTrigger className="mt-1 w-[220px] h-9 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todos los productos</SelectItem>
+              {productOptions
+                .filter(p => filterCategory === 'all' || rawMovements.some((m: any) => m.product_id === p.id && m.products?.category === filterCategory))
+                .map(p => <SelectItem key={p.id} value={p.id} className="text-xs truncate">{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
         <Button size="sm" variant="outline" onClick={handleExport} disabled={movements.length === 0} className="h-9">
           <Download className="w-3.5 h-3.5 mr-1" /> Exportar Excel
         </Button>
