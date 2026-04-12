@@ -1921,7 +1921,7 @@ function MonthlyTrendChart({ sales, saleItems, view }: { sales: any[]; saleItems
         <LineChart data={trendData.rows}>
           <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false}
-            tickFormatter={metric === 'gm_pct' ? (v: number) => `${v.toFixed(0)}%` : (v: number) => `$${(v/1000).toFixed(0)}K`} />
+            tickFormatter={metric === 'gm_pct' ? (v: number) => `${v.toFixed(0)}%` : (v: number) => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
           <Tooltip contentStyle={chartTooltipStyle}
             formatter={(v: number) => metric === 'gm_pct' ? `${v.toFixed(1)}%` : formatUSD(v)} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
