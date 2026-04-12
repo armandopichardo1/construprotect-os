@@ -807,8 +807,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       {/* Exchange rate */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto">
         <ArrowLeftRight className="w-3.5 h-3.5" />
-        <span>1 USD = <span className="text-foreground font-semibold">RD${xr.toFixed(2)}</span></span>
-        {rate?.date && <span className="text-[10px]">({rate.date})</span>}
+        <span>1 USD = <span className={cn("font-semibold", isHistoricalRate ? "text-amber-400" : "text-foreground")}>RD${xr.toFixed(2)}</span></span>
+        {isHistoricalRate ? (
+          <span className="text-[10px] text-amber-400/80">(tasa histórica {manualDate?.toLocaleDateString('es-DO', { month: 'short', year: 'numeric' })})</span>
+        ) : (
+          rate?.date && <span className="text-[10px]">({rate.date})</span>
+        )}
       </div>
     </div>
   );
