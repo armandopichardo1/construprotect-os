@@ -204,9 +204,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
   };
 
-  const journalTotalDebit = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
-  const journalTotalCredit = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
-  const journalIsBalanced = Math.abs(journalTotalDebit - journalTotalCredit) < 0.01;
+  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
+  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
+  const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
+  const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
+  const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
 
   // Purchase computed
   const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
@@ -442,13 +444,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         const { data: entry, error } = await supabase.from('journal_entries').insert(entryPayload).select().single();
         if (error || !entry) throw error || new Error('Error creando asiento');
 
-        const linesData = validLines.map(l => ({
-          journal_entry_id: entry.id,
-          account_id: l.account_id,
-          debit_usd: l.debit || 0,
-          credit_usd: l.credit || 0,
-          description: l.description || null,
-        }));
+        const linesData = validLines.map(l => {
+          const debitUsd = currencyBase === 'DOP' ? (l.debit || 0) / xr : (l.debit || 0);
+          const creditUsd = currencyBase === 'DOP' ? (l.credit || 0) / xr : (l.credit || 0);
+          return {
+            journal_entry_id: entry.id,
+            account_id: l.account_id,
+            debit_usd: Math.round(debitUsd * 100) / 100,
+            credit_usd: Math.round(creditUsd * 100) / 100,
+            description: l.description || null,
+          };
+        });
         await supabase.from('journal_entry_lines').insert(linesData);
 
         toast.success('Asiento contable registrado');
@@ -1274,7 +1280,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en USD)</span></Label>
+                  <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en {currencyBase})</span></Label>
                   <div className="rounded-xl border border-border overflow-hidden">
                     <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
@@ -1305,12 +1311,20 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30">
                       <span className="text-xs font-bold">Totales</span>
                       <div className="text-right">
-                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalDebit)}</span>
-                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalDebit * xr)}</span>
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>
+                          {currencyBase === 'DOP' ? formatDOP(journalTotalDebitRaw) : formatUSD(journalTotalDebitRaw)}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                          {currencyBase === 'DOP' ? formatUSD(journalTotalDebit) : formatDOP(journalTotalDebitRaw * xr)}
+                        </span>
                       </div>
                       <div className="text-right">
-                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>{formatUSD(journalTotalCredit)}</span>
-                        <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(journalTotalCredit * xr)}</span>
+                        <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>
+                          {currencyBase === 'DOP' ? formatDOP(journalTotalCreditRaw) : formatUSD(journalTotalCreditRaw)}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                          {currencyBase === 'DOP' ? formatUSD(journalTotalCredit) : formatDOP(journalTotalCreditRaw * xr)}
+                        </span>
                       </div>
                       <span />
                     </div>
