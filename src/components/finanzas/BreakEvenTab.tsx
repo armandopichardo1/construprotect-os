@@ -90,7 +90,7 @@ export function BreakEvenTab({ sales, saleItems, expenses }: Props) {
           <h2 className="text-sm font-semibold text-foreground">Parámetros</h2>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Costos Fijos Mensuales (USD)</Label>
+              <Label className="text-xs">Costos Fijos Mensuales (RD$)</Label>
               <Input type="number" value={fixedCosts} onChange={e => setFixedCosts(e.target.value)} className="mt-1" />
               <p className="text-[10px] text-muted-foreground mt-1">Promedio 3 meses: {formatUSD(metrics.avgMonthlyExpenses)}</p>
             </div>

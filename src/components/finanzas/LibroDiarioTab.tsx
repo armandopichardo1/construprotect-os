@@ -319,15 +319,15 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
           <p className="text-lg font-bold text-foreground">{filtered.length}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
-          <p className="text-xs text-muted-foreground">Total Débitos USD</p>
+          <p className="text-xs text-muted-foreground">Total Débitos</p>
           <p className="text-lg font-bold text-warning">{formatUSD(totals.debit_usd)}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
-          <p className="text-xs text-muted-foreground">Total Créditos USD</p>
+          <p className="text-xs text-muted-foreground">Total Créditos</p>
           <p className="text-lg font-bold text-success">{formatUSD(totals.credit_usd)}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
-          <p className="text-xs text-muted-foreground">Balance USD</p>
+          <p className="text-xs text-muted-foreground">Balance</p>
           <p className={cn('text-lg font-bold', (totals.debit_usd - totals.credit_usd) >= 0 ? 'text-warning' : 'text-success')}>
             {formatUSD(Math.abs(totals.debit_usd - totals.credit_usd))}
           </p>
