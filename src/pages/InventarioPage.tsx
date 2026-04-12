@@ -351,7 +351,16 @@ export default function InventarioPage() {
                       <TableCell className="text-xs font-mono text-muted-foreground">{item.sku}</TableCell>
                       <TableCell className="text-xs font-medium">{item.name}</TableCell>
                       <TableCell className="text-xs"><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{item.category}</span></TableCell>
-                      <TableCell className="text-xs text-right font-mono font-bold">{item.qty}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-bold">
+                        <span className="inline-flex items-center gap-1.5">
+                          {item.qty}
+                          {item.qty > 0 && item.qty <= item.reorder && (
+                            <span className="inline-flex items-center rounded-full bg-destructive/15 text-destructive text-[9px] font-semibold px-1.5 py-0.5 leading-none whitespace-nowrap">
+                              ↓ Reorden
+                            </span>
+                          )}
+                        </span>
+                      </TableCell>
                       <TableCell className="px-2">
                         <StockThermometer qty={item.qty} reorder={item.reorder} maxQty={maxQty} />
                       </TableCell>
