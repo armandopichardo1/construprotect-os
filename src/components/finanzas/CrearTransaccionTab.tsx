@@ -1305,14 +1305,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
-                    <Select value={cnSupplierId} onValueChange={handleCnSupplier}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar proveedor" /></SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((s: any) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
+                      value={cnSupplierId}
+                      onValueChange={handleCnSupplier}
+                      placeholder="Seleccionar proveedor"
+                      searchPlaceholder="Buscar proveedor..."
+                      emptyMessage="No se encontró proveedor"
+                    />
                   ) : (
                     <Input value={cnSupplierName} onChange={e => setCnSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
                   )}
