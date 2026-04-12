@@ -19,7 +19,7 @@ import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ProductosContent } from '@/pages/ProductosPage';
 
-const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables'];
+const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables', 'Tasas de Cambio'];
 
 const TAB_MAP: Record<string, string> = {
   productos: 'Productos',
@@ -28,6 +28,7 @@ const TAB_MAP: Record<string, string> = {
   marcas: 'Marcas',
   servicios: 'Servicios',
   cuentas: 'Cuentas Contables',
+  tasas: 'Tasas de Cambio',
 };
 
 export default function MaestrasPage() {
@@ -61,6 +62,7 @@ export default function MaestrasPage() {
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
+        {tab === 'Tasas de Cambio' && <TasasCambioMaestra />}
       </div>
     </AppLayout>
   );
