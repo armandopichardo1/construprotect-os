@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ const ADJUSTMENT_ACCOUNT_ID = '147bcb80-f2eb-4205-a82e-feab08b51503';
 
 export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<CountRow[]>([]);
@@ -239,12 +241,57 @@ export function BulkPhysicalCountDialog({ open, onOpenChange }: Props) {
       }
     }
 
+    // Save physical count history
+    const surplusRows = changedRows.filter(r => Number(r.counted_qty) > r.system_qty);
+    const shortfallRows = changedRows.filter(r => Number(r.counted_qty) < r.system_qty);
+    const surplusVal = surplusRows.reduce((s, r) => s + (Number(r.counted_qty) - r.system_qty) * r.unit_cost_usd, 0);
+    const shortfallVal = shortfallRows.reduce((s, r) => s + (r.system_qty - Number(r.counted_qty)) * r.unit_cost_usd, 0);
+
+    // Get user name from profiles
+    let userName = 'Sistema';
+    if (user?.id) {
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      userName = profile?.full_name || user.email || 'Sistema';
+    }
+
+    const { data: pc } = await supabase.from('physical_counts').insert({
+      performed_by: user?.id || null,
+      performed_by_name: userName,
+      notes: notes.trim() || null,
+      total_products_counted: rows.filter(r => r.counted_qty !== '').length,
+      total_differences: changedRows.length,
+      total_surplus: surplusRows.reduce((s, r) => s + (Number(r.counted_qty) - r.system_qty), 0),
+      total_shortfall: shortfallRows.reduce((s, r) => s + (r.system_qty - Number(r.counted_qty)), 0),
+      surplus_value_usd: surplusVal,
+      shortfall_value_usd: shortfallVal,
+      net_adjustment_value_usd: surplusVal - shortfallVal,
+    } as any).select('id').single();
+
+    if (pc) {
+      const countItems = changedRows.map(r => {
+        const diff = Number(r.counted_qty) - r.system_qty;
+        return {
+          physical_count_id: pc.id,
+          product_id: r.product_id,
+          sku: r.sku,
+          product_name: r.name,
+          system_qty: r.system_qty,
+          counted_qty: Number(r.counted_qty),
+          difference: diff,
+          unit_cost_usd: r.unit_cost_usd,
+          adjustment_value_usd: Math.abs(diff) * r.unit_cost_usd,
+        };
+      });
+      await supabase.from('physical_count_items').insert(countItems as any);
+    }
+
     setSaving(false);
     toast.success(`${successCount} producto(s) ajustado(s) — inventario y contabilidad actualizados`);
     queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     queryClient.invalidateQueries({ queryKey: ['products-with-stock'] });
+    queryClient.invalidateQueries({ queryKey: ['physical-counts-history'] });
     onOpenChange(false);
   };
 
