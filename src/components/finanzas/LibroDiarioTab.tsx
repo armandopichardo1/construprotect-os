@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Search, Download, Save } from 'lucide-react';
+import { Pencil, Search, Download, Save, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
 
@@ -53,6 +54,8 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState({ description: '', amount_usd: '', amount_dop: '', date: '', category: '' });
   const [saving, setSaving] = useState(false);
 
