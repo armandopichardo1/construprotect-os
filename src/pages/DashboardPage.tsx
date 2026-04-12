@@ -54,7 +54,41 @@ export default function DashboardPage() {
   const [reviewModel, setReviewModel] = useState('google/gemini-2.5-flash');
   const [reviewPrompt, setReviewPrompt] = useState('');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [savedPrompts, setSavedPrompts] = useState<{ name: string; prompt: string; model?: string }[]>([]);
   const alertsNotifiedRef = useRef(false);
+
+  // Load saved prompts from settings
+  useEffect(() => {
+    supabase.from('settings').select('value').eq('key', 'ai_saved_prompts').single().then(({ data }) => {
+      if (data?.value && Array.isArray(data.value)) setSavedPrompts(data.value as any);
+    });
+  }, []);
+
+  const persistPrompts = async (prompts: typeof savedPrompts) => {
+    setSavedPrompts(prompts);
+    const { error } = await supabase.from('settings').upsert({ key: 'ai_saved_prompts', value: prompts as any }, { onConflict: 'key' });
+    if (error) toast.error('Error guardando prompts');
+  };
+
+  const saveCurrentPrompt = () => {
+    if (!reviewPrompt.trim()) { toast.error('Escribe un prompt primero'); return; }
+    const name = reviewPrompt.slice(0, 50).trim() + (reviewPrompt.length > 50 ? '…' : '');
+    if (savedPrompts.some(p => p.prompt === reviewPrompt.trim())) { toast.info('Este prompt ya está guardado'); return; }
+    const newPrompts = [...savedPrompts, { name, prompt: reviewPrompt.trim(), model: reviewModel }];
+    persistPrompts(newPrompts);
+    toast.success('Prompt guardado');
+  };
+
+  const deleteSavedPrompt = (index: number) => {
+    persistPrompts(savedPrompts.filter((_, i) => i !== index));
+    toast.success('Prompt eliminado');
+  };
+
+  const loadSavedPrompt = (p: typeof savedPrompts[0]) => {
+    setReviewPrompt(p.prompt);
+    if (p.model) setReviewModel(p.model);
+    setShowPromptEditor(true);
+  };
 
   const { data: inventoryStats } = useQuery({
     queryKey: ['dashboard-inventory'],
