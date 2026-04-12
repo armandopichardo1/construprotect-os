@@ -504,12 +504,21 @@ export function ProductosContent() {
                       <EditableCell value={p.dimensions} type="text" field="dimensions" productId={p.id} onSave={handleInlineSave} />
                     </TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => setDeleteProduct(p)}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => setEditProduct(p)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          title="Editar producto completo"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteProduct(p)}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                   );
