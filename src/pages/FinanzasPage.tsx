@@ -1499,7 +1499,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         <ResponsiveContainer width="100%" height={380}>
           <BarChart data={waterfallData} barGap={2} barCategoryGap="20%">
             <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={80} />
-            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
               if (name === 'current') return [formatUSD(v), 'Actual'];
               if (name === 'previous') return [formatUSD(v), 'Anterior'];
@@ -1547,7 +1547,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
           <ResponsiveContainer width="100%" height={350}>
             <ComposedChart data={paretoData} barSize={36}>
               <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={80} />
-              <YAxis yAxisId="left" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+              <YAxis yAxisId="left" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
               <YAxis yAxisId="right" orientation="right" tick={{ fill: 'hsl(38, 92%, 50%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
               <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
                 if (name === 'value') return [formatUSD(v), 'Monto'];
@@ -1593,7 +1593,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
               </linearGradient>
             </defs>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+            <YAxis yAxisId="left" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
             <YAxis yAxisId="right" orientation="right" tick={{ fill: 'hsl(160, 84%, 39%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} domain={[-100, 100]} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => {
               if (name === 'margin') return [`${v.toFixed(1)}%`, 'Margen Neto'];
@@ -1725,7 +1725,7 @@ function PLTab({ sales, saleItems, expenses, costs }: { sales: any[]; saleItems:
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={trendData}>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[6,6,0,0]} />
             <Bar dataKey="revenuePY" name="Ing. Año Ant." fill="hsl(217, 91%, 60%)" fillOpacity={0.3} radius={[6,6,0,0]} />
@@ -2306,7 +2306,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
                   { name: '+90d', value: agingData.totals.over90 },
                 ]}>
                   <XAxis dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                  <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
                   <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
                   <Bar dataKey="value" name="Monto">
                     {[
@@ -2377,7 +2377,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
               {trendMode === 'bars' ? (
               <ComposedChart data={monthlyComparison}>
                 <XAxis dataKey="label" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
                 <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="revenue" name="Ingresos" fill="hsl(217, 91%, 60%)" radius={[4,4,0,0]} />
@@ -2388,7 +2388,7 @@ function ReportesTab({ sales, saleItems, expenses, costs, rate, rateForMonth }: 
               ) : (
               <ComposedChart data={monthlyComparison}>
                 <XAxis dataKey="label" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="usd" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+                <YAxis yAxisId="usd" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
                 <YAxis yAxisId="pct" orientation="right" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                 <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number, name: string) => name.includes('%') ? `${v.toFixed(1)}%` : formatUSD(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -2774,7 +2774,7 @@ function TerritoryCoverageSection({ data }: { data: { name: string; count: numbe
           <h3 className="text-xs font-semibold text-foreground">Ingresos por Territorio</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
-              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+              <XAxis type="number" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 10 }} width={90} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
               <Bar dataKey="revenue" radius={[0, 6, 6, 0]}>
