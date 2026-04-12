@@ -32,6 +32,11 @@ export function useExchangeRate() {
   const latestRate = rates[0];
   const rate = Number(latestRate?.usd_sell || 60);
 
+  // Keep global rate in sync for formatUSD()
+  useEffect(() => {
+    setGlobalExchangeRate(rate);
+  }, [rate]);
+
   /**
    * Get the sell rate for a specific month (YYYY-MM).
    * Finds the closest rate within that month, or the nearest prior month.
