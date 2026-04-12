@@ -87,6 +87,7 @@ export function ProductosContent() {
   const defaultList = targetMargins?.list ?? 30;
   const defaultArchitect = targetMargins?.architect ?? 25;
   const defaultProject = targetMargins?.project ?? 20;
+  const defaultWholesale = targetMargins?.wholesale ?? 15;
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
@@ -158,6 +159,8 @@ export function ProductosContent() {
                    <TableHead className="text-xs text-center">Margen Lista</TableHead>
                    <TableHead className="text-xs text-center">Margen Arquitecto</TableHead>
                    <TableHead className="text-xs text-center">Margen Proyecto</TableHead>
+                   <TableHead className="text-xs text-right">Precio Mayorista</TableHead>
+                   <TableHead className="text-xs text-center">Margen Mayorista</TableHead>
                    <TableHead className="text-xs">Dimensiones</TableHead>
                    <TableHead className="text-xs w-[80px]">Acciones</TableHead>
                  </TableRow>
@@ -181,6 +184,10 @@ export function ProductosContent() {
                     </TableCell>
                     <TableCell className="text-xs text-center">
                       <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
+                    </TableCell>
+                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_wholesale_usd))}</TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>
@@ -208,17 +215,21 @@ export function ProductosContent() {
                   const mList = calcRealMargin(cost, Number(p.price_list_usd));
                   const mArq = calcRealMargin(cost, Number(p.price_architect_usd));
                   const mProy = calcRealMargin(cost, Number(p.price_project_usd));
+                  const mMay = calcRealMargin(cost, Number(p.price_wholesale_usd));
                   if (mList !== null) { acc.list.sum += mList; acc.list.count++; }
                   if (mArq !== null) { acc.arq.sum += mArq; acc.arq.count++; }
                   if (mProy !== null) { acc.proy.sum += mProy; acc.proy.count++; }
+                  if (mMay !== null) { acc.may.sum += mMay; acc.may.count++; }
                   acc.costSum += Number(p.unit_cost_usd);
                   acc.priceSum += Number(p.price_list_usd);
+                  acc.wholesaleSum += Number(p.price_wholesale_usd);
                   return acc;
-                }, { list: { sum: 0, count: 0 }, arq: { sum: 0, count: 0 }, proy: { sum: 0, count: 0 }, costSum: 0, priceSum: 0 });
+                }, { list: { sum: 0, count: 0 }, arq: { sum: 0, count: 0 }, proy: { sum: 0, count: 0 }, may: { sum: 0, count: 0 }, costSum: 0, priceSum: 0, wholesaleSum: 0 });
 
                 const avgList = margins.list.count ? margins.list.sum / margins.list.count : null;
                 const avgArq = margins.arq.count ? margins.arq.sum / margins.arq.count : null;
                 const avgProy = margins.proy.count ? margins.proy.sum / margins.proy.count : null;
+                const avgMay = margins.may.count ? margins.may.sum / margins.may.count : null;
 
                 const formatAvg = (val: number | null) => {
                   if (val === null) return <span className="text-muted-foreground">—</span>;
@@ -240,6 +251,8 @@ export function ProductosContent() {
                       <TableCell className="text-xs text-center">{formatAvg(avgList)}</TableCell>
                       <TableCell className="text-xs text-center">{formatAvg(avgArq)}</TableCell>
                       <TableCell className="text-xs text-center">{formatAvg(avgProy)}</TableCell>
+                      <TableCell className="text-xs text-right font-mono font-semibold">{formatUSD(margins.wholesaleSum / (filtered.length || 1))}</TableCell>
+                      <TableCell className="text-xs text-center">{formatAvg(avgMay)}</TableCell>
                       <TableCell colSpan={2} className="text-xs text-muted-foreground">Promedios</TableCell>
                     </TableRow>
                   </TableFooter>
