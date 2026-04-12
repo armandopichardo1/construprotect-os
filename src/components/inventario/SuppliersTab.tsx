@@ -56,9 +56,9 @@ export function SuppliersTab() {
         <Plus className="w-3.5 h-3.5 mr-1" /> Nuevo Proveedor
       </Button>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden max-h-[calc(100vh-280px)] overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="text-xs">Proveedor</TableHead>
               <TableHead className="text-xs">Contacto</TableHead>

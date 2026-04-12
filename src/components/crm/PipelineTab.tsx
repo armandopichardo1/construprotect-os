@@ -213,10 +213,10 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
           </Select>
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">{filteredDeals.length} de {deals.length}</span>
         </div>
-        <div className="rounded-xl border border-border overflow-x-auto">
+        <div className="rounded-xl border border-border overflow-auto max-h-[calc(100vh-320px)]">
             <table className="w-full caption-bottom text-sm min-w-[480px]">
-              <TableHeader>
-                <TableRow className="bg-muted/50">
+              <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                <TableRow className="bg-card">
                   <TableHead className="text-[10px] font-semibold">Deal</TableHead>
                   <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Contacto</TableHead>
                   <TableHead className="text-[10px] font-semibold hidden sm:table-cell">Etapa</TableHead>
