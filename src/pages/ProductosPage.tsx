@@ -10,7 +10,6 @@ import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
 import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle, Box } from 'lucide-react';
 import { SwipeableRow } from '@/components/ui/swipeable-row';
-import { BulkLogisticsDialog } from '@/components/BulkLogisticsDialog';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Tables } from '@/integrations/supabase/types';
