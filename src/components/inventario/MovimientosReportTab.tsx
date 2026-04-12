@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { exportToExcel } from '@/lib/export-utils';
 import { Download, FileBarChart, TrendingUp, TrendingDown, Package, Search } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, AreaChart, Area, CartesianGrid, Legend, Line, ReferenceLine } from 'recharts';
 
 const TYPE_MAP: Record<string, { label: string; icon: string; color: string }> = {
   receipt: { label: 'Entrada', icon: '📥', color: '#3b82f6' },
@@ -309,6 +309,8 @@ export function MovimientosReportTab() {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Area type="monotone" dataKey="entries" name="Entradas" stroke="#10b981" fill="url(#gradIn)" strokeWidth={2} />
               <Area type="monotone" dataKey="exits" name="Salidas" stroke="#ef4444" fill="url(#gradOut)" strokeWidth={2} />
+              <Line type="monotone" dataKey="net" name="Neto" stroke="hsl(217, 91%, 60%)" strokeWidth={2.5} dot={{ r: 3, fill: 'hsl(217, 91%, 60%)' }} strokeDasharray="none" />
+              <ReferenceLine y={0} stroke="hsl(222, 10%, 35%)" strokeDasharray="4 4" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
