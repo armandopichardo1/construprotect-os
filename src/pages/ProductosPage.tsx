@@ -540,6 +540,7 @@ export function ProductosContent() {
                         <button
                           onClick={() => setDeleteProduct(p)}
                           className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          title="Eliminar producto"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

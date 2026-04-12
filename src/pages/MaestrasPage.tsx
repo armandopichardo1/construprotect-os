@@ -186,8 +186,8 @@ function ClientesMaestra() {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(c)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(c)}><Trash2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(c)} title="Editar categoría"><Pencil className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(c)} title="Eliminar categoría"><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -336,8 +336,8 @@ function ProveedoresMaestra() {
                 <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', s.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>{s.is_active ? 'Activo' : 'Inactivo'}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(s)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(s)}><Trash2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(s)} title="Editar servicio"><Pencil className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(s)} title="Eliminar servicio"><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -451,8 +451,8 @@ function MarcasMaestra() {
                 <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', b.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>{b.is_active ? 'Activa' : 'Inactiva'}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(b)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(b)}><Trash2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(b)} title="Editar marca"><Pencil className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(b)} title="Eliminar marca"><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -547,8 +547,8 @@ function ServiciosMaestra() {
                 <TableCell className="text-xs text-muted-foreground">{s.family || '—'}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(s)}><Pencil className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(s)}><Trash2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing(s)} title="Editar suplidor"><Pencil className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(s)} title="Eliminar suplidor"><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -959,8 +959,8 @@ function CuentasMaestra() {
       </TableCell>
       <TableCell>
         <div className="flex gap-1">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing({ ...a, parent_id: a.parent_id || '' })}><Pencil className="w-3 h-3" /></Button>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(a)}><Trash2 className="w-3 h-3" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditing({ ...a, parent_id: a.parent_id || '' })} title="Editar cuenta"><Pencil className="w-3 h-3" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleting(a)} title="Eliminar cuenta"><Trash2 className="w-3 h-3" /></Button>
         </div>
       </TableCell>
     </TableRow>
