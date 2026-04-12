@@ -325,21 +325,7 @@ export default function MasPage() {
             </div>
 
             {/* Users */}
-            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Usuarios</h2>
-              <div className="space-y-2">
-                {profiles.map(p => (
-                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{p.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{p.role}</p>
-                    </div>
-                    <span className="h-2.5 w-2.5 rounded-full bg-success" />
-                  </div>
-                ))}
-                {profiles.length === 0 && <p className="text-sm text-muted-foreground">No hay usuarios registrados aún</p>}
-              </div>
-            </div>
+            <UsersSection profiles={profiles} queryClient={queryClient} />
 
             {/* Margin Settings */}
             <div className="rounded-2xl bg-card border border-border p-6 space-y-5 lg:col-span-2">
