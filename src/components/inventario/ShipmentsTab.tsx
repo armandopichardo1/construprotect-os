@@ -64,7 +64,44 @@ export function ShipmentsTab() {
       await supabase.from('shipment_items').update({ quantity_received: item.quantity_ordered }).eq('id', item.id);
     }
 
-    toast.success('Envío recibido — inventario actualizado');
+    // Auto-generate journal entry for receipt
+    const totalCost = items.reduce((s: number, i: any) => s + (Number(i.unit_cost_usd || 0) * Number(i.quantity_ordered || 0)), 0);
+    if (totalCost > 0) {
+      try {
+        const desc = `Recepción inventario — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
+        
+        // Fetch accounts for automatic journal entry
+        const { data: accts } = await supabase.from('chart_of_accounts')
+          .select('id, code, description, account_type')
+          .eq('is_active', true).order('code');
+        const accounts = accts || [];
+        
+        const invAcct = accounts.find(a => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
+        const cxpAcct = accounts.find(a => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
+
+        if (invAcct && cxpAcct) {
+          const { data: entry } = await supabase.from('journal_entries').insert({
+            description: desc,
+            total_debit_usd: totalCost,
+            total_credit_usd: totalCost,
+            notes: `Auto-generado al recibir envío. Productos: ${items.map((i: any) => `${i.products?.name || i.product_id} x${i.quantity_ordered}`).join(', ')}`,
+          }).select().single();
+
+          if (entry) {
+            // Debit: Inventario (increase asset), Credit: CxP (reduce liability — goods received)
+            await supabase.from('journal_entry_lines').insert([
+              { journal_entry_id: entry.id, account_id: invAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Recepción mercancía' },
+              { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación por compra' },
+            ]);
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      } catch (e) {
+        console.error('Error creating receipt journal entry:', e);
+      }
+    }
+
+    toast.success('Envío recibido — inventario y contabilidad actualizados');
     queryClient.invalidateQueries({ queryKey: ['shipments'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
   };
