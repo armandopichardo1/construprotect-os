@@ -133,6 +133,24 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
 
+  // Journal entry state
+  const [journalLines, setJournalLines] = useState<JournalLine[]>([
+    { account_id: '', debit: 0, credit: 0, description: '' },
+    { account_id: '', debit: 0, credit: 0, description: '' },
+  ]);
+  const [journalDescription, setJournalDescription] = useState('');
+  const [journalNotes, setJournalNotes] = useState('');
+
+  const addJournalLine = () => setJournalLines(prev => [...prev, { account_id: '', debit: 0, credit: 0, description: '' }]);
+  const removeJournalLine = (i: number) => setJournalLines(prev => prev.filter((_, idx) => idx !== i));
+  const updateJournalLine = (i: number, field: string, value: any) => {
+    setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
+  };
+
+  const journalTotalDebit = journalLines.reduce((s, l) => s + (l.debit || 0), 0);
+  const journalTotalCredit = journalLines.reduce((s, l) => s + (l.credit || 0), 0);
+  const journalIsBalanced = Math.abs(journalTotalDebit - journalTotalCredit) < 0.01;
+
   const getPriceForTier = (prod: any, tier: string) => {
     switch (tier) {
       case 'architect': return Number(prod?.price_architect_usd || prod?.price_list_usd || 0);
@@ -184,12 +202,55 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
+  // === Accounting Preview Lines ===
+  const previewLines = useMemo(() => {
+    const getAcct = (id: string) => accounts.find((a: any) => a.id === id);
+    const lines: { accountCode?: string; accountName: string; accountType?: string; debit: number; credit: number }[] = [];
+
+    if (manualType === 'journal') {
+      journalLines.forEach(jl => {
+        if (!jl.account_id || (jl.debit === 0 && jl.credit === 0)) return;
+        const acct = getAcct(jl.account_id);
+        lines.push({
+          accountCode: acct?.code || '',
+          accountName: acct?.description || 'Sin asignar',
+          accountType: acct?.account_type || '',
+          debit: jl.debit || 0,
+          credit: jl.credit || 0,
+        });
+      });
+    } else if (manualType === 'sale' && totalSale > 0) {
+      // Sale: Debit cash/CxC, Credit income
+      const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
+      const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
+      const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
+      const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
+      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, debit: totalSale, credit: 0 });
+      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, debit: 0, credit: totalSale });
+    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amountUsd) > 0 || parseFloat(amountDop) > 0)) {
+      const amt = parseFloat(amountUsd) || (parseFloat(amountDop) || 0) / xr;
+      const expAcct = accountId ? getAcct(accountId) : null;
+      const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
+      if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, debit: amt, credit: 0 });
+      else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amt, credit: 0 });
+      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, debit: 0, credit: amt });
+    }
+
+    return lines;
+  }, [manualType, journalLines, totalSale, paymentStatus, amountUsd, amountDop, accountId, accounts, xr]);
+
   const resetManualForm = () => {
     setDescription(''); setCategory(''); setVendor('');
     setAmountUsd(''); setAmountDop(''); setManualDate(undefined);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
     setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+    setJournalLines([
+      { account_id: '', debit: 0, credit: 0, description: '' },
+      { account_id: '', debit: 0, credit: 0, description: '' },
+    ]);
+    setJournalDescription('');
+    setJournalNotes('');
   };
 
   // ===== MANUAL SAVE =====
