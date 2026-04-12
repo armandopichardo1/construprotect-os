@@ -254,6 +254,8 @@ export default function FinanzasPage() {
             onEditCost={(data: any) => { setCostPrefill(data); setTab('Costos'); }} />
         )}
 
+        {tab === 'Pricing' && <PricingTab />}
+
         {tab === 'Resumen' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
