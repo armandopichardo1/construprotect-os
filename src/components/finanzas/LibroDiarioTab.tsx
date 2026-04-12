@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Search, Download, Save } from 'lucide-react';
+import { Pencil, Search, Download, Save, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
 
@@ -53,6 +54,8 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState({ description: '', amount_usd: '', amount_dop: '', date: '', category: '' });
   const [saving, setSaving] = useState(false);
 
@@ -234,6 +237,38 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!deleteEntry) return;
+    setDeleting(true);
+    try {
+      if (deleteEntry.type === 'sale') {
+        await supabase.from('sale_items').delete().eq('sale_id', deleteEntry.id);
+        const { error } = await supabase.from('sales').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sale-items'] });
+      } else if (deleteEntry.type === 'expense') {
+        const { error } = await supabase.from('expenses').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      } else if (deleteEntry.type === 'cost') {
+        const { error } = await supabase.from('costs').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['costs'] });
+      } else if (deleteEntry.type === 'journal') {
+        await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', deleteEntry.id);
+        const { error } = await supabase.from('journal_entries').delete().eq('id', deleteEntry.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      }
+      toast.success('Registro eliminado');
+      setDeleteEntry(null);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al eliminar');
+    }
+    setDeleting(false);
+  };
+
   const handleExport = () => {
     exportToExcel(filtered.map(e => ({
       Fecha: e.date,
@@ -339,9 +374,14 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
                     {formatDOP(entry.debit_dop || entry.credit_dop)}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Pencil className="w-3 h-3" />
-                    </button>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => setDeleteEntry(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -403,6 +443,32 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteEntry} onOpenChange={v => { if (!v) setDeleteEntry(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteEntry && (
+                <>
+                  <strong>{TYPE_LABELS[deleteEntry.type]?.emoji} {TYPE_LABELS[deleteEntry.type]?.label}</strong>: {deleteEntry.description}
+                  <br />
+                  Monto: {formatUSD(deleteEntry.debit_usd || deleteEntry.credit_usd)}
+                  <br /><br />
+                  Esta acción no se puede deshacer.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
