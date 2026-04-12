@@ -367,15 +367,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
     if (manualType === 'journal') {
       journalLines.forEach(jl => {
-        if (!jl.account_id || (jl.debit === 0 && jl.credit === 0)) return;
+        if (!jl.account_id || (parseNum(jl.debit) === 0 && parseNum(jl.credit) === 0)) return;
         const acct = getAcct(jl.account_id);
         lines.push({
           accountCode: acct?.code || '',
           accountName: acct?.description || 'Sin asignar',
           accountType: acct?.account_type || '',
           accountId: acct?.id,
-          debit: jl.debit || 0,
-          credit: jl.credit || 0,
+          debit: parseNum(jl.debit),
+          credit: parseNum(jl.credit),
         });
       });
     } else if (manualType === 'purchase' && purchaseTotal > 0) {
@@ -448,8 +448,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setCnSupplierId(''); setCnSupplierName('');
     setCnAmount(''); setCnReason(''); setCnNotes('');
     setJournalLines([
-      { account_id: '', debit: 0, credit: 0, description: '' },
-      { account_id: '', debit: 0, credit: 0, description: '' },
+      { account_id: '', debit: '', credit: '', description: '' },
+      { account_id: '', debit: '', credit: '', description: '' },
     ]);
     setJournalDescription('');
     setJournalNotes('');
@@ -500,7 +500,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     // ===== JOURNAL ENTRY =====
     if (manualType === 'journal') {
       if (!journalDescription.trim()) { toast.error('Descripción requerida'); return; }
-      const validLines = journalLines.filter(l => l.account_id && (l.debit > 0 || l.credit > 0));
+      const validLines = journalLines.filter(l => l.account_id && (parseNum(l.debit) > 0 || parseNum(l.credit) > 0));
       if (validLines.length < 2) { toast.error('Se requieren al menos 2 líneas con cuentas y montos'); return; }
       if (!journalIsBalanced) { toast.error('Los débitos y créditos deben cuadrar'); return; }
 
@@ -520,8 +520,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error || !entry) throw error || new Error('Error creando asiento');
 
         const linesData = validLines.map(l => {
-          const debitUsd = currencyBase === 'DOP' ? (l.debit || 0) / xr : (l.debit || 0);
-          const creditUsd = currencyBase === 'DOP' ? (l.credit || 0) / xr : (l.credit || 0);
+          const debitVal = parseNum(l.debit);
+          const creditVal = parseNum(l.credit);
+          const debitUsd = currencyBase === 'DOP' ? debitVal / xr : debitVal;
+          const creditUsd = currencyBase === 'DOP' ? creditVal / xr : creditVal;
           return {
             journal_entry_id: entry.id,
             account_id: l.account_id,
@@ -1416,11 +1418,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           options={leafAccounts.map(a => ({ value: a.id, label: `${a.code} — ${a.description}` }))}
                           className="text-xs h-8"
                         />
-                        <Input type="number" min={0} step={0.01} value={line.debit || ''}
-                          onChange={e => updateJournalLine(i, 'debit', parseFloat(e.target.value) || 0)}
+                        <Input type="number" min={0} step={0.01} value={line.debit}
+                          onChange={e => updateJournalLine(i, 'debit', e.target.value)}
                           className="text-xs h-8 text-right" placeholder="0.00" />
-                        <Input type="number" min={0} step={0.01} value={line.credit || ''}
-                          onChange={e => updateJournalLine(i, 'credit', parseFloat(e.target.value) || 0)}
+                        <Input type="number" min={0} step={0.01} value={line.credit}
+                          onChange={e => updateJournalLine(i, 'credit', e.target.value)}
                           className="text-xs h-8 text-right" placeholder="0.00" />
                         {journalLines.length > 2 && (
                           <button onClick={() => removeJournalLine(i)} className="p-1 text-muted-foreground hover:text-destructive">
