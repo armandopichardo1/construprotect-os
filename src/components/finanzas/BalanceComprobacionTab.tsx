@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';

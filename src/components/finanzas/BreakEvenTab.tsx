@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Area, AreaChart } from 'recharts';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
