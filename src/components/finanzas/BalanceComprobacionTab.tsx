@@ -183,7 +183,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, rate
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {
