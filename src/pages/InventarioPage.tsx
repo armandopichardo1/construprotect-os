@@ -330,6 +330,8 @@ export default function InventarioPage() {
                     <SortHeader field="category">Categoría</SortHeader>
                     <SortHeader field="qty">Stock</SortHeader>
                     <TableHead className="text-xs w-[180px]">Nivel</TableHead>
+                    <TableHead className="text-xs text-center">Reorden Actual</TableHead>
+                    <TableHead className="text-xs text-center">ROP Recomendado</TableHead>
                     <SortHeader field="value">Valor</SortHeader>
                     <SortHeader field="velocity">Vel/mes</SortHeader>
                     <SortHeader field="status">Estado</SortHeader>
@@ -337,7 +339,10 @@ export default function InventarioPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sorted.map(item => (
+                  {sorted.map(item => {
+                    const ropDiff = item.recommendedROP - item.reorder;
+                    const ropMismatch = item.recommendedROP > 0 && Math.abs(ropDiff) > Math.max(item.reorder * 0.3, 2);
+                    return (
                     <TableRow key={item.id}>
                       <TableCell className="text-xs font-mono text-muted-foreground">{item.sku}</TableCell>
                       <TableCell className="text-xs font-medium">{item.name}</TableCell>
@@ -346,12 +351,43 @@ export default function InventarioPage() {
                       <TableCell className="px-2">
                         <StockThermometer qty={item.qty} reorder={item.reorder} maxQty={maxQty} />
                       </TableCell>
+                      <TableCell className="text-xs text-center font-mono">{item.reorder}</TableCell>
+                      <TableCell className="text-xs text-center">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                'inline-flex items-center gap-1 font-mono font-semibold',
+                                item.recommendedROP === 0 ? 'text-muted-foreground' :
+                                ropMismatch && ropDiff > 0 ? 'text-warning' :
+                                ropMismatch && ropDiff < 0 ? 'text-primary' :
+                                'text-success'
+                              )}>
+                                {ropMismatch && item.recommendedROP > 0 && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                                {item.recommendedROP}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs max-w-[220px]">
+                              <p className="font-semibold mb-1">Fórmula ROP</p>
+                              <p>Demanda diaria: {(item.velocity / 30).toFixed(2)} uds</p>
+                              <p>Lead time: {item.leadTimeDays} días</p>
+                              <p>Stock seguridad: {Math.ceil((item.velocity / 30) * Math.sqrt(item.leadTimeDays))} uds</p>
+                              <p className="mt-1 pt-1 border-t border-border">
+                                ROP = ({(item.velocity / 30).toFixed(2)} × {item.leadTimeDays}) + {Math.ceil((item.velocity / 30) * Math.sqrt(item.leadTimeDays))} = <strong>{item.recommendedROP}</strong>
+                              </p>
+                              {ropMismatch && ropDiff > 0 && <p className="text-warning mt-1">⚠ Reorden actual ({item.reorder}) menor al recomendado</p>}
+                              {ropMismatch && ropDiff < 0 && <p className="text-primary mt-1">ℹ Reorden actual ({item.reorder}) mayor al recomendado</p>}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatUSD(item.value)}</TableCell>
                       <TableCell className="text-xs text-right font-mono text-muted-foreground">{item.velocity.toFixed(1)}</TableCell>
                       <TableCell><StatusBadge status={item.status} /></TableCell>
                       <TableCell><MiniSparkline data={item.movements} /></TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
               {sorted.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Sin productos en inventario</p>}
