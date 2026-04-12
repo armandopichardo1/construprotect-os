@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { ComboboxInput } from '@/components/ui/combobox-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
@@ -1362,8 +1363,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor / Fuente</Label>
-                  <Input value={vendor} onChange={e => setVendor(e.target.value)}
-                    placeholder="Ej: DHL, Aduanas, etc." maxLength={100} />
+                  <ComboboxInput
+                    value={vendor}
+                    onChange={setVendor}
+                    suggestions={suppliers.map(s => s.name)}
+                    placeholder="Ej: DHL, Aduanas, etc."
+                    searchPlaceholder="Buscar proveedor..."
+                    emptyMessage="Escribir nombre libre"
+                    maxLength={100}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
