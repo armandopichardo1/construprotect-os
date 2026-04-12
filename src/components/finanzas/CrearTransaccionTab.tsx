@@ -1265,7 +1265,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en USD)</span></Label>
+                  <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en {currencyBase})</span></Label>
                   <div className="rounded-xl border border-border overflow-hidden">
                     <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
