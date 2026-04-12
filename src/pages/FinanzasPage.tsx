@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
-import { formatUSD, formatDOP } from '@/lib/format';
+import { formatUSD, formatDOP, getGlobalExchangeRate } from '@/lib/format';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
