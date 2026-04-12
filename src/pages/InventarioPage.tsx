@@ -492,6 +492,8 @@ export default function InventarioPage() {
 
         {tab === 'Reportes' && <MovimientosReportTab />}
 
+        {tab === 'Alertas' && <AlertsDashboard />}
+
         {tab === 'ABC' && (
           <div className="space-y-4">
             {/* ABC definitions info */}
