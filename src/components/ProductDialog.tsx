@@ -93,8 +93,8 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
     }
 
     const { error } = isEdit
-      ? await supabase.from('products').update(payload).eq('id', product!.id)
-      : await supabase.from('products').insert(payload);
+      ? await supabase.from('products').update(payload as any).eq('id', product!.id)
+      : await supabase.from('products').insert(payload as any);
 
     setSaving(false);
     if (error) { toast.error(error.message); return; }
