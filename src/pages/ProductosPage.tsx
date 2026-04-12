@@ -87,6 +87,7 @@ export function ProductosContent() {
   const defaultList = targetMargins?.list ?? 30;
   const defaultArchitect = targetMargins?.architect ?? 25;
   const defaultProject = targetMargins?.project ?? 20;
+  const defaultWholesale = targetMargins?.wholesale ?? 15;
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
@@ -158,6 +159,8 @@ export function ProductosContent() {
                    <TableHead className="text-xs text-center">Margen Lista</TableHead>
                    <TableHead className="text-xs text-center">Margen Arquitecto</TableHead>
                    <TableHead className="text-xs text-center">Margen Proyecto</TableHead>
+                   <TableHead className="text-xs text-right">Precio Mayorista</TableHead>
+                   <TableHead className="text-xs text-center">Margen Mayorista</TableHead>
                    <TableHead className="text-xs">Dimensiones</TableHead>
                    <TableHead className="text-xs w-[80px]">Acciones</TableHead>
                  </TableRow>
@@ -181,6 +184,10 @@ export function ProductosContent() {
                     </TableCell>
                     <TableCell className="text-xs text-center">
                       <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
+                    </TableCell>
+                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_wholesale_usd))}</TableCell>
+                    <TableCell className="text-xs text-center">
+                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
                     <TableCell>
