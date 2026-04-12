@@ -124,8 +124,8 @@ export function QuotesTab({ quotes, onNew, onEdit, onDelete }: QuotesTabProps) {
                 <button onClick={() => handleDownloadPDF(q)} disabled={isDownloading} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-50">
                   {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />}
                 </button>
-                <button onClick={() => onEdit(q)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
-                <button onClick={() => onDelete(q)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
+                <button onClick={() => onEdit(q)} title="Editar cotización" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
+                <button onClick={() => onDelete(q)} title="Eliminar cotización" className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
               </div>
             </div>
             <div className="flex gap-4 text-[10px] text-muted-foreground">

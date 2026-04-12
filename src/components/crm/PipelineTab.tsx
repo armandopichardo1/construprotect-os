@@ -287,8 +287,8 @@ export function PipelineTab({ deals, onEdit, onDelete }: PipelineTabProps) {
                       </TableCell>
                       <TableCell className="py-1.5" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => onEdit(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
-                          <button onClick={() => onDelete(deal)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
+                          <button onClick={() => onEdit(deal)} title="Editar deal" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
+                          <button onClick={() => onDelete(deal)} title="Eliminar deal" className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -376,8 +376,8 @@ function DealCard({ deal, onEdit, onDelete, onStageChange, isDragging }: { deal:
             <p className="text-[9px] text-muted-foreground truncate">{deal.contacts?.contact_name} · {deal.contacts?.company_name || ''}</p>
           </div>
           <div className="flex gap-0.5 shrink-0">
-            <button onClick={() => onEdit(deal)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
-            <button onClick={() => onDelete(deal)} className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
+            <button onClick={() => onEdit(deal)} title="Editar deal" className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"><Pencil className="w-3 h-3" /></button>
+            <button onClick={() => onDelete(deal)} title="Eliminar deal" className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"><Trash2 className="w-3 h-3" /></button>
           </div>
         </div>
         <div className="flex items-center justify-between">

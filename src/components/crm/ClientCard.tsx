@@ -66,10 +66,10 @@ export function ClientCard({ client, onEdit, onDelete }: ClientCardProps) {
               <Mail className="w-3.5 h-3.5" />
             </a>
           )}
-          <button onClick={() => onEdit(client)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <button onClick={() => onEdit(client)} title="Editar cliente" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onDelete(client)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+          <button onClick={() => onDelete(client)} title="Eliminar cliente" className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>

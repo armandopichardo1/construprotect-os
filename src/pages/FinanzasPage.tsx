@@ -421,11 +421,11 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <button onClick={() => { setEditSale(s); setShowForm(true); }}
+                    <button onClick={() => { setEditSale(s); setShowForm(true); }} title="Editar venta"
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setDeleteSale(s)}
+                    <button onClick={() => setDeleteSale(s)} title="Eliminar venta"
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -727,11 +727,11 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <button onClick={() => { setEditExpense(e); setShowForm(true); }}
+                      <button onClick={() => { setEditExpense(e); setShowForm(true); }} title="Editar gasto"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setDeleteExpense(e)}
+                      <button onClick={() => setDeleteExpense(e)} title="Eliminar gasto"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -938,11 +938,11 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <button onClick={() => { setEditCost(c); setShowForm(true); }}
+                      <button onClick={() => { setEditCost(c); setShowForm(true); }} title="Editar costo"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setDeleteCost(c)}
+                      <button onClick={() => setDeleteCost(c)} title="Eliminar costo"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
