@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, Download, ChevronRight, ChevronDown, FolderInput } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
