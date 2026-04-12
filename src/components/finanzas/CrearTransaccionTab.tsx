@@ -329,9 +329,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       const incomeAcct = accounts.find((a: any) => a.code?.startsWith('41') || a.code?.startsWith('40'));
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
       const cxcAcct = accounts.find((a: any) => a.code?.startsWith('121') || a.code?.startsWith('12'));
+      const itbisAcct = accounts.find((a: any) => a.code?.startsWith('241') || (a.code?.startsWith('24') && a.account_type === 'Pasivo'));
       const counterAcct = paymentStatus === 'paid' ? cashAcct : cxcAcct;
+      // Debit: Caja/CxC por el total (subtotal + ITBIS)
       if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, accountId: counterAcct.id, debit: totalSale, credit: 0 });
-      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, accountId: incomeAcct.id, debit: 0, credit: totalSale });
+      // Credit: Ingreso por el subtotal (sin ITBIS)
+      if (incomeAcct) lines.push({ accountCode: incomeAcct.code, accountName: incomeAcct.description, accountType: incomeAcct.account_type, accountId: incomeAcct.id, debit: 0, credit: subtotal });
+      // Credit: ITBIS por Pagar (línea independiente)
+      if (itbis > 0) {
+        if (itbisAcct) lines.push({ accountCode: itbisAcct.code, accountName: itbisAcct.description, accountType: itbisAcct.account_type, accountId: itbisAcct.id, debit: 0, credit: itbis });
+        else lines.push({ accountName: 'ITBIS por Pagar', accountType: 'Pasivo', debit: 0, credit: itbis });
+      }
     } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amount) > 0)) {
       const amtUsd = getAmountUsd(amount);
       const expAcct = accountId ? getAcct(accountId) : null;
