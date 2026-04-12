@@ -318,7 +318,33 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const handleTypeChange = (t: TxType) => {
     setManualType(t);
     setCategory('');
+    setAccountId('');
     setPreviewAccountOverrides({});
+  };
+
+  // Auto-assign account based on category
+  const handleCategoryChange = (cat: string) => {
+    setCategory(cat);
+    const map = manualType === 'cost' ? COST_ACCOUNT_MAP : EXPENSE_ACCOUNT_MAP;
+    const codePrefixes = map[cat] || [];
+    // Find first matching leaf account by code prefix
+    for (const prefix of codePrefixes) {
+      const match = leafAccounts.find(a => a.code?.startsWith(prefix));
+      if (match) {
+        setAccountId(match.id);
+        return;
+      }
+    }
+    // Fallback: try parent accounts too
+    for (const prefix of codePrefixes) {
+      const match = accounts.find(a => a.code?.startsWith(prefix));
+      if (match) {
+        setAccountId(match.id);
+        return;
+      }
+    }
+    // No match found — clear
+    setAccountId('');
   };
 
   // Credit note USD amount (for preview/save)
