@@ -130,13 +130,13 @@ interface EditableCellProps {
   productId: string;
   onSave: (productId: string, field: string, value: string) => Promise<void>;
   className?: string;
-  // For margin cells: linked price/cost fields
   linkedField?: string;
   cost?: number;
   displayValue?: React.ReactNode;
+  minMargin?: number;
 }
 
-function EditableCell({ value, type, field, productId, onSave, className, linkedField, cost, displayValue }: EditableCellProps) {
+function EditableCell({ value, type, field, productId, onSave, className, linkedField, cost, displayValue, minMargin }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -156,12 +156,24 @@ function EditableCell({ value, type, field, productId, onSave, className, linked
 
   const cancel = () => setEditing(false);
 
+  // Compute whether the current edit value would result in a margin below minimum
+  const isBelowMin = (() => {
+    if (minMargin == null || !editing) return false;
+    const num = Number(editValue);
+    if (isNaN(num)) return false;
+    if (type === 'margin') return num < minMargin;
+    if (type === 'currency' && cost && cost > 0) {
+      const impliedMargin = calcRealMargin(cost, num);
+      return impliedMargin !== null && impliedMargin < minMargin;
+    }
+    return false;
+  })();
+
   const save = async () => {
     if (editValue === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
     try {
       if (type === 'margin' && linkedField && cost) {
-        // When editing a margin, also update the linked price
         const newMargin = Number(editValue);
         const newPrice = calcPriceFromMargin(cost, newMargin);
         if (newPrice !== null) {
@@ -171,7 +183,6 @@ function EditableCell({ value, type, field, productId, onSave, className, linked
           await onSave(productId, field, editValue);
         }
       } else if (type === 'currency' && linkedField && cost) {
-        // When editing a price, also update the linked margin
         const newPrice = Number(editValue);
         const newMargin = calcRealMargin(cost, newPrice);
         await onSave(productId, field, editValue);
@@ -194,7 +205,7 @@ function EditableCell({ value, type, field, productId, onSave, className, linked
 
   if (editing) {
     return (
-      <div className="flex items-center gap-0.5">
+      <div className="relative">
         <input
           ref={inputRef}
           type={type === 'text' ? 'text' : 'number'}
@@ -205,10 +216,18 @@ function EditableCell({ value, type, field, productId, onSave, className, linked
           onBlur={save}
           disabled={saving}
           className={cn(
-            "w-full h-6 px-1.5 text-xs rounded border border-primary bg-background text-foreground outline-none focus:ring-1 focus:ring-primary",
-            type !== 'text' && 'text-right font-mono'
+            "w-full h-6 px-1.5 text-xs rounded border bg-background text-foreground outline-none focus:ring-1",
+            type !== 'text' && 'text-right font-mono',
+            isBelowMin
+              ? 'border-destructive focus:ring-destructive text-destructive'
+              : 'border-primary focus:ring-primary'
           )}
         />
+        {isBelowMin && (
+          <span className="absolute -bottom-4 right-0 text-[9px] text-destructive font-medium whitespace-nowrap animate-in fade-in">
+            ⚠ Margen &lt; {minMargin}%
+          </span>
+        )}
       </div>
     );
   }
@@ -430,6 +449,7 @@ export function ProductosContent() {
                         linkedField="margin_list_pct"
                         cost={cost}
                         displayValue={formatUSD(Number(p.price_list_usd))}
+                        minMargin={minMargin}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-center">
@@ -441,6 +461,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_list_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || defaultList)} label="Margen Lista" minMargin={minMargin} />
                         }
@@ -455,6 +476,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_architect_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || defaultArchitect)} label="Margen Arquitecto" minMargin={minMargin} />
                         }
@@ -469,6 +491,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_project_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
                         }
@@ -484,6 +507,7 @@ export function ProductosContent() {
                         linkedField="margin_wholesale_pct"
                         cost={cost}
                         displayValue={formatUSD(Number(p.price_wholesale_usd))}
+                        minMargin={minMargin}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-center">
@@ -495,6 +519,7 @@ export function ProductosContent() {
                         onSave={handleInlineSave}
                         linkedField="price_wholesale_usd"
                         cost={cost}
+                        minMargin={minMargin}
                         displayValue={
                           <MarginCell cost={cost} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
                         }
