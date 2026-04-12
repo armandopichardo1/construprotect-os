@@ -1325,12 +1325,17 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
 
             {/* Accounting Preview */}
             {mode === 'manual' && previewLines.length > 0 && (
-              <AccountingPreview lines={previewLines} description={
-                manualType === 'journal' ? journalDescription
-                : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
-                : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
-                : description
-              } />
+              <AccountingPreview
+                lines={previewLines}
+                accounts={accounts}
+                onAccountChange={handlePreviewAccountChange}
+                description={
+                  manualType === 'journal' ? journalDescription
+                  : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
+                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
+                  : description
+                }
+              />
             )}
 
             {/* Submit */}
