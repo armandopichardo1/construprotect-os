@@ -882,7 +882,7 @@ export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCos
             {/* Type selector - scrollable row */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {(['journal', 'expense', 'cost', 'sale', 'purchase', 'credit_note'] as const).map(t => (
-                <button key={t} onClick={() => { setManualType(t); setCategory(''); }}
+                <button key={t} onClick={() => handleTypeChange(t)}
                   className={cn(
                     'shrink-0 rounded-xl border-2 px-3 py-3 text-sm font-medium transition-all whitespace-nowrap',
                     manualType === t
