@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, LineChart, Line, Area, AreaChart, Legend } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -261,7 +261,7 @@ export function CashFlowTab({ sales, expenses, costs = [], journalEntries = [] }
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" />
             <Bar dataKey="inflows" name="Entradas" fill="hsl(160, 84%, 39%)" radius={[6,6,0,0]} />
@@ -372,12 +372,12 @@ export function CashFlowTab({ sales, expenses, costs = [], journalEntries = [] }
               </linearGradient>
             </defs>
             <XAxis dataKey="month" tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} />
+            <YAxis tick={{ fill: 'hsl(220, 12%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
             <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatUSD(v)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <ReferenceLine y={0} stroke="hsl(220, 12%, 30%)" strokeDasharray="3 3" />
             {thresholdEnabled && (
-              <ReferenceLine y={thresholdValue} stroke="hsl(38, 92%, 50%)" strokeDasharray="6 3" strokeWidth={2} label={{ value: `Umbral $${(thresholdValue/1000).toFixed(0)}K`, position: 'right', fill: 'hsl(38, 92%, 50%)', fontSize: 10 }} />
+              <ReferenceLine y={thresholdValue} stroke="hsl(38, 92%, 50%)" strokeDasharray="6 3" strokeWidth={2} label={{ value: `Umbral RD$${(thresholdValue * getGlobalExchangeRate() / 1000).toFixed(0)}K`, position: 'right', fill: 'hsl(38, 92%, 50%)', fontSize: 10 }} />
             )}
             <Area type="monotone" dataKey="cumOptimista" name="Optimista (+20%)" stroke="hsl(160, 84%, 39%)" fill="url(#optGrad)" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
             <Area type="monotone" dataKey="cumulative" name="Base" stroke="hsl(217, 91%, 60%)" fill="url(#projGrad)" strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(217, 91%, 60%)' }} />
