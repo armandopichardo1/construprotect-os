@@ -1,74 +1,52 @@
 
 
-# Balance de Comprobación (Trial Balance)
+# Auto-cálculo de Precios y Márgenes en ProductDialog
 
-## Overview
-Add a new "Balance Comprobación" tab to FinanzasPage that aggregates all transactions (sales, expenses, costs) by chart of accounts, showing debits, credits, and balances per account. Include summary charts for visual analysis.
+## Resumen
+Modificar el formulario de productos para que precio y margen se calculen automáticamente de forma bidireccional, usando la fórmula contable estándar:
 
-## Data Sources & Interconnection Logic
+```text
+Margen (%) = ((Precio - Costo) / Precio) × 100
+Precio = Costo / (1 - Margen/100)
+```
 
-The trial balance pulls from ALL financial sources:
+## Comportamiento
 
-| Source | Debit | Credit | Account Mapping |
-|--------|-------|--------|-----------------|
-| **Sales** (ventas) | — | total_usd | `account_id` → chart_of_accounts, or default to Ingreso accounts |
-| **Sale Items** (COGS) | unit_cost × qty | — | Maps to Costo de Ventas (inventory cost) |
-| **Expenses** (gastos) | amount_usd | — | `account_id` → chart_of_accounts, or category-based mapping |
-| **Costs** (costos) | amount_usd | — | `account_id` → chart_of_accounts, or category-based mapping |
-| **Inventory** | Derived from movements | — | Maps to Inventarios account (13000) |
-| **Accounts Receivable** | Unpaid sales (pending/overdue) | Paid sales | Maps to CxC account (12000) |
+Para cada par precio/margen (Lista, Arquitecto, Proyecto, Mayoreo):
 
-## Changes
+1. **Si el usuario cambia el Costo** → recalcula los 4 márgenes reales basándose en los precios existentes
+2. **Si el usuario cambia un Precio** → recalcula su margen correspondiente automáticamente
+3. **Si el usuario cambia un Margen** → recalcula su precio correspondiente automáticamente
 
-### 1. Add tab to FinanzasPage
-- Add "Balance" to the `tabs` array (between "Reportes" and "Flujo Caja")
-- Render new `<BalanceComprobacionTab>` component with all data props (sales, expenses, costs, saleItems, rate)
+El costo unitario (`unit_cost_usd`) es el dato base. Los campos de precio y margen se muestran lado a lado para que sea evidente la relación.
 
-### 2. New component: `src/components/finanzas/BalanceComprobacionTab.tsx`
+## Cambios en `src/components/ProductDialog.tsx`
 
-**Table section — Trial Balance by Account:**
-- Fetch `chart_of_accounts` with hierarchical structure
-- For each account, aggregate debits and credits from all sources using `account_id` foreign keys + automatic mappings for unmapped transactions
-- Columns: Código, Cuenta, Tipo, Débitos USD, Créditos USD, Saldo Deudor, Saldo Acreedor
-- Group by account_type (Activo, Pasivo, Capital, Ingreso, Gasto, Costo)
-- Show subtotals per group and grand totals at bottom
-- Validation row: Total Débitos = Total Créditos (highlight in green if balanced, red if not)
-- DatePeriodFilter for time range selection
-- Export to Excel button
+1. **Reorganizar la sección de precios**: mostrar cada precio junto a su margen en la misma fila (Precio Lista ↔ Margen Lista, etc.) para que la relación sea visual e intuitiva.
 
-**Chart 1 — Composición por Tipo de Cuenta (Stacked Bar):**
-- Horizontal stacked bar showing the balance distribution across account types
-- Colors per type: Activo=blue, Pasivo=orange, Capital=purple, Ingreso=green, Gasto=red, Costo=yellow
+2. **Reemplazar el `set()` genérico** con funciones inteligentes:
+   - `handleCostChange(newCost)` — actualiza costo y recalcula los 4 márgenes
+   - `handlePriceChange(tier, newPrice)` — actualiza el precio y calcula el margen: `((price - cost) / price) * 100`
+   - `handleMarginChange(tier, newMargin)` — actualiza el margen y calcula el precio: `cost / (1 - margin/100)`
 
-**Chart 2 — Debit vs Credit by Account Type (Grouped Bar):**
-- Grouped bar chart comparing total debits vs credits for each account type
-- Helps visualize where money flows
+3. **Indicador visual**: si un margen resulta negativo o menor a 5%, mostrar el campo en rojo como advertencia.
 
-**Chart 3 — Balance Verification Donut:**
-- Donut chart showing total debits vs total credits
-- Center text shows the difference (should be 0 for a balanced set of books)
+4. **Protección**: si el costo es 0, no calcular (dejar campos editables manualmente). Si el margen ingresado es ≥100%, no calcular precio (sería división por 0).
 
-**KPI cards at top:**
-- Total Débitos, Total Créditos, Diferencia (should be ~0), Cuentas Activas
+## Estructura visual del formulario (nueva)
 
-### 3. Account Mapping Logic
-For transactions without `account_id`, auto-map based on:
-- Sales → default Ingreso account (code starting with 40xxx or 41xxx)
-- Expenses → map by category to Gasto accounts (50xxx-59xxx)
-- Costs → map by category to Costo accounts (matching classification)
-- COGS from sale_items → Costo de Ventas account
-- Unpaid sales → Cuentas por Cobrar (12xxx)
+```text
+💰 Costo y Precios (USD)
+┌─────────────────┐
+│ Costo Unitario   │  ← campo base
+└─────────────────┘
 
-### 4. Validation Checks
-Display warnings if:
-- Débitos ≠ Créditos (partida doble not balanced)
-- Accounts with no transactions (optional toggle to show/hide)
-- Transactions with no account mapping (show count of unmapped)
+│ Precio Lista    │  │ Margen Lista %   │  ← bidireccional
+│ Precio Arquitecto │ │ Margen Arq %    │  ← bidireccional  
+│ Precio Proyecto │  │ Margen Proyecto % │  ← bidireccional
+│ Precio Mayoreo  │  │ Margen Mayoreo %  │  ← bidireccional
+```
 
-## Technical Notes
-- Component will be ~400 lines, extracted to its own file
-- Uses existing queries from FinanzasPage (sales, expenses, costs, saleItems) plus a new query for chart_of_accounts
-- DatePeriodFilter reused from existing components
-- Recharts for all charts (already installed)
-- Export via existing `exportToExcel` utility
+## Archivo modificado
+- `src/components/ProductDialog.tsx` — única modificación necesaria
 
