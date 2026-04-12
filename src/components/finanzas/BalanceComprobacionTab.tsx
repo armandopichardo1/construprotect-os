@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatUSD } from '@/lib/format';
+import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
@@ -276,7 +276,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
           <h3 className="text-sm font-semibold text-foreground">Débitos vs Créditos por Tipo</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={barChartData} layout="vertical">
-              <XAxis type="number" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
+              <XAxis type="number" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
               <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => formatUSD(v)} />
               <Legend />
@@ -292,7 +292,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={compositionData}>
               <XAxis dataKey="name" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 9 }} axisLine={false} tickLine={false} angle={-30} textAnchor="end" height={60} />
-              <YAxis tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
+              <YAxis tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => formatUSD(v)} />
               <Bar dataKey="value" name="Saldo" radius={[6, 6, 0, 0]}>
                 {compositionData.map((d, i) => (

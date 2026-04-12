@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { setGlobalExchangeRate } from '@/lib/format';
 
 interface RateRow {
   date: string;
@@ -29,6 +31,11 @@ export function useExchangeRate() {
   const rates = query.data || [];
   const latestRate = rates[0];
   const rate = Number(latestRate?.usd_sell || 60);
+
+  // Keep global rate in sync for formatUSD()
+  useEffect(() => {
+    setGlobalExchangeRate(rate);
+  }, [rate]);
 
   /**
    * Get the sell rate for a specific month (YYYY-MM).
