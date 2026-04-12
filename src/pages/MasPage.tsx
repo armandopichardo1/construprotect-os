@@ -146,6 +146,7 @@ export default function MasPage() {
       toast.success(`Tasa actualizada: Compra ${data.data.usd_buy.toFixed(4)} / Venta ${data.data.usd_sell.toFixed(4)}`);
       queryClient.invalidateQueries({ queryKey: ['exchange-rate'] });
       queryClient.invalidateQueries({ queryKey: ['latest-rate'] });
+      queryClient.invalidateQueries({ queryKey: ['all-exchange-rates'] });
     } catch (err: any) {
       toast.error(err.message || 'Error al obtener tasa de cambio');
     } finally {
