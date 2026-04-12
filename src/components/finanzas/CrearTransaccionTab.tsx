@@ -177,16 +177,21 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [manualDate, setManualDate] = useState<Date | undefined>();
   const [accountId, setAccountId] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
+  const [customRate, setCustomRate] = useState<string>(''); // user override for exchange rate
+  const [editingRate, setEditingRate] = useState(false);
 
-  // Use historical rate when a past date is selected
-  const xr = useMemo(() => {
+  // Use historical rate when a past date is selected, or custom override
+  const autoXr = useMemo(() => {
     if (manualDate && rateForMonth) {
       const ym = `${manualDate.getFullYear()}-${String(manualDate.getMonth() + 1).padStart(2, '0')}`;
       return rateForMonth(ym);
     }
     return latestXr;
   }, [manualDate, rateForMonth, latestXr]);
-  const isHistoricalRate = xr !== latestXr;
+
+  const xr = customRate ? (parseFloat(customRate) || autoXr) : autoXr;
+  const isHistoricalRate = autoXr !== latestXr && !customRate;
+  const isCustomRate = !!customRate && parseFloat(customRate) !== autoXr;
   // Sale-specific manual state
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
