@@ -21,8 +21,9 @@ import { DaysOfSupplyChart, OverstockWarnings } from '@/components/inventario/In
 import { ReorderTab } from '@/components/inventario/ReorderTab';
 import { ContainerPlanner } from '@/components/inventario/ContainerPlanner';
 import { MovimientosReportTab } from '@/components/inventario/MovimientosReportTab';
+import { AlertsDashboard } from '@/components/inventario/AlertsDashboard';
 
-const tabs = ['Stock', 'Reorden', 'Contenedor', 'Movimientos', 'Analytics', 'Envíos', 'ABC', 'Reportes'];
+const tabs = ['Stock', 'Reorden', 'Contenedor', 'Movimientos', 'Analytics', 'Envíos', 'ABC', 'Reportes', 'Alertas'];
 const chartTooltipStyle = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 function StatusBadge({ status }: { status: string }) {
