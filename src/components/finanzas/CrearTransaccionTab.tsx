@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
+import { AccountingPreview } from './AccountingPreview';
 
 const EXAMPLES = [
   'Pagué flete DHL $350 USD',
@@ -28,6 +29,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string; color: string }
   sale: { label: 'Venta', icon: '💰', color: 'bg-success/15 text-success border-success/30' },
   expense: { label: 'Gasto', icon: '💸', color: 'bg-warning/15 text-warning border-warning/30' },
   cost: { label: 'Costo', icon: '🏗️', color: 'bg-primary/15 text-primary border-primary/30' },
+  journal: { label: 'Asiento', icon: '📖', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
 };
 
 const EXPENSE_CATEGORIES: Record<string, string> = {
@@ -56,12 +58,19 @@ interface SessionEntry {
 }
 
 type Mode = 'ai' | 'manual';
-type TxType = 'expense' | 'cost' | 'sale';
+type TxType = 'expense' | 'cost' | 'sale' | 'journal';
 
 interface SaleItem {
   product_id: string;
   quantity: number;
   unit_price_usd: number;
+}
+
+interface JournalLine {
+  account_id: string;
+  debit: number;
+  credit: number;
+  description: string;
 }
 
 export function CrearTransaccionTab({ rate, onEditSale, onEditExpense, onEditCost }: {
