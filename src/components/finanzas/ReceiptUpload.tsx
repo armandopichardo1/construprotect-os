@@ -7,9 +7,10 @@ interface Props {
   expenseId: string;
   currentUrl: string | null;
   onUploaded: (url: string) => void;
+  tableName?: 'expenses' | 'costs';
 }
 
-export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
+export function ReceiptUpload({ expenseId, currentUrl, onUploaded, tableName = 'expenses' }: Props) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -26,7 +27,7 @@ export function ReceiptUpload({ expenseId, currentUrl, onUploaded }: Props) {
     if (error) { toast.error('Error al subir archivo'); setUploading(false); return; }
 
     // Store the storage path (bucket is private, use signed URLs to view)
-    await supabase.from('expenses').update({ receipt_url: path }).eq('id', expenseId);
+    await supabase.from(tableName).update({ receipt_url: path }).eq('id', expenseId);
 
     onUploaded(path);
     toast.success('Recibo subido');

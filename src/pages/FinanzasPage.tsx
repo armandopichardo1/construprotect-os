@@ -81,6 +81,7 @@ function ExchangeRateKpi({ rate }: { rate: any }) {
       if (resp.error) throw resp.error;
       toast.success('Tasa actualizada');
       queryClient.invalidateQueries({ queryKey: ['latest-rate'] });
+      queryClient.invalidateQueries({ queryKey: ['all-exchange-rates'] });
     } catch { toast.error('Error al obtener tasa'); }
     setFetching(false);
   };
@@ -385,6 +386,27 @@ function VentasTab({ sales, queryClient, rate, prefill, clearPrefill, onExport }
 
   const handleDeleteSale = async () => {
     if (!deleteSale) return;
+    // Revert inventory for each sale item before deleting
+    if (deleteSale.sale_items?.length) {
+      for (const si of deleteSale.sale_items) {
+        if (si.product_id && si.quantity) {
+          const { data: inv } = await supabase.from('inventory').select('quantity_on_hand').eq('product_id', si.product_id).maybeSingle();
+          if (inv) {
+            await supabase.from('inventory').update({ quantity_on_hand: inv.quantity_on_hand + si.quantity }).eq('product_id', si.product_id);
+          }
+          // Create reversal movement
+          await supabase.from('inventory_movements').insert({
+            product_id: si.product_id,
+            quantity: si.quantity,
+            movement_type: 'adjustment' as any,
+            unit_cost_usd: si.unit_cost_usd || 0,
+            reference_id: deleteSale.id,
+            reference_type: 'sale_reversal',
+            notes: `Reversión por eliminación de venta ${deleteSale.invoice_ref || deleteSale.id.slice(0, 8)}`,
+          });
+        }
+      }
+    }
     // Delete sale items first, then sale
     await supabase.from('sale_items').delete().eq('sale_id', deleteSale.id);
     const { error } = await supabase.from('sales').delete().eq('id', deleteSale.id);
@@ -570,7 +592,7 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
     const salePayload = {
       contact_id: contactId, invoice_ref: invoiceRef || null,
       subtotal_usd: subtotal, itbis_usd: itbis, total_usd: total,
-      total_dop: total * xr, exchange_rate: xr, payment_status: 'pending' as any,
+      total_dop: total * xr, exchange_rate: xr, payment_status: (isEdit ? editSale.payment_status : 'pending') as any,
     };
 
     let saleId: string;
@@ -755,7 +777,7 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
             })}
           </TableBody>
         </Table>
-        {expenses.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay gastos registrados</p>}
+        {filteredExpenses.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay gastos registrados</p>}
       </div>
       <ExpenseFormDialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) setEditExpense(null); }} queryClient={queryClient} rate={rate} editExpense={editExpense} />
       <DeleteConfirmDialog
@@ -770,7 +792,7 @@ function GastosTab({ expenses, queryClient, rate, prefill, clearPrefill, onExpor
 }
 
 function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editExpense;
@@ -795,10 +817,10 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
         vendor: editExpense.vendor || '',
         amount_usd: String(editExpense.amount_usd || ''),
         amount_dop: String(editExpense.amount_dop || ''),
-        account_id: editExpense.account_id || '',
+        account_id: editExpense.account_id || 'none',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
     }
   }, [editExpense, open]);
 
@@ -813,7 +835,7 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
       amount_usd: Math.round(amtUsd * 100) / 100,
       amount_dop: Math.round(amtDop * 100) / 100,
       exchange_rate: xr,
-      account_id: form.account_id || null,
+      account_id: form.account_id && form.account_id !== 'none' ? form.account_id : null,
     };
 
     const { error } = isEdit
@@ -853,7 +875,7 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
               <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar cuenta..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="none">Sin asignar</SelectItem>
                   {gastoAccounts.length > 0 && (
                     <>
                       <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Gastos / Costos</div>
@@ -947,7 +969,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
                   <TableCell className="text-xs text-muted-foreground">{c.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
-                    <ReceiptUpload expenseId={c.id} currentUrl={c.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['costs'] })} />
+                    <ReceiptUpload expenseId={c.id} currentUrl={c.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['costs'] })} tableName="costs" />
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -966,7 +988,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
             })}
           </TableBody>
         </Table>
-        {costs.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay costos registrados</p>}
+        {filteredCosts.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay costos registrados</p>}
       </div>
       <CostFormDialog open={showForm} onOpenChange={(v: boolean) => { setShowForm(v); if (!v) setEditCost(null); }} queryClient={queryClient} rate={rate} editCost={editCost} />
       <DeleteConfirmDialog
@@ -981,7 +1003,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
 }
 
 function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any) {
-  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+  const [form, setForm] = useState({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
   const [saving, setSaving] = useState(false);
   const xr = Number(rate?.usd_sell) || 60.76;
   const isEdit = !!editCost;
@@ -1005,10 +1027,10 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
         vendor: editCost.vendor || '',
         amount_usd: String(editCost.amount_usd || ''),
         amount_dop: String(editCost.amount_dop || ''),
-        account_id: editCost.account_id || '',
+        account_id: editCost.account_id || 'none',
       });
     } else {
-      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: '' });
+      setForm({ description: '', category: 'other', vendor: '', amount_usd: '', amount_dop: '', account_id: 'none' });
     }
   }, [editCost, open]);
 
@@ -1023,7 +1045,7 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
       amount_usd: Math.round(amtUsd * 100) / 100,
       amount_dop: Math.round(amtDop * 100) / 100,
       exchange_rate: xr,
-      account_id: form.account_id || null,
+      account_id: form.account_id && form.account_id !== 'none' ? form.account_id : null,
     };
 
     const { error } = isEdit
@@ -1063,7 +1085,7 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
               <Select value={form.account_id} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Seleccionar cuenta..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="none">Sin asignar</SelectItem>
                   {costoAccounts.length > 0 && (
                     <>
                       <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Costos / Gastos</div>
