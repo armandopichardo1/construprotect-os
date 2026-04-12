@@ -408,7 +408,7 @@ export function ProductosContent() {
                       <EditableCell value={p.brand} type="text" field="brand" productId={p.id} onSave={handleInlineSave} />
                     </TableCell>
                     <TableCell className="text-xs">
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{p.category || '—'}</span>
+                      <EditableCategoryCell value={p.category} productId={p.id} onSave={handleInlineSave} options={categories} />
                     </TableCell>
                     <TableCell className="text-xs text-right font-mono">
                       <EditableCell
