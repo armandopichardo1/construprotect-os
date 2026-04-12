@@ -66,6 +66,58 @@ function MarginCell({ cost, price, targetPct, label, minMargin }: { cost: number
   );
 }
 
+// ──────────── Inline Category Dropdown ────────────
+
+function EditableCategoryCell({ value, productId, onSave, options }: {
+  value: string | null;
+  productId: string;
+  onSave: (productId: string, field: string, value: string) => Promise<void>;
+  options: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSelect = async (cat: string) => {
+    if (cat === (value || '')) { setOpen(false); return; }
+    setSaving(true);
+    try {
+      await onSave(productId, 'category', cat);
+    } finally {
+      setSaving(false);
+      setOpen(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          className="cursor-pointer rounded-full bg-muted px-2 py-0.5 text-[10px] hover:bg-muted/80 hover:ring-1 hover:ring-border transition-colors inline-block"
+          title="Click para cambiar categoría"
+        >
+          {saving ? '...' : (value || '—')}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start">
+        <div className="flex flex-col gap-0.5">
+          {options.map(cat => (
+            <button
+              key={cat}
+              onClick={() => handleSelect(cat)}
+              className={cn(
+                "text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors",
+                cat === value && "bg-primary/10 text-primary font-medium"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ──────────── Inline Editable Cell ────────────
 
 type EditableCellType = 'text' | 'number' | 'currency' | 'margin';
