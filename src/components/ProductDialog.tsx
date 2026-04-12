@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
 
 const categories = ['Protección de Pisos', 'Protección de Superficies', 'Contención de Polvo', 'Cintas', 'Accesorios'];
 
@@ -19,6 +20,13 @@ interface ProductDialogProps {
   onSuccess: () => void;
 }
 
+const tiers = [
+  { price: 'price_list_usd', margin: 'margin_list_pct', labelPrice: 'Precio Lista', labelMargin: 'Margen Lista %' },
+  { price: 'price_architect_usd', margin: 'margin_architect_pct', labelPrice: 'Precio Arquitecto', labelMargin: 'Margen Arq %' },
+  { price: 'price_project_usd', margin: 'margin_project_pct', labelPrice: 'Precio Proyecto', labelMargin: 'Margen Proy %' },
+  { price: 'price_wholesale_usd', margin: 'margin_wholesale_pct', labelPrice: 'Precio Mayoreo', labelMargin: 'Margen May %' },
+] as const;
+
 const defaultForm = {
   sku: '', name: '', brand: '', category: '',
   unit_cost_usd: '', price_list_usd: '', price_architect_usd: '',
@@ -27,6 +35,18 @@ const defaultForm = {
   margin_list_pct: '', margin_architect_pct: '', margin_project_pct: '', margin_wholesale_pct: '',
   cbm_per_unit: '', weight_kg_per_unit: '', min_order_qty: '1', reorder_qty: '50',
 };
+
+function calcMargin(cost: number, price: number): string {
+  if (!price || price <= 0) return '';
+  const m = ((price - cost) / price) * 100;
+  return m.toFixed(1);
+}
+
+function calcPrice(cost: number, margin: number): string {
+  if (margin >= 100 || margin < 0) return '';
+  if (!cost) return '';
+  return (cost / (1 - margin / 100)).toFixed(2);
+}
 
 export function ProductDialog({ open, onOpenChange, product, onSuccess }: ProductDialogProps) {
   const [form, setForm] = useState(defaultForm);
@@ -65,6 +85,46 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
   }, [product, open]);
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
+
+  const handleCostChange = (newCostStr: string) => {
+    const cost = Number(newCostStr);
+    const updates: Record<string, string> = { unit_cost_usd: newCostStr };
+    if (cost > 0) {
+      for (const t of tiers) {
+        const price = Number(form[t.price]);
+        if (price > 0) {
+          updates[t.margin] = calcMargin(cost, price);
+        }
+      }
+    }
+    setForm(f => ({ ...f, ...updates }));
+  };
+
+  const handlePriceChange = (priceKey: string, marginKey: string, newPriceStr: string) => {
+    const cost = Number(form.unit_cost_usd);
+    const price = Number(newPriceStr);
+    const updates: Record<string, string> = { [priceKey]: newPriceStr };
+    if (cost > 0 && price > 0) {
+      updates[marginKey] = calcMargin(cost, price);
+    }
+    setForm(f => ({ ...f, ...updates }));
+  };
+
+  const handleMarginChange = (priceKey: string, marginKey: string, newMarginStr: string) => {
+    const cost = Number(form.unit_cost_usd);
+    const margin = Number(newMarginStr);
+    const updates: Record<string, string> = { [marginKey]: newMarginStr };
+    if (cost > 0 && margin < 100) {
+      const p = calcPrice(cost, margin);
+      if (p) updates[priceKey] = p;
+    }
+    setForm(f => ({ ...f, ...updates }));
+  };
+
+  const marginWarning = (val: string) => {
+    const n = Number(val);
+    return val !== '' && (n < 5 || n < 0);
+  };
 
   const handleSave = async () => {
     if (!form.sku.trim() || !form.name.trim()) {
@@ -128,22 +188,34 @@ export function ProductDialog({ open, onOpenChange, product, onSuccess }: Produc
             </div>
           </div>
 
-          <p className="text-[10px] font-semibold text-muted-foreground pt-1">💰 Precios (USD)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label className="text-xs">Costo</Label><Input type="number" step="0.01" value={form.unit_cost_usd} onChange={e => set('unit_cost_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Precio Lista</Label><Input type="number" step="0.01" value={form.price_list_usd} onChange={e => set('price_list_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Precio Arquitecto</Label><Input type="number" step="0.01" value={form.price_architect_usd} onChange={e => set('price_architect_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Precio Proyecto</Label><Input type="number" step="0.01" value={form.price_project_usd} onChange={e => set('price_project_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
-            <div><Label className="text-xs">Precio Mayoreo</Label><Input type="number" step="0.01" value={form.price_wholesale_usd} onChange={e => set('price_wholesale_usd', e.target.value)} className="h-8 text-xs mt-1" /></div>
+          <p className="text-[10px] font-semibold text-muted-foreground pt-1">💰 Costo y Precios (USD)</p>
+          <div>
+            <Label className="text-xs">Costo Unitario</Label>
+            <Input type="number" step="0.01" value={form.unit_cost_usd} onChange={e => handleCostChange(e.target.value)} className="h-8 text-xs mt-1" />
           </div>
 
-          <p className="text-[10px] font-semibold text-muted-foreground pt-1">🎯 Márgenes Objetivo (%)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label className="text-xs">Margen Lista</Label><Input type="number" step="0.1" value={form.margin_list_pct} onChange={e => set('margin_list_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="55.0" /></div>
-            <div><Label className="text-xs">Margen Arquitecto</Label><Input type="number" step="0.1" value={form.margin_architect_pct} onChange={e => set('margin_architect_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="53.0" /></div>
-            <div><Label className="text-xs">Margen Proyecto</Label><Input type="number" step="0.1" value={form.margin_project_pct} onChange={e => set('margin_project_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="50.0" /></div>
-            <div><Label className="text-xs">Margen Mayoreo</Label><Input type="number" step="0.1" value={form.margin_wholesale_pct} onChange={e => set('margin_wholesale_pct', e.target.value)} className="h-8 text-xs mt-1" placeholder="44.0" /></div>
-          </div>
+          {tiers.map(t => (
+            <div key={t.price} className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">{t.labelPrice}</Label>
+                <Input
+                  type="number" step="0.01"
+                  value={form[t.price]}
+                  onChange={e => handlePriceChange(t.price, t.margin, e.target.value)}
+                  className="h-8 text-xs mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">{t.labelMargin}</Label>
+                <Input
+                  type="number" step="0.1"
+                  value={form[t.margin]}
+                  onChange={e => handleMarginChange(t.price, t.margin, e.target.value)}
+                  className={cn("h-8 text-xs mt-1", marginWarning(form[t.margin]) && "border-destructive text-destructive")}
+                />
+              </div>
+            </div>
+          ))}
 
           <p className="text-[10px] font-semibold text-muted-foreground pt-1">📦 Inventario & Specs</p>
           <div className="grid grid-cols-2 gap-2">
