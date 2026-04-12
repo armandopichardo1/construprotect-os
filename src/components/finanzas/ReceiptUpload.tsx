@@ -27,7 +27,7 @@ export function ReceiptUpload({ expenseId, currentUrl, onUploaded, tableName = '
     if (error) { toast.error('Error al subir archivo'); setUploading(false); return; }
 
     // Store the storage path (bucket is private, use signed URLs to view)
-    await supabase.from('expenses').update({ receipt_url: path }).eq('id', expenseId);
+    await supabase.from(tableName).update({ receipt_url: path }).eq('id', expenseId);
 
     onUploaded(path);
     toast.success('Recibo subido');

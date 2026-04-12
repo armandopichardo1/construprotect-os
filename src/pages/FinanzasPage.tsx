@@ -969,7 +969,7 @@ function CostosTab({ costs, queryClient, rate, prefill, clearPrefill, onExport }
                   <TableCell className="text-xs text-muted-foreground">{c.vendor || '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono font-bold text-destructive">{formatDOP(amountDop)}</TableCell>
                   <TableCell>
-                    <ReceiptUpload expenseId={c.id} currentUrl={c.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['costs'] })} />
+                    <ReceiptUpload expenseId={c.id} currentUrl={c.receipt_url} onUploaded={() => queryClient.invalidateQueries({ queryKey: ['costs'] })} tableName="costs" />
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
