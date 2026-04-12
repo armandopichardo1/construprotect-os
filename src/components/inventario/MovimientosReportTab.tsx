@@ -272,10 +272,11 @@ export function MovimientosReportTab() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KpiMini icon={<FileBarChart className="w-4 h-4" />} label="Movimientos" value={totals.movements} color="text-primary" />
         <KpiMini icon={<TrendingUp className="w-4 h-4" />} label="Entradas (uds)" value={`+${totals.entries}`} color="text-success" />
         <KpiMini icon={<TrendingDown className="w-4 h-4" />} label="Salidas (uds)" value={`-${totals.exits}`} color="text-destructive" />
+        <KpiMini icon={<Package className="w-4 h-4" />} label="Neto Acumulado" value={`${totals.netQty >= 0 ? '+' : ''}${totals.netQty} uds · ${formatUSD(totals.netValue)}`} color={totals.netQty >= 0 ? 'text-success' : 'text-destructive'} />
         <KpiMini icon={<Package className="w-4 h-4" />} label="Valor Total" value={formatUSD(totals.totalValue)} color="text-warning" />
       </div>
 
