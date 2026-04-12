@@ -17,7 +17,7 @@ import { exportToExcel } from '@/lib/export-utils';
 interface JournalEntry {
   id: string;
   date: string;
-  type: 'sale' | 'expense' | 'cost';
+  type: 'sale' | 'expense' | 'cost' | 'journal';
   description: string;
   category: string;
   account_code: string;
@@ -36,12 +36,14 @@ const TYPE_LABELS: Record<string, { label: string; emoji: string; color: string 
   sale: { label: 'Venta', emoji: '💰', color: 'text-success' },
   expense: { label: 'Gasto', emoji: '📤', color: 'text-destructive' },
   cost: { label: 'Costo', emoji: '🏭', color: 'text-warning' },
+  journal: { label: 'Asiento', emoji: '📒', color: 'text-primary' },
 };
 
 interface Props {
   sales: any[];
   expenses: any[];
   costs: any[];
+  journalEntries?: any[];
   rate: number;
 }
 
