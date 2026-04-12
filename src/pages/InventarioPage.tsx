@@ -148,7 +148,7 @@ export default function InventarioPage() {
     queryFn: async () => {
       const [{ data: inv }, { data: products }, { data: movements }] = await Promise.all([
         supabase.from('inventory').select('*'),
-        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point').eq('is_active', true),
+        supabase.from('products').select('id, sku, name, category, unit_cost_usd, reorder_point, lead_time_days').eq('is_active', true),
         supabase.from('inventory_movements').select('product_id, quantity, created_at, movement_type').order('created_at'),
       ]);
       if (!inv || !products) return [];
