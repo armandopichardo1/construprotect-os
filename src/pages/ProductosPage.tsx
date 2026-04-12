@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +8,12 @@ import { formatUSD } from '@/lib/format';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { ProductDialog } from '@/components/ProductDialog';
 import { ProductDeleteDialog } from '@/components/ProductDeleteDialog';
-import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle, Box } from 'lucide-react';
+import { Pencil, Trash2, TrendingDown, TrendingUp, AlertTriangle, Box, Check, X } from 'lucide-react';
 import { BulkLogisticsDialog } from '@/components/BulkLogisticsDialog';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
@@ -23,6 +25,11 @@ const DEFAULT_MIN_MARGIN = 5;
 function calcRealMargin(cost: number, price: number): number | null {
   if (!price || price === 0) return null;
   return ((price - cost) / price) * 100;
+}
+
+function calcPriceFromMargin(cost: number, margin: number): number | null {
+  if (margin >= 100 || !cost) return null;
+  return cost / (1 - margin / 100);
 }
 
 function MarginCell({ cost, price, targetPct, label, minMargin }: { cost: number; price: number; targetPct: number; label: string; minMargin: number }) {
@@ -58,6 +65,122 @@ function MarginCell({ cost, price, targetPct, label, minMargin }: { cost: number
     </TooltipProvider>
   );
 }
+
+// ──────────── Inline Editable Cell ────────────
+
+type EditableCellType = 'text' | 'number' | 'currency' | 'margin';
+
+interface EditableCellProps {
+  value: string | number | null;
+  type: EditableCellType;
+  field: string;
+  productId: string;
+  onSave: (productId: string, field: string, value: string) => Promise<void>;
+  className?: string;
+  // For margin cells: linked price/cost fields
+  linkedField?: string;
+  cost?: number;
+  displayValue?: React.ReactNode;
+}
+
+function EditableCell({ value, type, field, productId, onSave, className, linkedField, cost, displayValue }: EditableCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const startEdit = () => {
+    setEditValue(String(value ?? ''));
+    setEditing(true);
+  };
+
+  const cancel = () => setEditing(false);
+
+  const save = async () => {
+    if (editValue === String(value ?? '')) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      if (type === 'margin' && linkedField && cost) {
+        // When editing a margin, also update the linked price
+        const newMargin = Number(editValue);
+        const newPrice = calcPriceFromMargin(cost, newMargin);
+        if (newPrice !== null) {
+          await onSave(productId, field, editValue);
+          await onSave(productId, linkedField, newPrice.toFixed(2));
+        } else {
+          await onSave(productId, field, editValue);
+        }
+      } else if (type === 'currency' && linkedField && cost) {
+        // When editing a price, also update the linked margin
+        const newPrice = Number(editValue);
+        const newMargin = calcRealMargin(cost, newPrice);
+        await onSave(productId, field, editValue);
+        if (newMargin !== null) {
+          await onSave(productId, linkedField, newMargin.toFixed(1));
+        }
+      } else {
+        await onSave(productId, field, editValue);
+      }
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') cancel();
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-0.5">
+        <input
+          ref={inputRef}
+          type={type === 'text' ? 'text' : 'number'}
+          step={type === 'margin' ? '0.1' : '0.01'}
+          value={editValue}
+          onChange={e => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={save}
+          disabled={saving}
+          className={cn(
+            "w-full h-6 px-1.5 text-xs rounded border border-primary bg-background text-foreground outline-none focus:ring-1 focus:ring-primary",
+            type !== 'text' && 'text-right font-mono'
+          )}
+        />
+      </div>
+    );
+  }
+
+  const formattedDisplay = displayValue ?? (
+    type === 'currency' ? formatUSD(Number(value)) :
+    type === 'number' ? String(value ?? '—') :
+    String(value || '—')
+  );
+
+  return (
+    <span
+      onClick={startEdit}
+      className={cn(
+        "cursor-pointer rounded px-1 -mx-1 py-0.5 transition-colors hover:bg-muted/60 hover:ring-1 hover:ring-border",
+        className
+      )}
+      title="Click para editar"
+    >
+      {formattedDisplay}
+    </span>
+  );
+}
+
+// ──────────── Main Component ────────────
 
 export function ProductosContent() {
   const [search, setSearch] = useState('');
@@ -106,6 +229,50 @@ export function ProductosContent() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['products'] });
 
+  const handleInlineSave = useCallback(async (productId: string, field: string, value: string) => {
+    const numericFields = [
+      'unit_cost_usd', 'price_list_usd', 'price_architect_usd', 'price_project_usd', 'price_wholesale_usd',
+      'margin_list_pct', 'margin_architect_pct', 'margin_project_pct', 'margin_wholesale_pct',
+    ];
+    const payload: Record<string, any> = {};
+
+    if (numericFields.includes(field)) {
+      payload[field] = Number(value) || 0;
+    } else {
+      payload[field] = value.trim() || null;
+    }
+
+    // If cost changed, recalculate all margins
+    if (field === 'unit_cost_usd') {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const newCost = Number(value) || 0;
+        const prices = [
+          { price: Number(product.price_list_usd), marginField: 'margin_list_pct' },
+          { price: Number(product.price_architect_usd), marginField: 'margin_architect_pct' },
+          { price: Number(product.price_project_usd), marginField: 'margin_project_pct' },
+          { price: Number(product.price_wholesale_usd), marginField: 'margin_wholesale_pct' },
+        ];
+        for (const { price, marginField } of prices) {
+          if (price > 0) {
+            const m = calcRealMargin(newCost, price);
+            if (m !== null) payload[marginField] = Number(m.toFixed(1));
+          }
+        }
+      }
+    }
+
+    const { error } = await supabase.from('products').update(payload as any).eq('id', productId);
+    if (error) {
+      toast.error(`Error: ${error.message}`);
+      throw error;
+    }
+    // Optimistic: update cache
+    queryClient.setQueryData(['products'], (old: Product[] | undefined) =>
+      old?.map(p => p.id === productId ? { ...p, ...payload } : p) ?? []
+    );
+  }, [products, queryClient]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
@@ -147,6 +314,9 @@ export function ProductosContent() {
           <div className="text-center text-sm text-muted-foreground py-12">No hay productos</div>
         ) : (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border flex items-center gap-1.5">
+              <Pencil className="w-3 h-3" /> Haz click en cualquier celda para editar directamente
+            </div>
             <Table>
               <TableHeader>
                  <TableRow>
@@ -162,52 +332,130 @@ export function ProductosContent() {
                    <TableHead className="text-xs text-right">Precio Mayorista</TableHead>
                    <TableHead className="text-xs text-center">Margen Mayorista</TableHead>
                    <TableHead className="text-xs">Dimensiones</TableHead>
-                   <TableHead className="text-xs w-[80px]">Acciones</TableHead>
+                   <TableHead className="text-xs w-[60px]"></TableHead>
                  </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(p => (
+                {filtered.map(p => {
+                  const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
+                  return (
                   <TableRow key={p.id}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
-                    <TableCell className="text-xs font-medium">{p.name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{p.brand || '—'}</TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      <EditableCell value={p.sku} type="text" field="sku" productId={p.id} onSave={handleInlineSave} />
+                    </TableCell>
+                    <TableCell className="text-xs font-medium">
+                      <EditableCell value={p.name} type="text" field="name" productId={p.id} onSave={handleInlineSave} />
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      <EditableCell value={p.brand} type="text" field="brand" productId={p.id} onSave={handleInlineSave} />
+                    </TableCell>
                     <TableCell className="text-xs">
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{p.category || '—'}</span>
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.unit_cost_usd))}</TableCell>
-                    <TableCell className="text-xs text-right font-mono font-medium text-primary">{formatUSD(Number(p.price_list_usd))}</TableCell>
-                    <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || defaultList)} label="Margen Lista" minMargin={minMargin} />
+                    <TableCell className="text-xs text-right font-mono">
+                      <EditableCell
+                        value={p.unit_cost_usd}
+                        type="currency"
+                        field="unit_cost_usd"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        displayValue={formatUSD(Number(p.unit_cost_usd))}
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs text-right font-mono font-medium text-primary">
+                      <EditableCell
+                        value={p.price_list_usd}
+                        type="currency"
+                        field="price_list_usd"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="margin_list_pct"
+                        cost={cost}
+                        displayValue={formatUSD(Number(p.price_list_usd))}
+                      />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || defaultArchitect)} label="Margen Arquitecto" minMargin={minMargin} />
+                      <EditableCell
+                        value={Number(p.margin_list_pct)}
+                        type="margin"
+                        field="margin_list_pct"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="price_list_usd"
+                        cost={cost}
+                        displayValue={
+                          <MarginCell cost={cost} price={Number(p.price_list_usd)} targetPct={Number(p.margin_list_pct || defaultList)} label="Margen Lista" minMargin={minMargin} />
+                        }
+                      />
                     </TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
+                      <EditableCell
+                        value={Number(p.margin_architect_pct)}
+                        type="margin"
+                        field="margin_architect_pct"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="price_architect_usd"
+                        cost={cost}
+                        displayValue={
+                          <MarginCell cost={cost} price={Number(p.price_architect_usd)} targetPct={Number(p.margin_architect_pct || defaultArchitect)} label="Margen Arquitecto" minMargin={minMargin} />
+                        }
+                      />
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatUSD(Number(p.price_wholesale_usd))}</TableCell>
                     <TableCell className="text-xs text-center">
-                      <MarginCell cost={Number(p.total_unit_cost_usd || p.unit_cost_usd)} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
+                      <EditableCell
+                        value={Number(p.margin_project_pct)}
+                        type="margin"
+                        field="margin_project_pct"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="price_project_usd"
+                        cost={cost}
+                        displayValue={
+                          <MarginCell cost={cost} price={Number(p.price_project_usd)} targetPct={Number(p.margin_project_pct || defaultProject)} label="Margen Proyecto" minMargin={minMargin} />
+                        }
+                      />
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{p.dimensions || '—'}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">
+                      <EditableCell
+                        value={p.price_wholesale_usd}
+                        type="currency"
+                        field="price_wholesale_usd"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="margin_wholesale_pct"
+                        cost={cost}
+                        displayValue={formatUSD(Number(p.price_wholesale_usd))}
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs text-center">
+                      <EditableCell
+                        value={Number(p.margin_wholesale_pct)}
+                        type="margin"
+                        field="margin_wholesale_pct"
+                        productId={p.id}
+                        onSave={handleInlineSave}
+                        linkedField="price_wholesale_usd"
+                        cost={cost}
+                        displayValue={
+                          <MarginCell cost={cost} price={Number(p.price_wholesale_usd)} targetPct={Number(p.margin_wholesale_pct || defaultWholesale)} label="Margen Mayorista" minMargin={minMargin} />
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      <EditableCell value={p.dimensions} type="text" field="dimensions" productId={p.id} onSave={handleInlineSave} />
+                    </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => { setEditProduct(p); setDialogOpen(true); }}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteProduct(p)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setDeleteProduct(p)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
               {(() => {
                 const margins = filtered.reduce((acc, p) => {
