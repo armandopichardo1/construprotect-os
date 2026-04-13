@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
+import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
 interface JournalEntry {
   id: string;
@@ -84,6 +85,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
+  const [editEntry, setEditEntry] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -352,10 +354,16 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
-                    <button onClick={() => setDeleteEntry(e)} title="Eliminar asiento"
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => setEditEntry(e.raw)} title="Editar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteEntry(e)} title="Eliminar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -399,6 +407,12 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Edit Dialog */}
+      <JournalEntryEditDialog
+        open={!!editEntry}
+        onOpenChange={(v) => { if (!v) setEditEntry(null); }}
+        journalEntry={editEntry}
+      />
     </div>
   );
 }
