@@ -5,8 +5,7 @@ import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import {
   getDefaultAccounts, buildAccountAccumulator,
-  accumulateSales, accumulateCOGS, accumulateExpenses, accumulateCosts, accumulateJournalEntries,
-  findExpenseAccount, findCostAccount,
+  accumulateJournalEntries, isDebitNatural,
 } from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
@@ -34,10 +33,6 @@ const TYPE_COLORS: Record<string, string> = {
 const TYPE_ORDER = ['Activo', 'Pasivo', 'Capital', 'Ingreso', 'Ingresos No Operacionales', 'Costo', 'Gasto', 'Gastos No Operacionales'];
 
 interface BalanceComprobacionTabProps {
-  sales: any[];
-  expenses: any[];
-  costs: any[];
-  saleItems: any[];
   journalEntries?: any[];
   rate: number;
 }
@@ -53,7 +48,7 @@ interface AccountRow {
   saldo_acreedor: number;
 }
 
-export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: BalanceComprobacionTabProps) {
+export function BalanceComprobacionTab({ journalEntries = [], rate }: BalanceComprobacionTabProps) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [showEmpty, setShowEmpty] = useState(false);
 
@@ -66,27 +61,10 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     },
   });
 
-  const filteredSales = filterByDate(sales);
-  const filteredExpenses = filterByDate(expenses);
-  const filteredCosts = filterByDate(costs);
-  const filteredSaleItems = useMemo(() => {
-    if (period === 'all') return saleItems;
-    return saleItems.filter((si: any) => {
-      const d = si.sales?.date;
-      return d && filterByDate([{ date: d }]).length > 0;
-    });
-  }, [saleItems, period, filterByDate]);
-
-  const defaults = useMemo(() => getDefaultAccounts(accounts), [accounts]);
-
   const rows = useMemo(() => {
     const acc = buildAccountAccumulator();
 
-    accumulateSales(filteredSales, defaults, acc);
-    accumulateCOGS(filteredSaleItems, defaults, acc);
-    accumulateExpenses(filteredExpenses, accounts, defaults, acc);
-    accumulateCosts(filteredCosts, accounts, defaults, acc);
-
+    // ONLY source from journal entries — the single source of truth
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
     accumulateJournalEntries(filteredJournals, acc);
 
@@ -115,16 +93,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, defaults, filterByDate, journalEntries]);
-
-  // Unmapped count
-  const unmappedCount = useMemo(() => {
-    let count = 0;
-    filteredSales.forEach((s: any) => { if (!s.account_id && !defaults.income) count++; });
-    filteredExpenses.forEach((e: any) => { if (!e.account_id && !findExpenseAccount(accounts, e.category)) count++; });
-    filteredCosts.forEach((c: any) => { if (!c.account_id && !findCostAccount(accounts, c.category)) count++; });
-    return count;
-  }, [filteredSales, filteredExpenses, filteredCosts, accounts, defaults]);
+  }, [accounts, journalEntries, showEmpty, filterByDate]);
 
   const totalDebits = rows.reduce((s, r) => s + r.debits, 0);
   const totalCredits = rows.reduce((s, r) => s + r.credits, 0);
@@ -171,8 +140,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
         <KpiCard title="Diferencia" value={formatUSD(difference)} icon={ArrowLeftRight}
           variant={isBalanced ? 'success' : 'destructive'}
           subtitle={isBalanced ? '✓ Cuadrado' : '⚠ Descuadre'} />
-        <KpiCard title="Cuentas Activas" value={String(rows.length)} icon={BookOpen}
-          subtitle={unmappedCount > 0 ? `${unmappedCount} sin mapear` : 'Todo mapeado'} />
+        <KpiCard title="Cuentas Activas" value={String(rows.length)} icon={BookOpen} />
       </div>
 
       {/* Warnings */}
@@ -182,21 +150,14 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
           <p className="text-sm text-destructive">Débitos y Créditos no cuadran. Diferencia: {formatUSD(difference)}</p>
         </div>
       )}
-      {unmappedCount > 0 && (
-        <div className="rounded-xl bg-warning/10 border border-warning/30 p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
-          <p className="text-sm text-warning">{unmappedCount} transacciones sin cuenta contable asignada</p>
-        </div>
-      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Grouped Bar: Debits vs Credits */}
         <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Débitos vs Créditos por Tipo</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={barChartData} layout="vertical">
-              <XAxis type="number" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
+              <XAxis type="number" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
               <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => formatUSD(v)} />
               <Legend />
@@ -206,13 +167,12 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
           </ResponsiveContainer>
         </div>
 
-        {/* Composition by type */}
         <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Composición por Tipo</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={compositionData}>
               <XAxis dataKey="name" tick={{ fill: 'hsl(220,12%,55%)', fontSize: 9 }} axisLine={false} tickLine={false} angle={-30} textAnchor="end" height={60} />
-              <YAxis tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `RD$${(v * getGlobalExchangeRate() / 1000).toFixed(0)}K`} />
+              <YAxis tick={{ fill: 'hsl(220,12%,55%)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => formatUSD(v)} />
               <Bar dataKey="value" name="Saldo" radius={[6, 6, 0, 0]}>
                 {compositionData.map((d, i) => (
@@ -223,7 +183,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
           </ResponsiveContainer>
         </div>
 
-        {/* Donut verification */}
         <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Verificación de Balance</h3>
           <div className="relative">
@@ -289,7 +248,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
               let currentType = '';
               rows.forEach((r, i) => {
                 if (r.account_type !== currentType) {
-                  // Subtotal for previous group
                   if (currentType) {
                     const group = byType.find(t => t.type === currentType);
                     if (group) {
@@ -304,7 +262,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
                       );
                     }
                   }
-                  // Type header
                   elements.push(
                     <TableRow key={`hdr-${r.account_type}`} className="bg-muted/50">
                       <TableCell colSpan={7} className="text-xs font-bold uppercase tracking-wider" style={{ color: TYPE_COLORS[r.account_type] }}>
@@ -325,7 +282,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
                     <TableCell className="text-xs text-right">{r.saldo_acreedor > 0 ? formatUSD(r.saldo_acreedor) : '—'}</TableCell>
                   </TableRow>
                 );
-                // Last group subtotal
                 if (i === rows.length - 1) {
                   const group = byType.find(t => t.type === currentType);
                   if (group) {
@@ -343,7 +299,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
               });
               return elements;
             })()}
-            {/* Grand total */}
             <TableRow className={cn('font-bold text-sm', isBalanced ? 'bg-success/10' : 'bg-destructive/10')}>
               <TableCell colSpan={3} className="text-xs font-bold">TOTALES</TableCell>
               <TableCell className="text-xs text-right font-bold">{formatUSD(totalDebits)}</TableCell>
@@ -357,5 +312,3 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     </div>
   );
 }
-
-

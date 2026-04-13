@@ -761,8 +761,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           account_id: preview.data.account_id || null,
         });
         if (error) throw error;
-        toast.success('Gasto registrado');
+        // Auto journal entry
+        const lines = buildExpenseJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
+        await createAutoJournal(`Gasto: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, lines, { exchangeRate: xr });
+        toast.success('Gasto registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       } else if (preview.type === 'cost') {
         const { error } = await supabase.from('costs').insert({
           description: preview.data.description,
@@ -774,8 +778,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           account_id: preview.data.account_id || null,
         });
         if (error) throw error;
-        toast.success('Costo registrado');
+        // Auto journal entry
+        const costLines = buildCostJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
+        await createAutoJournal(`Costo: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, costLines, { exchangeRate: xr });
+        toast.success('Costo registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['costs'] });
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       } else if (preview.type === 'sale') {
         const salePayload: any = {
           contact_id: preview.data.contact_id || null,

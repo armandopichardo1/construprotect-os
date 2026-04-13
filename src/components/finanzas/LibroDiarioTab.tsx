@@ -1,10 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatUSD, formatDOP } from '@/lib/format';
-import { getDefaultAccounts } from '@/lib/account-mapping';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,9 +18,8 @@ import { exportToExcel } from '@/lib/export-utils';
 interface JournalEntry {
   id: string;
   date: string;
-  type: 'sale' | 'expense' | 'cost' | 'journal';
+  type: 'sale' | 'expense' | 'cost' | 'journal' | 'purchase' | 'credit_note';
   description: string;
-  category: string;
   account_code: string;
   account_name: string;
   credit_account_code: string;
@@ -41,41 +39,50 @@ const TYPE_LABELS: Record<string, { label: string; emoji: string; color: string 
   expense: { label: 'Gasto', emoji: '📤', color: 'text-destructive' },
   cost: { label: 'Costo', emoji: '🏭', color: 'text-warning' },
   journal: { label: 'Asiento', emoji: '📒', color: 'text-primary' },
+  purchase: { label: 'Compra', emoji: '📦', color: 'text-blue-400' },
+  credit_note: { label: 'NC', emoji: '📝', color: 'text-emerald-400' },
 };
 
 type SortField = 'date' | 'type' | 'description' | 'account_name' | 'credit_account_name' | 'vendor_client' | 'debit_usd' | 'credit_usd' | 'debit_dop';
 type SortDir = 'asc' | 'desc';
 
+/** Infer transaction type from journal entry description */
+function inferType(desc: string): JournalEntry['type'] {
+  const d = desc.toLowerCase();
+  if (d.startsWith('venta')) return 'sale';
+  if (d.startsWith('gasto')) return 'expense';
+  if (d.startsWith('costo')) return 'cost';
+  if (d.startsWith('compra')) return 'purchase';
+  if (d.startsWith('nota de crédito') || d.startsWith('nota de credito')) return 'credit_note';
+  return 'journal';
+}
+
+/** Extract vendor/client from description (format: "Type ... — Name") */
+function extractVendorClient(desc: string): string {
+  const parts = desc.split('—');
+  if (parts.length > 1) {
+    const candidate = parts[parts.length - 1].trim();
+    // Skip if it looks like an amount
+    if (!candidate.startsWith('$') && !candidate.startsWith('RD$')) return candidate;
+    if (parts.length > 2) return parts[1].trim();
+  }
+  return '—';
+}
+
 interface Props {
-  sales: any[];
-  expenses: any[];
-  costs: any[];
   journalEntries?: any[];
   rate: number;
 }
 
-export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], rate }: Props) {
+export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const queryClient = useQueryClient();
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [editForm, setEditForm] = useState({ description: '', amount_usd: '', amount_dop: '', date: '', category: '' });
-  const [saving, setSaving] = useState(false);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-
-  const { data: chartAccounts = [] } = useQuery({
-    queryKey: ['chart-of-accounts-diario'],
-    queryFn: async () => {
-      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true).order('code');
-      return data || [];
-    },
-  });
-
-  const defaults = useMemo(() => getDefaultAccounts(chartAccounts), [chartAccounts]);
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => {
@@ -88,121 +95,42 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
     });
   }, []);
 
+  // Build entries from ONLY journal_entries — single source of truth
   const entries: JournalEntry[] = useMemo(() => {
     const all: JournalEntry[] = [];
 
-    sales.forEach((s: any) => {
-      const exRate = Number(s.exchange_rate) || rate;
-      const amount = Number(s.total_usd || 0);
-      // Debit: CxC or Banco depending on payment status
-      const debitAcct = ['paid'].includes(s.payment_status)
-        ? defaults.cash : defaults.cxc;
-      // Credit: Income account
-      const creditAcct = defaults.income;
-      all.push({
-        id: s.id,
-        date: s.date,
-        type: 'sale',
-        description: `Venta ${s.invoice_ref || ''}`.trim(),
-        category: 'Venta',
-        account_code: debitAcct?.code || s.chart_of_accounts?.code || '',
-        account_name: debitAcct?.description || s.chart_of_accounts?.description || 'Cuentas por Cobrar',
-        credit_account_code: creditAcct?.code || '',
-        credit_account_name: creditAcct?.description || 'Ingresos por Ventas',
-        debit_usd: amount,
-        credit_usd: amount,
-        debit_dop: amount * exRate,
-        credit_dop: Number(s.total_dop) || amount * exRate,
-        exchange_rate: exRate,
-        vendor_client: s.contacts?.contact_name || '—',
-        ref: s.invoice_ref || '',
-        raw: s,
-      });
-    });
-
-    expenses.forEach((e: any) => {
-      const exRate = Number(e.exchange_rate) || rate;
-      const amount = Number(e.amount_usd || 0);
-      // Credit: Banco/Efectivo
-      const creditAcct = defaults.cash;
-      all.push({
-        id: e.id,
-        date: e.date,
-        type: 'expense',
-        description: e.description,
-        category: e.category,
-        account_code: e.chart_of_accounts?.code || '',
-        account_name: e.chart_of_accounts?.description || e.category,
-        credit_account_code: creditAcct?.code || '',
-        credit_account_name: creditAcct?.description || 'Efectivo / Banco',
-        debit_usd: amount,
-        credit_usd: amount,
-        debit_dop: Number(e.amount_dop) || amount * exRate,
-        credit_dop: Number(e.amount_dop) || amount * exRate,
-        exchange_rate: exRate,
-        vendor_client: e.vendor || '—',
-        ref: '',
-        raw: e,
-      });
-    });
-
-    costs.forEach((c: any) => {
-      const exRate = Number(c.exchange_rate) || rate;
-      const amount = Number(c.amount_usd || 0);
-      // Credit: CxP
-      const creditAcct = defaults.cxp || defaults.cash;
-      all.push({
-        id: c.id,
-        date: c.date,
-        type: 'cost',
-        description: c.description,
-        category: c.category,
-        account_code: c.chart_of_accounts?.code || '',
-        account_name: c.chart_of_accounts?.description || c.category,
-        credit_account_code: creditAcct?.code || '',
-        credit_account_name: creditAcct?.description || 'Cuentas por Pagar',
-        debit_usd: amount,
-        credit_usd: amount,
-        debit_dop: Number(c.amount_dop) || amount * exRate,
-        credit_dop: Number(c.amount_dop) || amount * exRate,
-        exchange_rate: exRate,
-        vendor_client: c.vendor || '—',
-        ref: '',
-        raw: c,
-      });
-    });
-
-    // Journal entries (manual)
     journalEntries.forEach((je: any) => {
-      const totalDebit = Number(je.total_debit_usd || 0);
-      const totalCredit = Number(je.total_credit_usd || 0);
-      const exRate = Number(je.exchange_rate) || rate;
       const lines = je.journal_entry_lines || [];
       const debitLines = lines.filter((l: any) => Number(l.debit_usd) > 0);
       const creditLines = lines.filter((l: any) => Number(l.credit_usd) > 0);
+      const totalDebit = Number(je.total_debit_usd || 0);
+      const totalCredit = Number(je.total_credit_usd || 0);
+      const exRate = Number(je.exchange_rate) || rate;
+      const type = inferType(je.description);
+      const vendorClient = extractVendorClient(je.description);
+
       all.push({
         id: je.id,
         date: je.date,
-        type: 'journal',
+        type,
         description: je.description,
-        category: 'Asiento Manual',
         account_code: debitLines.map((l: any) => l.chart_of_accounts?.code).filter(Boolean).join(', '),
-        account_name: debitLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
+        account_name: debitLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Sin cuenta',
         credit_account_code: creditLines.map((l: any) => l.chart_of_accounts?.code).filter(Boolean).join(', '),
-        credit_account_name: creditLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
+        credit_account_name: creditLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Sin cuenta',
         debit_usd: totalDebit,
         credit_usd: totalCredit,
         debit_dop: totalDebit * exRate,
         credit_dop: totalCredit * exRate,
         exchange_rate: exRate,
-        vendor_client: '—',
+        vendor_client: vendorClient,
         ref: '',
         raw: je,
       });
     });
 
     return all;
-  }, [sales, expenses, costs, journalEntries, rate]);
+  }, [journalEntries, rate]);
 
   const filtered = useMemo(() => {
     let items = filterByDate(entries);
@@ -213,24 +141,20 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         e.description.toLowerCase().includes(q) ||
         e.vendor_client.toLowerCase().includes(q) ||
         e.account_name.toLowerCase().includes(q) ||
-        e.credit_account_name.toLowerCase().includes(q) ||
-        e.ref.toLowerCase().includes(q) ||
-        e.category.toLowerCase().includes(q)
+        e.credit_account_name.toLowerCase().includes(q)
       );
     }
-    // Sort
     items.sort((a, b) => {
       let cmp = 0;
-      const fa = sortField;
-      if (fa === 'date') cmp = a.date.localeCompare(b.date);
-      else if (fa === 'type') cmp = a.type.localeCompare(b.type);
-      else if (fa === 'description') cmp = a.description.localeCompare(b.description);
-      else if (fa === 'account_name') cmp = a.account_name.localeCompare(b.account_name);
-      else if (fa === 'credit_account_name') cmp = a.credit_account_name.localeCompare(b.credit_account_name);
-      else if (fa === 'vendor_client') cmp = a.vendor_client.localeCompare(b.vendor_client);
-      else if (fa === 'debit_usd') cmp = a.debit_usd - b.debit_usd;
-      else if (fa === 'credit_usd') cmp = a.credit_usd - b.credit_usd;
-      else if (fa === 'debit_dop') cmp = (a.debit_dop || a.credit_dop) - (b.debit_dop || b.credit_dop);
+      if (sortField === 'date') cmp = a.date.localeCompare(b.date);
+      else if (sortField === 'type') cmp = a.type.localeCompare(b.type);
+      else if (sortField === 'description') cmp = a.description.localeCompare(b.description);
+      else if (sortField === 'account_name') cmp = a.account_name.localeCompare(b.account_name);
+      else if (sortField === 'credit_account_name') cmp = a.credit_account_name.localeCompare(b.credit_account_name);
+      else if (sortField === 'vendor_client') cmp = a.vendor_client.localeCompare(b.vendor_client);
+      else if (sortField === 'debit_usd') cmp = a.debit_usd - b.debit_usd;
+      else if (sortField === 'credit_usd') cmp = a.credit_usd - b.credit_usd;
+      else if (sortField === 'debit_dop') cmp = (a.debit_dop || a.credit_dop) - (b.debit_dop || b.credit_dop);
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
@@ -260,93 +184,15 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
     </TableHead>
   );
 
-  const openEdit = (entry: JournalEntry) => {
-    setEditEntry(entry);
-    if (entry.type === 'sale') {
-      setEditForm({
-        description: entry.raw.invoice_ref || '',
-        amount_usd: String(entry.raw.total_usd || 0),
-        amount_dop: String(entry.raw.total_dop || 0),
-        date: entry.date,
-        category: '',
-      });
-    } else {
-      setEditForm({
-        description: entry.raw.description || '',
-        amount_usd: String(entry.raw.amount_usd || 0),
-        amount_dop: String(entry.raw.amount_dop || 0),
-        date: entry.date,
-        category: entry.raw.category || '',
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    if (!editEntry) return;
-    setSaving(true);
-    try {
-      if (editEntry.type === 'sale') {
-        const { error } = await supabase.from('sales').update({
-          invoice_ref: editForm.description,
-          date: editForm.date,
-        }).eq('id', editEntry.id);
-        if (error) throw error;
-      } else if (editEntry.type === 'expense') {
-        const { error } = await supabase.from('expenses').update({
-          description: editForm.description,
-          amount_usd: Number(editForm.amount_usd),
-          amount_dop: Number(editForm.amount_dop),
-          date: editForm.date,
-          category: editForm.category as any,
-        }).eq('id', editEntry.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('costs').update({
-          description: editForm.description,
-          amount_usd: Number(editForm.amount_usd),
-          amount_dop: Number(editForm.amount_dop),
-          date: editForm.date,
-          category: editForm.category as any,
-        }).eq('id', editEntry.id);
-        if (error) throw error;
-      }
-
-      toast.success('Registro actualizado');
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      queryClient.invalidateQueries({ queryKey: ['costs'] });
-      setEditEntry(null);
-    } catch (e: any) {
-      toast.error(e.message || 'Error al guardar');
-    }
-    setSaving(false);
-  };
-
   const handleDelete = async () => {
     if (!deleteEntry) return;
     setDeleting(true);
     try {
-      if (deleteEntry.type === 'sale') {
-        await supabase.from('sale_items').delete().eq('sale_id', deleteEntry.id);
-        const { error } = await supabase.from('sales').delete().eq('id', deleteEntry.id);
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ['sales'] });
-        queryClient.invalidateQueries({ queryKey: ['sale-items'] });
-      } else if (deleteEntry.type === 'expense') {
-        const { error } = await supabase.from('expenses').delete().eq('id', deleteEntry.id);
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      } else if (deleteEntry.type === 'cost') {
-        const { error } = await supabase.from('costs').delete().eq('id', deleteEntry.id);
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ['costs'] });
-      } else if (deleteEntry.type === 'journal') {
-        await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', deleteEntry.id);
-        const { error } = await supabase.from('journal_entries').delete().eq('id', deleteEntry.id);
-        if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-      }
-      toast.success('Registro eliminado');
+      await supabase.from('journal_entry_lines').delete().eq('journal_entry_id', deleteEntry.id);
+      const { error } = await supabase.from('journal_entries').delete().eq('id', deleteEntry.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      toast.success('Asiento eliminado');
       setDeleteEntry(null);
     } catch (e: any) {
       toast.error(e.message || 'Error al eliminar');
@@ -357,7 +203,7 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
   const handleExport = () => {
     exportToExcel(filtered.map(e => ({
       Fecha: e.date,
-      Tipo: TYPE_LABELS[e.type].label,
+      Tipo: TYPE_LABELS[e.type]?.label || e.type,
       Descripción: e.description,
       'Proveedor/Cliente': e.vendor_client,
       'Cuenta Débito': e.account_name,
@@ -369,7 +215,6 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
       'Débito DOP': e.debit_dop || '',
       'Crédito DOP': e.credit_dop || '',
       'Tasa Cambio': e.exchange_rate,
-      Referencia: e.ref,
     })), 'libro-diario', 'Libro Diario');
   };
 
@@ -391,6 +236,8 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
             <SelectItem value="expense" className="text-xs">📤 Gastos</SelectItem>
             <SelectItem value="cost" className="text-xs">🏭 Costos</SelectItem>
             <SelectItem value="journal" className="text-xs">📒 Asientos</SelectItem>
+            <SelectItem value="purchase" className="text-xs">📦 Compras</SelectItem>
+            <SelectItem value="credit_note" className="text-xs">📝 NC</SelectItem>
           </SelectContent>
         </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
@@ -402,7 +249,7 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl bg-card border border-border p-3 text-center">
-          <p className="text-xs text-muted-foreground">Registros</p>
+          <p className="text-xs text-muted-foreground">Asientos</p>
           <p className="text-lg font-bold text-foreground">{filtered.length}</p>
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
@@ -415,148 +262,94 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
           <p className="text-xs text-muted-foreground">Balance</p>
-          <p className={cn('text-lg font-bold', (totals.debit_usd - totals.credit_usd) >= 0 ? 'text-warning' : 'text-success')}>
-            {formatUSD(Math.abs(totals.debit_usd - totals.credit_usd))}
+          <p className={cn('text-lg font-bold', Math.abs(totals.debit_usd - totals.credit_usd) < 0.01 ? 'text-success' : 'text-destructive')}>
+            {Math.abs(totals.debit_usd - totals.credit_usd) < 0.01 ? '✓ Cuadrado' : formatUSD(totals.debit_usd - totals.credit_usd)}
           </p>
         </div>
       </div>
 
-      {/* Journal Table */}
-      <div className="rounded-xl border border-border bg-card overflow-x-auto max-h-[calc(100vh-320px)] overflow-auto">
+      {/* Table */}
+      <div className="rounded-2xl bg-card border border-border overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
         <Table wrapperClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <SortableHead field="date">Fecha</SortableHead>
               <SortableHead field="type">Tipo</SortableHead>
               <SortableHead field="description">Descripción</SortableHead>
-              <SortableHead field="vendor_client" className="hidden lg:table-cell">Proveedor/Cliente</SortableHead>
-              <SortableHead field="account_name" className="hidden md:table-cell">Cta. Débito</SortableHead>
-              <SortableHead field="credit_account_name" className="hidden md:table-cell">Cta. Crédito</SortableHead>
+              <SortableHead field="vendor_client">Prov./Cliente</SortableHead>
+              <SortableHead field="account_name">Cuenta Débito</SortableHead>
+              <SortableHead field="credit_account_name">Cuenta Crédito</SortableHead>
               <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
               <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
-              <SortableHead field="debit_dop" className="text-right hidden md:table-cell">DOP</SortableHead>
-              <TableHead className="text-[10px] font-semibold w-[50px]"></TableHead>
+              <SortableHead field="debit_dop" className="text-right">DOP</SortableHead>
+              <TableHead className="text-[10px] w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map(entry => {
-              const cfg = TYPE_LABELS[entry.type];
+            {filtered.map(e => {
+              const tl = TYPE_LABELS[e.type] || TYPE_LABELS.journal;
               return (
-                <TableRow key={`${entry.type}-${entry.id}`} className="group hover:bg-muted/30">
-                  <TableCell className="text-xs py-1.5">{entry.date}</TableCell>
-                  <TableCell className="py-1.5">
-                    <span className={cn('text-[10px] font-medium', cfg.color)}>{cfg.emoji} {cfg.label}</span>
+                <TableRow key={e.id}>
+                  <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">{e.date}</TableCell>
+                  <TableCell>
+                    <span className={cn('text-[10px] font-medium', tl.color)}>{tl.emoji} {tl.label}</span>
                   </TableCell>
-                  <TableCell className="text-xs py-1.5 max-w-[200px] truncate">{entry.description}</TableCell>
-                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden lg:table-cell">{entry.vendor_client}</TableCell>
-                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
-                    {entry.account_code ? `${entry.account_code} · ` : ''}{entry.account_name}
+                  <TableCell className="text-xs max-w-[200px] truncate">{e.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{e.vendor_client}</TableCell>
+                  <TableCell className="text-xs max-w-[150px] truncate">
+                    <span className="text-muted-foreground font-mono text-[10px]">{e.account_code}</span>
+                    {e.account_code && ' '}
+                    {e.account_name}
                   </TableCell>
-                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
-                    {entry.credit_account_code ? `${entry.credit_account_code} · ` : ''}{entry.credit_account_name}
+                  <TableCell className="text-xs max-w-[150px] truncate">
+                    <span className="text-muted-foreground font-mono text-[10px]">{e.credit_account_code}</span>
+                    {e.credit_account_code && ' '}
+                    {e.credit_account_name}
                   </TableCell>
-                  <TableCell className="text-xs py-1.5 text-right font-mono">
-                    {entry.debit_usd > 0 ? formatUSD(entry.debit_usd) : ''}
-                  </TableCell>
-                  <TableCell className="text-xs py-1.5 text-right font-mono">
-                    {entry.credit_usd > 0 ? formatUSD(entry.credit_usd) : ''}
-                  </TableCell>
-                  <TableCell className="text-xs py-1.5 text-right font-mono text-muted-foreground hidden md:table-cell">
-                    {formatDOP(entry.debit_dop || entry.credit_dop)}
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openEdit(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted">
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => setDeleteEntry(entry)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
+                  <TableCell className="text-xs text-right font-mono">{e.debit_usd > 0 ? formatUSD(e.debit_usd) : '—'}</TableCell>
+                  <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
+                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
+                  <TableCell>
+                    <button onClick={() => setDeleteEntry(e)} title="Eliminar asiento"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </TableCell>
                 </TableRow>
               );
             })}
-            {filtered.length > 0 && (
-              <TableRow className="bg-muted/30 font-semibold">
-                <TableCell colSpan={4} className="text-xs py-2 text-right hidden lg:table-cell">TOTALES</TableCell>
-                <TableCell colSpan={4} className="text-xs py-2 text-right lg:hidden">TOTALES</TableCell>
-                <TableCell className="text-xs py-2 hidden md:table-cell" />
-                <TableCell className="text-xs py-2 hidden md:table-cell" />
-                <TableCell className="text-xs py-2 text-right font-mono">{formatUSD(totals.debit_usd)}</TableCell>
-                <TableCell className="text-xs py-2 text-right font-mono">{formatUSD(totals.credit_usd)}</TableCell>
-                <TableCell className="text-xs py-2 text-right font-mono text-muted-foreground hidden md:table-cell">
-                  {formatDOP(totals.debit_dop + totals.credit_dop)}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
+                  No hay asientos contables registrados
                 </TableCell>
+              </TableRow>
+            )}
+            {filtered.length > 0 && (
+              <TableRow className="font-bold bg-muted/30">
+                <TableCell colSpan={6} className="text-xs font-bold">TOTALES</TableCell>
+                <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.debit_usd)}</TableCell>
+                <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.credit_usd)}</TableCell>
+                <TableCell className="text-xs text-right font-bold font-mono text-muted-foreground">{formatDOP(totals.debit_dop)}</TableCell>
                 <TableCell />
               </TableRow>
             )}
           </TableBody>
         </Table>
-        {filtered.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No hay registros en el período</p>}
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editEntry} onOpenChange={v => { if (!v) setEditEntry(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <Pencil className="w-4 h-4" />
-              Editar {editEntry ? TYPE_LABELS[editEntry.type].label : ''}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">{editEntry?.type === 'sale' ? 'Referencia' : 'Descripción'}</Label>
-              <Input value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className="h-8 text-xs" />
-            </div>
-            <div>
-              <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={editForm.date} onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))} className="h-8 text-xs" />
-            </div>
-            {editEntry?.type !== 'sale' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Monto USD</Label>
-                    <Input type="number" step="0.01" value={editForm.amount_usd} onChange={e => setEditForm(p => ({ ...p, amount_usd: e.target.value }))} className="h-8 text-xs" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Monto DOP</Label>
-                    <Input type="number" step="0.01" value={editForm.amount_dop} onChange={e => setEditForm(p => ({ ...p, amount_dop: e.target.value }))} className="h-8 text-xs" />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button size="sm" variant="outline" onClick={() => setEditEntry(null)}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              <Save className="w-3.5 h-3.5 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteEntry} onOpenChange={v => { if (!v) setDeleteEntry(null); }}>
+      <AlertDialog open={!!deleteEntry} onOpenChange={(v) => { if (!v) setDeleteEntry(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar Asiento Contable</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteEntry && (
-                <>
-                  <strong>{TYPE_LABELS[deleteEntry.type]?.emoji} {TYPE_LABELS[deleteEntry.type]?.label}</strong>: {deleteEntry.description}
-                  <br />
-                  Monto: {formatUSD(deleteEntry.debit_usd || deleteEntry.credit_usd)}
-                  <br /><br />
-                  Esta acción no se puede deshacer.
-                </>
-              )}
+              ¿Eliminar el asiento "<strong>{deleteEntry?.description}</strong>" por <strong>{formatUSD(deleteEntry?.debit_usd || 0)}</strong>?
+              <br /><span className="text-destructive text-xs">Esto eliminará la partida contable. La transacción original (venta/gasto/costo) no se afecta.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
