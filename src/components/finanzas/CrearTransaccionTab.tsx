@@ -1163,14 +1163,25 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   <Label className="text-xs">Productos *</Label>
                   {saleItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
-                      <div className="flex-1 min-w-[140px]">
+                      <div className="w-28 shrink-0">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
+                          options={products.map((p: any) => ({ value: p.id, label: p.sku }))}
                           value={item.product_id}
                           onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                          placeholder="Producto"
-                          searchPlaceholder="Buscar producto..."
-                          emptyMessage="No se encontró producto"
+                          placeholder="SKU"
+                          searchPlaceholder="Buscar SKU..."
+                          emptyMessage="No encontrado"
+                          className="text-xs"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <SearchableSelect
+                          options={products.map((p: any) => ({ value: p.id, label: p.name }))}
+                          value={item.product_id}
+                          onValueChange={v => updateSaleItem(i, 'product_id', v)}
+                          placeholder="Nombre producto"
+                          searchPlaceholder="Buscar nombre..."
+                          emptyMessage="No encontrado"
                           className="text-xs"
                         />
                       </div>
@@ -1251,14 +1262,25 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   <Label className="text-xs">Productos * <span className="text-[10px] text-muted-foreground font-normal">(precios en USD)</span></Label>
                   {purchaseItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
-                      <div className="flex-1 min-w-[140px]">
+                      <div className="w-28 shrink-0">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
+                          options={products.map((p: any) => ({ value: p.id, label: p.sku }))}
                           value={item.product_id}
                           onValueChange={v => updatePurchaseItem(i, 'product_id', v)}
-                          placeholder="Producto"
-                          searchPlaceholder="Buscar producto..."
-                          emptyMessage="No se encontró producto"
+                          placeholder="SKU"
+                          searchPlaceholder="Buscar SKU..."
+                          emptyMessage="No encontrado"
+                          className="text-xs"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[120px]">
+                        <SearchableSelect
+                          options={products.map((p: any) => ({ value: p.id, label: p.name }))}
+                          value={item.product_id}
+                          onValueChange={v => updatePurchaseItem(i, 'product_id', v)}
+                          placeholder="Nombre producto"
+                          searchPlaceholder="Buscar nombre..."
+                          emptyMessage="No encontrado"
                           className="text-xs"
                         />
                       </div>
@@ -1420,18 +1442,27 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <Label className="text-xs">Líneas del Asiento <span className="text-[10px] text-muted-foreground font-normal">(montos en {currencyBase})</span></Label>
                   <div className="rounded-xl border border-border overflow-hidden">
-                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      <span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
+                    <div className="grid grid-cols-[100px_1fr_90px_90px_32px] gap-2 p-2 bg-muted/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span>Código</span><span>Cuenta</span><span className="text-right">Débito</span><span className="text-right">Crédito</span><span />
                     </div>
                     {journalLines.map((line, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border/50 items-center">
+                      <div key={i} className="grid grid-cols-[100px_1fr_90px_90px_32px] gap-2 p-2 border-t border-border/50 items-center">
                         <SearchableSelect
                           value={line.account_id}
                           onValueChange={v => updateJournalLine(i, 'account_id', v)}
-                          placeholder="Seleccionar cuenta"
+                          placeholder="Código"
+                          searchPlaceholder="Buscar código..."
+                          emptyMessage="No encontrada"
+                          options={leafAccounts.map(a => ({ value: a.id, label: a.code || '—' }))}
+                          className="text-xs h-8"
+                        />
+                        <SearchableSelect
+                          value={line.account_id}
+                          onValueChange={v => updateJournalLine(i, 'account_id', v)}
+                          placeholder="Nombre cuenta"
                           searchPlaceholder="Buscar cuenta..."
-                          emptyMessage="Cuenta no encontrada"
-                          options={leafAccounts.map(a => ({ value: a.id, label: `${a.code} — ${a.description}` }))}
+                          emptyMessage="No encontrada"
+                          options={leafAccounts.map(a => ({ value: a.id, label: a.description }))}
                           className="text-xs h-8"
                         />
                         <Input type="number" min={0} step={0.01} value={line.debit}
