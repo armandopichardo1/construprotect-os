@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { Upload, Download, Loader2, Check } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { z } from 'zod';
 
 interface Props {
   open: boolean;
@@ -26,10 +26,11 @@ const TX_LABELS: Record<TxType, { label: string; icon: string }> = {
   purchase: { label: 'Compras', icon: '📦' },
 };
 
-const EXPENSE_HEADERS = ['Fecha', 'Descripción', 'Categoría', 'Proveedor', 'Monto USD', 'Monto DOP'];
-const COST_HEADERS = ['Fecha', 'Descripción', 'Categoría', 'Proveedor', 'Monto USD', 'Monto DOP'];
-const SALE_HEADERS = ['Fecha', 'Cliente', 'Ref Factura', 'Subtotal USD', 'ITBIS USD', 'Total USD', 'Estado Pago'];
-const PURCHASE_HEADERS = ['Fecha', 'Proveedor', 'Producto SKU', 'Cantidad', 'Costo Unitario USD', 'Notas'];
+// Excel columns are LINE-ITEM fields only. Transaction-level fields go in the dialog.
+const EXPENSE_HEADERS = ['Descripción', 'Categoría', 'Monto'];
+const COST_HEADERS = ['Descripción', 'Categoría', 'Monto'];
+const SALE_HEADERS = ['Producto SKU', 'Cantidad', 'Precio Unitario USD'];
+const PURCHASE_HEADERS = ['Producto SKU', 'Cantidad', 'Costo Unitario USD'];
 
 const EXPENSE_CATS = ['purchases', 'warehouse', 'payroll', 'rent', 'utilities', 'insurance', 'maintenance', 'software', 'accounting', 'marketing', 'shipping', 'customs', 'travel', 'samples', 'office', 'bank_fees', 'other'];
 const COST_CATS = ['freight', 'customs', 'raw_materials', 'packaging', 'labor', 'logistics', 'warehousing', 'insurance', 'other'];
@@ -53,7 +54,21 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
-  const reset = () => { setStep('config'); setRows([]); setStats({ inserted: 0, failed: 0 }); };
+  // Transaction-level fields (not in Excel)
+  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [txVendor, setTxVendor] = useState('');
+  const [txClient, setTxClient] = useState('');
+  const [txInvoiceRef, setTxInvoiceRef] = useState('');
+  const [txPaymentStatus, setTxPaymentStatus] = useState('pending');
+  const [txNotes, setTxNotes] = useState('');
+  const [txCurrency, setTxCurrency] = useState<'USD' | 'DOP'>('USD');
+
+  const reset = () => {
+    setStep('config'); setRows([]); setStats({ inserted: 0, failed: 0 });
+    setTxDate(new Date().toISOString().split('T')[0]);
+    setTxVendor(''); setTxClient(''); setTxInvoiceRef('');
+    setTxPaymentStatus('pending'); setTxNotes(''); setTxCurrency('USD');
+  };
 
   const downloadTemplate = () => {
     let headers: string[] = [];
@@ -62,19 +77,19 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
     switch (txType) {
       case 'expense':
         headers = EXPENSE_HEADERS;
-        example = ['2025-01-15', 'Pago internet oficina', 'utilities', 'Claro', 50, 3000];
+        example = ['Pago internet oficina', 'utilities', 50];
         break;
       case 'cost':
         headers = COST_HEADERS;
-        example = ['2025-01-15', 'Flete contenedor China', 'freight', 'Maersk', 1200, 72000];
+        example = ['Flete contenedor China', 'freight', 1200];
         break;
       case 'sale':
         headers = SALE_HEADERS;
-        example = ['2025-01-15', 'Juan Pérez', 'FAC-001', 500, 90, 590, 'paid'];
+        example = ['PIR-6060-BG', 100, 28.0];
         break;
       case 'purchase':
         headers = PURCHASE_HEADERS;
-        example = ['2025-01-15', 'Porcelanosa', 'PIR-6060-BG', 100, 12.5, 'Contenedor marzo'];
+        example = ['PIR-6060-BG', 100, 12.5];
         break;
     }
 
@@ -117,35 +132,22 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
         case 'cost': {
           const desc = String(m.descripción || m.descripcion || m.description || '').trim();
           const cat = String(m.categoría || m.categoria || m.category || '').trim().toLowerCase();
-          const amtUsd = Number(m.monto_usd || m.amount_usd || 0);
-          const amtDop = Number(m.monto_dop || m.amount_dop || 0);
+          const amt = Number(m.monto || m.amount || m.monto_usd || m.monto_dop || m.amount_usd || m.amount_dop || 0);
           if (!desc) return { raw: m, valid: false, error: 'Falta descripción' };
           const validCats = type === 'expense' ? EXPENSE_CATS : COST_CATS;
           if (cat && !validCats.includes(cat)) return { raw: m, valid: false, error: `Categoría inválida: ${cat}` };
-          if (amtUsd <= 0 && amtDop <= 0) return { raw: m, valid: false, error: 'Falta monto' };
-          return { raw: { ...m, _desc: desc, _cat: cat || 'other', _vendor: String(m.proveedor || m.vendor || ''), _usd: amtUsd || amtDop / exchangeRate, _dop: amtDop || amtUsd * exchangeRate, _date: String(m.fecha || m.date || '') }, valid: true };
+          if (amt <= 0) return { raw: m, valid: false, error: 'Falta monto' };
+          return { raw: { ...m, _desc: desc, _cat: cat || 'other', _amt: amt }, valid: true };
         }
-        case 'sale': {
-          const cliente = String(m.cliente || m.client || '').trim();
-          const subtotal = Number(m.subtotal_usd || m.subtotal || 0);
-          const itbis = Number(m.itbis_usd || m.itbis || 0);
-          const total = Number(m.total_usd || m.total || 0);
-          if (subtotal <= 0 && total <= 0) return { raw: m, valid: false, error: 'Falta subtotal o total' };
-          const finalSubtotal = subtotal || (total / 1.18);
-          const finalItbis = itbis || (finalSubtotal * 0.18);
-          const finalTotal = total || (finalSubtotal + finalItbis);
-          return { raw: { ...m, _cliente: cliente, _ref: String(m.ref_factura || m.invoice_ref || ''), _subtotal: finalSubtotal, _itbis: finalItbis, _total: finalTotal, _dop: finalTotal * exchangeRate, _status: String(m.estado_pago || m.payment_status || 'pending'), _date: String(m.fecha || m.date || '') }, valid: true };
-        }
+        case 'sale':
         case 'purchase': {
-          const supplier = String(m.proveedor || m.supplier || '').trim();
           const sku = String(m.producto_sku || m.sku || m.product_sku || '').trim();
           const qty = Number(m.cantidad || m.quantity || 0);
-          const cost = Number(m.costo_unitario_usd || m.unit_cost_usd || m.cost || 0);
-          if (!supplier) return { raw: m, valid: false, error: 'Falta proveedor' };
+          const price = Number(m.precio_unitario_usd || m.costo_unitario_usd || m.unit_price_usd || m.unit_cost_usd || m.precio || m.costo || m.cost || m.price || 0);
           if (!sku) return { raw: m, valid: false, error: 'Falta SKU producto' };
           if (qty <= 0) return { raw: m, valid: false, error: 'Cantidad inválida' };
-          if (cost <= 0) return { raw: m, valid: false, error: 'Falta costo unitario' };
-          return { raw: { ...m, _supplier: supplier, _sku: sku, _qty: qty, _cost: cost, _notes: String(m.notas || m.notes || ''), _date: String(m.fecha || m.date || '') }, valid: true };
+          if (price <= 0) return { raw: m, valid: false, error: type === 'sale' ? 'Falta precio unitario' : 'Falta costo unitario' };
+          return { raw: { ...m, _sku: sku, _qty: qty, _price: price }, valid: true };
         }
       }
     } catch {
@@ -162,52 +164,115 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
     setImporting(true);
     let inserted = 0, failed = 0;
 
-    for (const row of validRows) {
-      try {
-        const d = row.raw;
-        const dateStr = String(d._date || '').trim();
-        const dateVal = dateStr ? dateStr : undefined;
-
-        switch (txType) {
-          case 'expense': {
-            const payload: any = { description: d._desc, category: d._cat, vendor: d._vendor || null, amount_usd: d._usd, amount_dop: d._dop, exchange_rate: exchangeRate };
-            if (dateVal) payload.date = dateVal;
-            const { error } = await supabase.from('expenses').insert(payload);
-            if (error) throw error;
-            break;
+    try {
+      switch (txType) {
+        case 'expense':
+        case 'cost': {
+          const table = txType === 'expense' ? 'expenses' : 'costs';
+          for (const row of validRows) {
+            const d = row.raw;
+            const amt = Number(d._amt);
+            const amtUsd = txCurrency === 'USD' ? amt : amt / exchangeRate;
+            const amtDop = txCurrency === 'DOP' ? amt : amt * exchangeRate;
+            const payload: any = {
+              description: d._desc,
+              category: d._cat,
+              vendor: txVendor || null,
+              amount_usd: amtUsd,
+              amount_dop: amtDop,
+              exchange_rate: exchangeRate,
+              date: txDate,
+            };
+            const { error } = await supabase.from(table).insert(payload);
+            if (error) { failed++; } else { inserted++; }
           }
-          case 'cost': {
-            const payload: any = { description: d._desc, category: d._cat, vendor: d._vendor || null, amount_usd: d._usd, amount_dop: d._dop, exchange_rate: exchangeRate };
-            if (dateVal) payload.date = dateVal;
-            const { error } = await supabase.from('costs').insert(payload);
-            if (error) throw error;
-            break;
-          }
-          case 'sale': {
-            const payload: any = { subtotal_usd: d._subtotal, itbis_usd: d._itbis, total_usd: d._total, total_dop: d._dop, exchange_rate: exchangeRate, payment_status: d._status || 'pending', invoice_ref: d._ref || null };
-            if (dateVal) payload.date = dateVal;
-            const { error } = await supabase.from('sales').insert(payload);
-            if (error) throw error;
-            break;
-          }
-          case 'purchase': {
-            const sku = String(d._sku || '');
-            const { data: prod } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle();
-            if (!prod) { failed++; continue; }
-            const totalCost = Number(d._qty) * Number(d._cost);
-            const shipPayload: any = { supplier_name: String(d._supplier || ''), po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`, total_cost_usd: totalCost, status: 'ordered' as any, notes: String(d._notes || '') || null };
-            if (dateVal) shipPayload.order_date = dateVal;
-            const { data: ship, error: se } = await supabase.from('shipments').insert(shipPayload).select('id').single();
-            if (se || !ship) throw se;
-            const shipItemPayload: any = { shipment_id: ship.id, product_id: prod.id, quantity_ordered: Number(d._qty), quantity_received: 0, unit_cost_usd: Number(d._cost) };
-            await supabase.from('shipment_items').insert(shipItemPayload);
-            break;
-          }
+          break;
         }
-        inserted++;
-      } catch {
-        failed++;
+        case 'sale': {
+          // All lines belong to ONE sale
+          let subtotal = 0;
+          const lineItems: { sku: string; qty: number; price: number }[] = [];
+          for (const row of validRows) {
+            const d = row.raw;
+            const qty = Number(d._qty);
+            const price = Number(d._price);
+            subtotal += qty * price;
+            lineItems.push({ sku: String(d._sku), qty, price });
+          }
+          const itbis = subtotal * 0.18;
+          const total = subtotal + itbis;
+          const salePayload: any = {
+            date: txDate,
+            subtotal_usd: subtotal,
+            itbis_usd: itbis,
+            total_usd: total,
+            total_dop: total * exchangeRate,
+            exchange_rate: exchangeRate,
+            payment_status: txPaymentStatus || 'pending',
+            invoice_ref: txInvoiceRef || null,
+          };
+          const { data: sale, error: se } = await supabase.from('sales').insert(salePayload).select('id').single();
+          if (se || !sale) { failed += lineItems.length; break; }
+
+          for (const item of lineItems) {
+            const { data: prod } = await supabase.from('products').select('id, unit_cost_usd').eq('sku', item.sku).maybeSingle();
+            const lineTotal = item.qty * item.price;
+            const unitCost = prod?.unit_cost_usd || 0;
+            const margin = item.price > 0 ? ((item.price - unitCost) / item.price) * 100 : 0;
+            const itemPayload: any = {
+              sale_id: sale.id,
+              product_id: prod?.id || null,
+              quantity: item.qty,
+              unit_price_usd: item.price,
+              unit_cost_usd: unitCost,
+              line_total_usd: lineTotal,
+              margin_pct: margin,
+            };
+            const { error } = await supabase.from('sale_items').insert(itemPayload);
+            if (error) { failed++; } else { inserted++; }
+          }
+          break;
+        }
+        case 'purchase': {
+          // All lines belong to ONE shipment/PO
+          let totalCost = 0;
+          const lineItems: { sku: string; qty: number; cost: number }[] = [];
+          for (const row of validRows) {
+            const d = row.raw;
+            const qty = Number(d._qty);
+            const cost = Number(d._price);
+            totalCost += qty * cost;
+            lineItems.push({ sku: String(d._sku), qty, cost });
+          }
+          const shipPayload: any = {
+            supplier_name: txVendor || 'Importación masiva',
+            po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`,
+            total_cost_usd: totalCost,
+            status: 'ordered' as any,
+            notes: txNotes || null,
+            order_date: txDate,
+          };
+          const { data: ship, error: shipErr } = await supabase.from('shipments').insert(shipPayload).select('id').single();
+          if (shipErr || !ship) { failed += lineItems.length; break; }
+
+          for (const item of lineItems) {
+            const { data: prod } = await supabase.from('products').select('id').eq('sku', item.sku).maybeSingle();
+            if (!prod) { failed++; continue; }
+            const itemPayload: any = {
+              shipment_id: ship.id,
+              product_id: prod.id,
+              quantity_ordered: item.qty,
+              quantity_received: 0,
+              unit_cost_usd: item.cost,
+            };
+            const { error } = await supabase.from('shipment_items').insert(itemPayload);
+            if (error) { failed++; } else { inserted++; }
+          }
+          break;
+        }
       }
+    } catch {
+      failed += validRows.length - inserted;
     }
 
     setStats({ inserted, failed });
@@ -218,6 +283,8 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
     qc.invalidateQueries({ queryKey: ['sales'] });
     qc.invalidateQueries({ queryKey: ['shipments'] });
   };
+
+  const getHeaders = () => txType === 'expense' ? EXPENSE_HEADERS : txType === 'cost' ? COST_HEADERS : txType === 'sale' ? SALE_HEADERS : PURCHASE_HEADERS;
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!importing) { onOpenChange(v); if (!v) reset(); } }}>
@@ -245,6 +312,77 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
               </Select>
             </div>
 
+            {/* Transaction-level fields */}
+            <div className="rounded-xl bg-muted/50 border border-border p-3 space-y-3">
+              <p className="text-xs font-semibold text-foreground">Datos de la transacción (aplica a todas las líneas):</p>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Fecha</label>
+                  <Input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} className="h-8 text-xs" />
+                </div>
+
+                {(txType === 'expense' || txType === 'cost') && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Proveedor</label>
+                      <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Moneda del monto</label>
+                      <Select value={txCurrency} onValueChange={v => setTxCurrency(v as 'USD' | 'DOP')}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD ($)</SelectItem>
+                          <SelectItem value="DOP">DOP (RD$)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {txType === 'sale' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Ref. Factura</label>
+                      <Input value={txInvoiceRef} onChange={e => setTxInvoiceRef(e.target.value)} placeholder="FAC-001" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Cliente</label>
+                      <Input value={txClient} onChange={e => setTxClient(e.target.value)} placeholder="Nombre del cliente" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Estado de Pago</label>
+                      <Select value={txPaymentStatus} onValueChange={setTxPaymentStatus}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {['pending', 'paid', 'partial', 'overdue', 'cancelled'].map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {txType === 'purchase' && (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Proveedor</label>
+                      <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {txType === 'purchase' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Notas</label>
+                  <Textarea value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="Notas de la orden..." className="text-xs min-h-[40px]" rows={2} />
+                </div>
+              )}
+            </div>
+
             <div
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-border rounded-2xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
@@ -255,40 +393,36 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
               <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
             </div>
 
-            {/* Format guide per category */}
+            {/* Format guide */}
             <div className="rounded-xl bg-muted p-3 space-y-2">
-              <p className="text-xs font-semibold text-foreground">Formato esperado — {TX_LABELS[txType].label}:</p>
+              <p className="text-xs font-semibold text-foreground">Columnas del archivo Excel — solo líneas:</p>
               <div className="flex flex-wrap gap-1.5">
-                {(txType === 'expense' ? EXPENSE_HEADERS : txType === 'cost' ? COST_HEADERS : txType === 'sale' ? SALE_HEADERS : PURCHASE_HEADERS).map((h, i) => (
-                  <span key={h} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/15 text-primary">
-                    {h}
-                  </span>
+                {getHeaders().map(h => (
+                  <span key={h} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/15 text-primary">{h}</span>
                 ))}
               </div>
+
               {(txType === 'expense' || txType === 'cost') && (
-                <div className="mt-1.5 space-y-1">
-                  <p className="text-[10px] text-muted-foreground font-medium">Categorías válidas:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(txType === 'expense' ? EXPENSE_CATS : COST_CATS).map(c => (
-                      <span key={c} className="rounded-full px-1.5 py-0.5 text-[9px] bg-card text-muted-foreground border border-border">{c}</span>
-                    ))}
+                <>
+                  <p className="text-[10px] text-muted-foreground">
+                    La columna <strong>Monto</strong> se interpreta según la moneda seleccionada arriba ({txCurrency}). El sistema convierte automáticamente a la otra moneda usando la tasa del día.
+                  </p>
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground font-medium">Categorías válidas:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(txType === 'expense' ? EXPENSE_CATS : COST_CATS).map(c => (
+                        <span key={c} className="rounded-full px-1.5 py-0.5 text-[9px] bg-card text-muted-foreground border border-border">{c}</span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
-              {txType === 'sale' && (
-                <div className="mt-1.5 space-y-1">
-                  <p className="text-[10px] text-muted-foreground font-medium">Estados de pago válidos:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {['pending', 'paid', 'partial', 'overdue', 'cancelled'].map(s => (
-                      <span key={s} className="rounded-full px-1.5 py-0.5 text-[9px] bg-card text-muted-foreground border border-border">{s}</span>
-                    ))}
-                  </div>
-                </div>
+
+              {(txType === 'sale' || txType === 'purchase') && (
+                <p className="text-[10px] text-muted-foreground">
+                  Cada fila es un producto. Todas las filas pertenecen a una sola {txType === 'sale' ? 'venta' : 'orden de compra'}. El SKU debe existir en el catálogo.
+                </p>
               )}
-              {txType === 'purchase' && (
-                <p className="text-[10px] text-muted-foreground mt-1">El SKU del producto debe existir en el catálogo. Se creará una orden de compra por cada fila.</p>
-              )}
-              <p className="text-[10px] text-muted-foreground">Fecha en formato YYYY-MM-DD. Columnas en español o inglés.</p>
             </div>
 
             <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={downloadTemplate}>
@@ -299,6 +433,20 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
 
         {step === 'preview' && (
           <div className="space-y-4">
+            {/* Summary of tx-level fields */}
+            <div className="rounded-xl bg-muted/50 border border-border p-2.5 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Fecha:</span><span className="font-medium">{txDate}</span></div>
+              {(txType === 'expense' || txType === 'cost') && txVendor && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Proveedor:</span><span className="font-medium">{txVendor}</span></div>
+              )}
+              {txType === 'sale' && txInvoiceRef && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Factura:</span><span className="font-medium">{txInvoiceRef}</span></div>
+              )}
+              {txType === 'purchase' && txVendor && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Proveedor:</span><span className="font-medium">{txVendor}</span></div>
+              )}
+            </div>
+
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl bg-muted p-2">
                 <p className="text-lg font-bold">{rows.length}</p>
@@ -333,20 +481,13 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                           <>
                             <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Descripción</th>
                             <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Cat.</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">USD</th>
-                          </>
-                        ) : txType === 'sale' ? (
-                          <>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Cliente</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Total USD</th>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Estado</th>
+                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Monto ({txCurrency})</th>
                           </>
                         ) : (
                           <>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Proveedor</th>
                             <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">SKU</th>
                             <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Cant.</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Costo</th>
+                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">{txType === 'sale' ? 'Precio' : 'Costo'} USD</th>
                           </>
                         )}
                       </tr>
@@ -358,20 +499,13 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                             <>
                               <td className="px-2 py-1.5 truncate max-w-[150px]">{String(r.raw._desc)}</td>
                               <td className="px-2 py-1.5 text-muted-foreground">{String(r.raw._cat)}</td>
-                              <td className="px-2 py-1.5 text-right font-mono">${Number(r.raw._usd).toFixed(2)}</td>
-                            </>
-                          ) : txType === 'sale' ? (
-                            <>
-                              <td className="px-2 py-1.5 truncate max-w-[150px]">{String(r.raw._cliente) || '—'}</td>
-                              <td className="px-2 py-1.5 text-right font-mono">${Number(r.raw._total).toFixed(2)}</td>
-                              <td className="px-2 py-1.5 text-muted-foreground">{String(r.raw._status)}</td>
+                              <td className="px-2 py-1.5 text-right font-mono">{Number(r.raw._amt).toFixed(2)}</td>
                             </>
                           ) : (
                             <>
-                              <td className="px-2 py-1.5 truncate max-w-[100px]">{String(r.raw._supplier)}</td>
                               <td className="px-2 py-1.5 font-mono">{String(r.raw._sku)}</td>
                               <td className="px-2 py-1.5 text-right">{String(r.raw._qty)}</td>
-                              <td className="px-2 py-1.5 text-right font-mono">${Number(r.raw._cost).toFixed(2)}</td>
+                              <td className="px-2 py-1.5 text-right font-mono">${Number(r.raw._price).toFixed(2)}</td>
                             </>
                           )}
                         </tr>
@@ -388,7 +522,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={reset}>Cancelar</Button>
               <Button className="flex-1" onClick={handleImport} disabled={validRows.length === 0}>
-                Importar {validRows.length} {TX_LABELS[txType].label.toLowerCase()}
+                Importar {validRows.length} líneas
               </Button>
             </div>
           </div>
