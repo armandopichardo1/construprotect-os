@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Upload, Download, Loader2, Check, Pencil, Trash2, X, Save, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -53,6 +54,22 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const [stats, setStats] = useState({ inserted: 0, failed: 0 });
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['sale-contacts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('id, contact_name, company_name');
+      return data || [];
+    },
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
 
   // Editing state for preview
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
@@ -234,7 +251,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
           const itbis = subtotal * 0.18;
           const total = subtotal + itbis;
           const salePayload: any = {
-            date: txDate,
+date: txDate,
             subtotal_usd: subtotal,
             itbis_usd: itbis,
             total_usd: total,
@@ -242,6 +259,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             exchange_rate: exchangeRate,
             payment_status: txPaymentStatus || 'pending',
             invoice_ref: txInvoiceRef || null,
+            contact_id: txClient || null,
           };
           const { data: sale, error: se } = await supabase.from('sales').insert(salePayload).select('id').single();
           if (se || !sale) { failed += lineItems.length; break; }
@@ -358,7 +376,19 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Proveedor</label>
-                      <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      {suppliers.length > 0 ? (
+                        <SearchableSelect
+                          options={suppliers.map((s: any) => ({ value: s.name, label: s.name }))}
+                          value={txVendor}
+                          onValueChange={setTxVendor}
+                          placeholder="Seleccionar proveedor"
+                          searchPlaceholder="Buscar proveedor..."
+                          emptyMessage="No encontrado"
+                          className="h-8 text-xs"
+                        />
+                      ) : (
+                        <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Moneda del monto</label>
@@ -381,7 +411,15 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Cliente</label>
-                      <Input value={txClient} onChange={e => setTxClient(e.target.value)} placeholder="Nombre del cliente" className="h-8 text-xs" />
+                      <SearchableSelect
+                        options={contacts.map((c: any) => ({ value: c.id, label: c.contact_name + (c.company_name ? ` — ${c.company_name}` : '') }))}
+                        value={txClient}
+                        onValueChange={setTxClient}
+                        placeholder="Seleccionar cliente"
+                        searchPlaceholder="Buscar cliente..."
+                        emptyMessage="No encontrado"
+                        className="h-8 text-xs"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Estado de Pago</label>
@@ -401,7 +439,19 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Proveedor</label>
-                      <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      {suppliers.length > 0 ? (
+                        <SearchableSelect
+                          options={suppliers.map((s: any) => ({ value: s.name, label: s.name }))}
+                          value={txVendor}
+                          onValueChange={setTxVendor}
+                          placeholder="Seleccionar proveedor"
+                          searchPlaceholder="Buscar proveedor..."
+                          emptyMessage="No encontrado"
+                          className="h-8 text-xs"
+                        />
+                      ) : (
+                        <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      )}
                     </div>
                   </>
                 )}
