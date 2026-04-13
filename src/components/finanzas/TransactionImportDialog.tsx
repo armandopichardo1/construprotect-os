@@ -438,7 +438,19 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Proveedor</label>
-                      <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      {suppliers.length > 0 ? (
+                        <SearchableSelect
+                          options={suppliers.map((s: any) => ({ value: s.name, label: s.name }))}
+                          value={txVendor}
+                          onValueChange={setTxVendor}
+                          placeholder="Seleccionar proveedor"
+                          searchPlaceholder="Buscar proveedor..."
+                          emptyMessage="No encontrado"
+                          className="h-8 text-xs"
+                        />
+                      ) : (
+                        <Input value={txVendor} onChange={e => setTxVendor(e.target.value)} placeholder="Nombre del proveedor" className="h-8 text-xs" />
+                      )}
                     </div>
                   </>
                 )}
