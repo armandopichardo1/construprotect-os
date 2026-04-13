@@ -652,16 +652,6 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         });
         await supabase.from('sale_items').insert(itemsData);
 
-        // Auto-create journal entry for the sale
-        const clientName = contacts.find(c => c.id === contactId)?.contact_name || 'Cliente';
-        const saleDesc = `Venta — ${clientName}${invoiceRef ? ` — ${invoiceRef}` : ''} — ${formatUSD(totalSale)}`;
-        try {
-          await createJournalFromPreview(saleDesc, `Auto-generado por venta. Ítems: ${saleItems.map(i => {
-            const p = products.find((pr: any) => pr.id === i.product_id);
-            return `${p?.name || i.product_id} x${i.quantity}`;
-          }).join(', ')}`);
-        } catch (je) { console.error('Journal entry for sale failed:', je); }
-
         toast.success('Venta registrada');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
@@ -702,12 +692,6 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
       const { error } = await supabase.from(table).insert(row);
       if (error) throw error;
-
-      // Auto-create journal entry for expense/cost
-      const txDesc = `${manualType === 'expense' ? 'Gasto' : 'Costo'} — ${description.trim()}${vendor ? ` — ${vendor.trim()}` : ''} — ${formatUSD(finalUsd)}`;
-      try {
-        await createJournalFromPreview(txDesc, `Auto-generado por ${manualType === 'expense' ? 'gasto' : 'costo'}. Categoría: ${category}`);
-      } catch (je) { console.error('Journal entry for expense/cost failed:', je); }
 
       toast.success(manualType === 'expense' ? 'Gasto registrado' : 'Costo registrado');
       queryClient.invalidateQueries({ queryKey: [table] });
