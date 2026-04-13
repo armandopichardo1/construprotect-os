@@ -822,8 +822,21 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
             line_total_usd: i.line_total_usd, margin_pct: i.margin_pct || 0,
           })));
         }
-        // Auto journal entry for sale
+        // Auto journal entry for sale (revenue + ITBIS + COGS)
         const saleLines = buildSaleJournalLines(accounts, preview.data.total_usd, preview.data.subtotal_usd, preview.data.itbis_usd, 'pending');
+        
+        // Calculate COGS and add inventory reduction lines
+        const totalCogs = (preview.data.items || []).reduce((s: number, i: any) => {
+          const prod = products.find((p: any) => p.id === i.product_id);
+          return s + (Number(prod?.unit_cost_usd || 0) * i.quantity);
+        }, 0);
+        if (totalCogs > 0) {
+          const cogsAcct = accounts.find((a: any) => a.code === '50000' || (a.code?.startsWith('500') && a.account_type === 'Costo'));
+          const merchAcct = accounts.find((a: any) => a.code === '13100' || (a.code?.startsWith('131') && a.account_type === 'Activo'));
+          if (cogsAcct) saleLines.push({ accountId: cogsAcct.id, debit: totalCogs, credit: 0 });
+          if (merchAcct) saleLines.push({ accountId: merchAcct.id, debit: 0, credit: totalCogs });
+        }
+
         const contactName = preview.data.contact_name || '';
         await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
         toast.success('Venta registrada con asiento contable');
