@@ -630,8 +630,18 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                   </table>
                 </div>
               </div>
+              <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={addNewRow}>
+                <Plus className="w-3.5 h-3.5" /> Añadir línea
+              </Button>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-xs text-muted-foreground mb-2">No hay líneas cargadas</p>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={addNewRow}>
+                  <Plus className="w-3.5 h-3.5" /> Añadir línea manualmente
+                </Button>
+              </div>
             )}
-
             {/* Totals summary */}
             <div className="rounded-xl bg-muted/70 border border-border p-3 space-y-1.5">
               <p className="text-xs font-semibold text-foreground mb-2">Resumen a registrar:</p>
