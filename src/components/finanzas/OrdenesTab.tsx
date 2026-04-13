@@ -567,6 +567,18 @@ export function OrdenesTab() {
         }}
         editShipment={editShipment}
       />
+
+      {/* Edit Sale Dialog */}
+      <SaleEditDialog
+        open={!!editSale}
+        onOpenChange={v => {
+          if (!v) {
+            setEditSale(null);
+            queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+          }
+        }}
+        sale={editSale}
+      />
     </div>
   );
 }
