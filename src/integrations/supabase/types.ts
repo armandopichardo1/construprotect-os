@@ -1520,9 +1520,58 @@ export type Database = {
           },
         ]
       }
+      shipment_payments: {
+        Row: {
+          account_id: string
+          amount_usd: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          shipment_id: string
+        }
+        Insert: {
+          account_id: string
+          amount_usd?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          shipment_id: string
+        }
+        Update: {
+          account_id?: string
+          amount_usd?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_payments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_payments_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           actual_arrival: string | null
+          amount_paid_usd: number
           created_at: string
           created_by: string | null
           customs_cost_usd: number | null
@@ -1543,6 +1592,7 @@ export type Database = {
         }
         Insert: {
           actual_arrival?: string | null
+          amount_paid_usd?: number
           created_at?: string
           created_by?: string | null
           customs_cost_usd?: number | null
@@ -1563,6 +1613,7 @@ export type Database = {
         }
         Update: {
           actual_arrival?: string | null
+          amount_paid_usd?: number
           created_at?: string
           created_by?: string | null
           customs_cost_usd?: number | null
