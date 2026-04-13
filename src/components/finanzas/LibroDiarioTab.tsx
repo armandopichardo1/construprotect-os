@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
+import { JournalEntryDuplicateDialog } from './JournalEntryDuplicateDialog';
 
 interface JournalEntry {
   id: string;
@@ -85,6 +86,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [duplicateEntry, setDuplicateEntry] = useState<any>(null);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -296,7 +298,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
               <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
               <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
               <SortableHead field="debit_dop" className="text-right">DOP</SortableHead>
-              <TableHead className="text-[10px] w-[50px]"></TableHead>
+              <TableHead className="text-[10px] w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -352,10 +354,16 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
-                    <button onClick={() => setDeleteEntry(e)} title="Eliminar asiento"
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => setDuplicateEntry(e.raw)} title="Duplicar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteEntry(e)} title="Eliminar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -399,6 +407,14 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Duplicate Dialog */}
+      <JournalEntryDuplicateDialog
+        open={!!duplicateEntry}
+        onOpenChange={(v) => { if (!v) setDuplicateEntry(null); }}
+        sourceEntry={duplicateEntry}
+        rate={rate}
+      />
     </div>
   );
 }
