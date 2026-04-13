@@ -111,11 +111,11 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
   // Unmapped count
   const unmappedCount = useMemo(() => {
     let count = 0;
-    filteredSales.forEach((s: any) => { if (!s.account_id && !incomeAccount) count++; });
+    filteredSales.forEach((s: any) => { if (!s.account_id && !defaults.incomeAccount) count++; });
     filteredExpenses.forEach((e: any) => { if (!e.account_id && !findExpenseAccount(accounts, e.category)) count++; });
     filteredCosts.forEach((c: any) => { if (!c.account_id && !findCostAccount(accounts, c.category)) count++; });
     return count;
-  }, [filteredSales, filteredExpenses, filteredCosts, accounts, incomeAccount]);
+  }, [filteredSales, filteredExpenses, filteredCosts, accounts, defaults.incomeAccount]);
 
   const totalDebits = rows.reduce((s, r) => s + r.debits, 0);
   const totalCredits = rows.reduce((s, r) => s + r.credits, 0);
