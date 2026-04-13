@@ -372,15 +372,21 @@ export default function DashboardPage() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon={DollarSign} variant="primary" />
-          <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon={TrendingUp} variant="success" />
-          <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart3} variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
-          <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon={Warehouse} />
-          <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon={Bell}
-            variant={inventoryStats?.alerts ? 'warning' : 'default'}
-            subtitle={`${(inventoryStats?.totalUnits || 0).toLocaleString()} unidades total`} />
-        </div>
+        {(() => {
+          const netCashFlow = (revenueData?.totalRevenue || 0) - (revenueData?.totalCogs || 0) - (revenueData?.totalDirectCosts || 0) - (revenueData?.totalExpenses || 0);
+          return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon={DollarSign} variant="primary" />
+            <KpiCard title="Flujo Caja Neto" value={fmt(netCashFlow)} icon={TrendingUp} variant={netCashFlow >= 0 ? 'success' : 'destructive'} subtitle={`USD ${formatUSD(netCashFlow)}`} />
+            <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon={TrendingUp} variant="success" />
+            <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart3} variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
+            <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon={Warehouse} />
+            <KpiCard title="Alertas Stock" value={`${inventoryStats?.alerts || 0}`} icon={Bell}
+              variant={inventoryStats?.alerts ? 'warning' : 'default'}
+              subtitle={`${(inventoryStats?.totalUnits || 0).toLocaleString()} unidades total`} />
+          </div>
+          );
+        })()}
 
         {/* Row 2: Revenue chart + Revenue by Category donut */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
