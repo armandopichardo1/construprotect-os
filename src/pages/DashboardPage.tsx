@@ -257,6 +257,24 @@ export default function DashboardPage() {
     },
   });
 
+  // Net Cash Flow: actual cash movements (paid sales as inflows, expenses + costs as outflows)
+  const { data: netCashFlow } = useQuery({
+    queryKey: ['dashboard-net-cashflow'],
+    queryFn: async () => {
+      const [{ data: sales }, { data: expenses }, { data: costs }] = await Promise.all([
+        supabase.from('sales').select('total_usd, payment_status'),
+        supabase.from('expenses').select('amount_usd'),
+        supabase.from('costs').select('amount_usd'),
+      ]);
+      const inflows = (sales || [])
+        .filter((s: any) => s.payment_status === 'paid')
+        .reduce((sum: number, s: any) => sum + Number(s.total_usd || 0), 0);
+      const expenseOutflows = (expenses || []).reduce((sum: number, e: any) => sum + Number(e.amount_usd || 0), 0);
+      const costOutflows = (costs || []).reduce((sum: number, c: any) => sum + Number(c.amount_usd || 0), 0);
+      return { inflows, outflows: expenseOutflows + costOutflows, net: inflows - expenseOutflows - costOutflows };
+    },
+  });
+
   const { data: clientTrends } = useQuery({
     queryKey: ['dashboard-client-trends'],
     queryFn: async () => {
@@ -373,11 +391,13 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         {(() => {
-          const netCashFlow = (revenueData?.totalRevenue || 0) - (revenueData?.totalCogs || 0) - (revenueData?.totalDirectCosts || 0) - (revenueData?.totalExpenses || 0);
+          const cashNet = netCashFlow?.net || 0;
+          const cashIn = netCashFlow?.inflows || 0;
+          const cashOut = netCashFlow?.outflows || 0;
           return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon={DollarSign} variant="primary" />
-            <KpiCard title="Flujo Caja Neto" value={fmt(netCashFlow)} icon={TrendingUp} variant={netCashFlow >= 0 ? 'success' : 'destructive'} subtitle={`USD ${formatUSD(netCashFlow)}`} />
+            <KpiCard title="Flujo Caja Neto" value={fmt(cashNet)} icon={TrendingUp} variant={cashNet >= 0 ? 'success' : 'destructive'} subtitle={`Entradas: ${formatUSD(cashIn)} | Salidas: ${formatUSD(cashOut)}`} />
             <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon={TrendingUp} variant="success" />
             <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart3} variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
             <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon={Warehouse} />
