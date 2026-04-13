@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatUSD } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import {
-  buildAccountAccumulator, accumulateJournalEntries, isDebitNatural,
+  buildAccountAccumulator, accumulateJournalEntries,
 } from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
