@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
+import { fetchAccounts, findTransitAccount, findInventoryAccount, findCxPAccount } from '@/lib/accounting-utils';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ShipmentDialog } from './ShipmentDialog';
 import { ShipmentPaymentDialog } from './ShipmentPaymentDialog';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, PackageCheck, CreditCard, Badge } from 'lucide-react';
+import { Plus, Pencil, Trash2, PackageCheck, CreditCard } from 'lucide-react';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 const STATUS_STEPS = ['ordered', 'in_transit', 'customs', 'warehouse', 'received'];
@@ -46,24 +47,9 @@ export function ShipmentsTab() {
     if (totalCost <= 0) return;
 
     try {
-      const { data: accts } = await supabase.from('chart_of_accounts')
-        .select('id, code, description, account_type')
-        .eq('is_active', true).order('code');
-      const accounts = accts || [];
-
-      // Inventory in Transit (asset) — look for code starting with 13 or 14 with "tránsito"
-      const transitAcct = accounts.find(a =>
-        a.account_type === 'Activo' && (
-          a.description?.toLowerCase().includes('tránsito') ||
-          a.description?.toLowerCase().includes('transito') ||
-          a.code?.startsWith('14') || a.code?.startsWith('13')
-        )
-      ) || accounts.find(a => a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar'));
-
-      const cxpAcct = accounts.find(a =>
-        a.code?.startsWith('21') || a.code?.startsWith('20') ||
-        (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
-      );
+      const accounts = await fetchAccounts();
+      const transitAcct = findTransitAccount(accounts);
+      const cxpAcct = findCxPAccount(accounts);
 
       if (transitAcct && cxpAcct) {
         const desc = `Orden de compra — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
@@ -77,7 +63,7 @@ export function ShipmentsTab() {
 
         if (entry) {
           await supabase.from('journal_entry_lines').insert([
-            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Inventario en tránsito' },
+            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Compras en tránsito' },
             { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación con proveedor' },
           ]);
         }
@@ -146,25 +132,9 @@ export function ShipmentsTab() {
     const totalCost = items.reduce((s: number, i: any) => s + (Number(i.unit_cost_usd || 0) * Number(i.quantity_ordered || 0)), 0);
     if (totalCost > 0) {
       try {
-        const { data: accts } = await supabase.from('chart_of_accounts')
-          .select('id, code, description, account_type')
-          .eq('is_active', true).order('code');
-        const accounts = accts || [];
-
-        const invAcct = accounts.find(a =>
-          a.account_type === 'Activo' && (
-            a.description?.toLowerCase().includes('inventar') &&
-            !a.description?.toLowerCase().includes('tránsito') &&
-            !a.description?.toLowerCase().includes('transito')
-          )
-        ) || accounts.find(a => a.code?.startsWith('14') || a.code?.startsWith('13'));
-
-        const transitAcct = accounts.find(a =>
-          a.account_type === 'Activo' && (
-            a.description?.toLowerCase().includes('tránsito') ||
-            a.description?.toLowerCase().includes('transito')
-          )
-        ) || accounts.find(a => a.code?.startsWith('14') || a.code?.startsWith('13'));
+        const accounts = await fetchAccounts();
+        const invAcct = findInventoryAccount(accounts);
+        const transitAcct = findTransitAccount(accounts);
 
         if (invAcct && transitAcct && invAcct.id !== transitAcct.id) {
           const desc = `Recepción inventario — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
@@ -178,22 +148,19 @@ export function ShipmentsTab() {
           if (entry) {
             await supabase.from('journal_entry_lines').insert([
               { journal_entry_id: entry.id, account_id: invAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Inventario recibido' },
-              { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Cierre inventario en tránsito' },
+              { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Cierre compras en tránsito' },
             ]);
           }
         } else if (invAcct) {
-          // Fallback: if no separate transit account, use old behavior (Debit Inv, Credit CxP)
-          const cxpAcct = accounts.find(a =>
-            a.code?.startsWith('21') || a.code?.startsWith('20') ||
-            (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
-          );
+          // Fallback: if no separate transit account
+          const cxpAcct = findCxPAccount(accounts);
           if (cxpAcct) {
             const desc = `Recepción inventario — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
             const { data: entry } = await supabase.from('journal_entries').insert({
               description: desc,
               total_debit_usd: totalCost,
               total_credit_usd: totalCost,
-              notes: `Recepción de mercancía. Productos: ${items.map((i: any) => `${i.products?.name || i.product_id} x${i.quantity_ordered}`).join(', ')}`,
+              notes: `Recepción de mercancía.`,
             }).select().single();
 
             if (entry) {
