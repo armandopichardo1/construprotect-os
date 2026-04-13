@@ -47,24 +47,9 @@ export function ShipmentsTab() {
     if (totalCost <= 0) return;
 
     try {
-      const { data: accts } = await supabase.from('chart_of_accounts')
-        .select('id, code, description, account_type')
-        .eq('is_active', true).order('code');
-      const accounts = accts || [];
-
-      // Inventory in Transit (asset) — look for code starting with 13 or 14 with "tránsito"
-      const transitAcct = accounts.find(a =>
-        a.account_type === 'Activo' && (
-          a.description?.toLowerCase().includes('tránsito') ||
-          a.description?.toLowerCase().includes('transito') ||
-          a.code?.startsWith('14') || a.code?.startsWith('13')
-        )
-      ) || accounts.find(a => a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar'));
-
-      const cxpAcct = accounts.find(a =>
-        a.code?.startsWith('21') || a.code?.startsWith('20') ||
-        (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
-      );
+      const accounts = await fetchAccounts();
+      const transitAcct = findTransitAccount(accounts);
+      const cxpAcct = findCxPAccount(accounts);
 
       if (transitAcct && cxpAcct) {
         const desc = `Orden de compra — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
@@ -78,7 +63,7 @@ export function ShipmentsTab() {
 
         if (entry) {
           await supabase.from('journal_entry_lines').insert([
-            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Inventario en tránsito' },
+            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Compras en tránsito' },
             { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación con proveedor' },
           ]);
         }
