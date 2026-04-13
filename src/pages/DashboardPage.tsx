@@ -257,49 +257,65 @@ export default function DashboardPage() {
     },
   });
 
-  // Net Cash Flow: derived from journal entry lines touching cash accounts (10000-10499)
-  // Falls back to sales/expenses/costs if no journal entries exist
+  // Net Cash Flow: reuses same logic as Finanzas > Flujo de Caja tab
+  // Reads journal entries touching cash accounts (10000-10499), last 12 months cumulative
   const isCashAccount = (code: string | null | undefined) =>
     code != null && /^10[0-4]\d{2}$/.test(code);
 
   const { data: netCashFlow } = useQuery({
     queryKey: ['dashboard-net-cashflow'],
     queryFn: async () => {
-      // Try journal-entry based (most accurate)
-      const { data: journalEntries } = await supabase
-        .from('journal_entries')
-        .select('id, date, journal_entry_lines(debit_usd, credit_usd, chart_of_accounts(code))');
+      const [{ data: journalEntries }, { data: sales }, { data: expenses }, { data: costs }] = await Promise.all([
+        supabase.from('journal_entries').select('id, date, journal_entry_lines(debit_usd, credit_usd, chart_of_accounts(code))'),
+        supabase.from('sales').select('total_usd, payment_status, date'),
+        supabase.from('expenses').select('amount_usd, date'),
+        supabase.from('costs').select('amount_usd, date'),
+      ]);
 
-      let jeInflows = 0;
-      let jeOutflows = 0;
-      let hasJournalData = false;
-
+      // Check for journal-based cash data
+      const jeCashFlows: { key: string; inflow: number; outflow: number }[] = [];
       for (const je of (journalEntries || [])) {
+        const dateKey = je.date?.substring(0, 7);
+        if (!dateKey) continue;
         for (const line of (je.journal_entry_lines || [])) {
           const code = (line as any).chart_of_accounts?.code;
           if (!isCashAccount(code)) continue;
-          hasJournalData = true;
-          jeInflows += Number((line as any).debit_usd || 0);
-          jeOutflows += Number((line as any).credit_usd || 0);
+          jeCashFlows.push({ key: dateKey, inflow: Number((line as any).debit_usd || 0), outflow: Number((line as any).credit_usd || 0) });
         }
       }
+      const hasJournalData = jeCashFlows.length > 0;
 
-      if (hasJournalData) {
-        return { inflows: jeInflows, outflows: jeOutflows, net: jeInflows - jeOutflows };
+      // Build monthly cumulative over last 12 months (same as CashFlowTab)
+      const now = new Date();
+      let cumulative = 0;
+      let totalIn = 0;
+      let totalOut = 0;
+
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+        let monthIn: number;
+        let monthOut: number;
+
+        if (hasJournalData) {
+          monthIn = jeCashFlows.filter(f => f.key === key).reduce((s, f) => s + f.inflow, 0);
+          monthOut = jeCashFlows.filter(f => f.key === key).reduce((s, f) => s + f.outflow, 0);
+        } else {
+          monthIn = (sales || [])
+            .filter((s: any) => s.date?.startsWith(key) && s.payment_status === 'paid')
+            .reduce((s: number, r: any) => s + Number(r.total_usd || 0), 0);
+          const expOut = (expenses || []).filter((e: any) => e.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+          const costOut = (costs || []).filter((c: any) => c.date?.startsWith(key)).reduce((s: number, r: any) => s + Number(r.amount_usd || 0), 0);
+          monthOut = expOut + costOut;
+        }
+
+        totalIn += monthIn;
+        totalOut += monthOut;
+        cumulative += monthIn - monthOut;
       }
 
-      // Fallback: sales/expenses/costs
-      const [{ data: sales }, { data: expenses }, { data: costs }] = await Promise.all([
-        supabase.from('sales').select('total_usd, payment_status'),
-        supabase.from('expenses').select('amount_usd'),
-        supabase.from('costs').select('amount_usd'),
-      ]);
-      const inflows = (sales || [])
-        .filter((s: any) => s.payment_status === 'paid')
-        .reduce((sum: number, s: any) => sum + Number(s.total_usd || 0), 0);
-      const expenseOutflows = (expenses || []).reduce((sum: number, e: any) => sum + Number(e.amount_usd || 0), 0);
-      const costOutflows = (costs || []).reduce((sum: number, c: any) => sum + Number(c.amount_usd || 0), 0);
-      return { inflows, outflows: expenseOutflows + costOutflows, net: inflows - expenseOutflows - costOutflows };
+      return { inflows: totalIn, outflows: totalOut, net: cumulative };
     },
   });
 
