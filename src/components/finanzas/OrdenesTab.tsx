@@ -451,6 +451,13 @@ export function OrdenesTab() {
                 <DialogDescription>Detalle de la orden de venta.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Action buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                    onClick={() => { setEditSale(detailOrder); setDetailOrder(null); }}>
+                    <Pencil className="w-3.5 h-3.5" /> Editar Venta
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 text-xs">
                     <User className="w-3.5 h-3.5 text-muted-foreground" />
