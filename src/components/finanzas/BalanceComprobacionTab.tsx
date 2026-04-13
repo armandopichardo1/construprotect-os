@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Download, DollarSign, ArrowLeftRight, AlertTriangle, BookOpen } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
+import { buildAccountAccumulator, findExpenseAccount, findCostAccount, getDefaultAccounts } from '@/lib/account-mapping';
 
 const TOOLTIP_STYLE = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
@@ -72,101 +73,11 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
   }, [saleItems, period, filterByDate]);
 
-  // Find default accounts by code prefix
-  const findAccount = (prefix: string) => accounts.find((a: any) => a.code?.startsWith(prefix));
-  const incomeAccount = findAccount('41') || findAccount('40');
-  const cxcAccount = findAccount('121') || findAccount('12');
-  const cogsAccount = findAccount('50') || accounts.find((a: any) => a.account_type === 'Costo');
-  const inventoryAccount = findAccount('131') || findAccount('13');
-  const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
-  const cxpAccount = findAccount('201') || findAccount('20');
+  const defaults = getDefaultAccounts(accounts);
 
   const rows = useMemo(() => {
-    const accMap: Record<string, { debits: number; credits: number }> = {};
-    const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
-
-    // === VENTAS (partida doble completa) ===
-    filteredSales.forEach((s: any) => {
-      const incId = s.account_id || incomeAccount?.id;
-      const amount = Number(s.total_usd || 0);
-      if (!incId || amount === 0) return;
-
-      // Credit: Ingreso
-      ensure(incId);
-      accMap[incId].credits += amount;
-
-      if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        // Debit: CxC (venta pendiente de cobro)
-        if (cxcAccount) {
-          ensure(cxcAccount.id);
-          accMap[cxcAccount.id].debits += amount;
-        }
-      } else if (s.payment_status === 'paid') {
-        // Debit: Caja/Banco (venta cobrada)
-        if (cashAccount) {
-          ensure(cashAccount.id);
-          accMap[cashAccount.id].debits += amount;
-        }
-      }
-    });
-
-    // === COGS / Inventario (partida doble) ===
-    filteredSaleItems.forEach((si: any) => {
-      const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
-      if (cogsAmt === 0) return;
-      // Debit: Costo de Ventas
-      if (cogsAccount) {
-        ensure(cogsAccount.id);
-        accMap[cogsAccount.id].debits += cogsAmt;
-      }
-      // Credit: Inventarios
-      if (inventoryAccount) {
-        ensure(inventoryAccount.id);
-        accMap[inventoryAccount.id].credits += cogsAmt;
-      }
-    });
-
-    // === GASTOS (partida doble: Debit Gasto, Credit Caja/Banco) ===
-    filteredExpenses.forEach((e: any) => {
-      const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
-      const amount = Number(e.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      // Debit: Gasto
-      ensure(accId);
-      accMap[accId].debits += amount;
-      // Credit: Caja/Banco (salida de efectivo)
-      if (cashAccount) {
-        ensure(cashAccount.id);
-        accMap[cashAccount.id].credits += amount;
-      }
-    });
-
-    // === COSTOS (partida doble: Debit Costo, Credit CxP o Caja) ===
-    filteredCosts.forEach((c: any) => {
-      const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
-      const amount = Number(c.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      // Debit: Costo
-      ensure(accId);
-      accMap[accId].debits += amount;
-      // Credit: Cuentas por Pagar o Caja/Banco
-      const counterAcct = cxpAccount || cashAccount;
-      if (counterAcct) {
-        ensure(counterAcct.id);
-        accMap[counterAcct.id].credits += amount;
-      }
-    });
-
-    // === ASIENTOS MANUALES (journal entries) ===
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
-    filteredJournals.forEach((je: any) => {
-      je.journal_entry_lines?.forEach((line: any) => {
-        if (!line.account_id) return;
-        ensure(line.account_id);
-        accMap[line.account_id].debits += Number(line.debit_usd || 0);
-        accMap[line.account_id].credits += Number(line.credit_usd || 0);
-      });
-    });
+    const accMap = buildAccountAccumulator(accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, filteredJournals);
 
     // Build rows
     const result: AccountRow[] = accounts
@@ -195,7 +106,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, filterByDate, journalEntries]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {
