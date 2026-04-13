@@ -191,6 +191,9 @@ export function ShipmentsTab() {
           const stepIdx = STATUS_STEPS.indexOf(s.status);
           const itemCount = s.shipment_items?.length || 0;
           const payStatus = s.payment_status || 'pending';
+          const totalCostPO = Number(s.total_cost_usd || 0);
+          const paidAmount = Number(s.amount_paid_usd || 0);
+          const pendingBalance = totalCostPO - paidAmount;
           return (
             <div key={s.id} className="rounded-2xl bg-card border border-border p-5 space-y-4">
               <div className="flex justify-between items-start">
@@ -204,16 +207,16 @@ export function ShipmentsTab() {
                     {PAYMENT_LABELS[payStatus] || payStatus}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {itemCount} ítems · {formatUSD(Number(s.total_cost_usd))}
-                    {(Number(s.shipping_cost_usd) > 0 || Number(s.customs_cost_usd) > 0) && (
-                      <span className="ml-1 text-[10px]">(envío: {formatUSD(Number(s.shipping_cost_usd || 0))}, aduana: {formatUSD(Number(s.customs_cost_usd || 0))})</span>
+                    {itemCount} ítems · {formatUSD(totalCostPO)}
+                    {payStatus === 'partial' && (
+                      <span className="ml-1 text-[10px] text-amber-400">(saldo: {formatUSD(pendingBalance)})</span>
                     )}
                   </span>
                   {s.estimated_arrival && <span className="text-xs text-primary font-medium">ETA: {s.estimated_arrival}</span>}
                   <div className="flex gap-1">
-                    {payStatus !== 'paid' && s.status !== 'received' && (
+                    {payStatus !== 'paid' && (
                       <Button size="sm" variant="outline" className="gap-1 text-xs h-7" onClick={() => setPayShipment(s)}>
-                        <CreditCard className="w-3 h-3" /> Pagar
+                        <CreditCard className="w-3 h-3" /> {payStatus === 'partial' ? 'Abonar' : 'Pagar'}
                       </Button>
                     )}
                     {s.status !== 'received' && (
