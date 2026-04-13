@@ -81,83 +81,94 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
   const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
   const cxpAccount = findAccount('201') || findAccount('20');
 
+  // Collect journal entry IDs that were auto-generated from sales/expenses/costs
+  // to avoid double-counting when we also process raw transactions
+  const journalLinkedIds = useMemo(() => {
+    const ids = new Set<string>();
+    journalEntries.forEach((je: any) => {
+      if (je.notes && /auto-generado/i.test(je.notes)) ids.add(je.id);
+    });
+    return ids;
+  }, [journalEntries]);
+
   const rows = useMemo(() => {
     const accMap: Record<string, { debits: number; credits: number }> = {};
     const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
 
-    // === VENTAS (partida doble completa) ===
+    // === VENTAS sin asiento contable (legacy) ===
+    // Check which sales have a matching journal entry by looking for description patterns
+    const salesWithJournal = new Set<string>();
+    journalEntries.forEach((je: any) => {
+      if (je.description?.startsWith('Venta —') || je.description?.startsWith('Venta —')) {
+        // Mark as covered by journal
+        salesWithJournal.add(je.description);
+      }
+    });
+
     filteredSales.forEach((s: any) => {
+      // Skip if this sale likely has an auto-generated journal entry
+      const hasJournal = journalEntries.some((je: any) =>
+        je.notes && /auto-generado.*venta/i.test(je.notes) &&
+        Math.abs(Number(je.total_debit_usd) - Number(s.total_usd || 0)) < 0.02
+      );
+      if (hasJournal) return;
+
       const incId = s.account_id || incomeAccount?.id;
       const amount = Number(s.total_usd || 0);
       if (!incId || amount === 0) return;
 
-      // Credit: Ingreso
       ensure(incId);
       accMap[incId].credits += amount;
 
       if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        // Debit: CxC (venta pendiente de cobro)
-        if (cxcAccount) {
-          ensure(cxcAccount.id);
-          accMap[cxcAccount.id].debits += amount;
-        }
+        if (cxcAccount) { ensure(cxcAccount.id); accMap[cxcAccount.id].debits += amount; }
       } else if (s.payment_status === 'paid') {
-        // Debit: Caja/Banco (venta cobrada)
-        if (cashAccount) {
-          ensure(cashAccount.id);
-          accMap[cashAccount.id].debits += amount;
-        }
+        if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].debits += amount; }
       }
     });
 
-    // === COGS / Inventario (partida doble) ===
+    // === COGS / Inventario (solo para ventas sin journal) ===
     filteredSaleItems.forEach((si: any) => {
       const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
       if (cogsAmt === 0) return;
-      // Debit: Costo de Ventas
-      if (cogsAccount) {
-        ensure(cogsAccount.id);
-        accMap[cogsAccount.id].debits += cogsAmt;
-      }
-      // Credit: Inventarios
-      if (inventoryAccount) {
-        ensure(inventoryAccount.id);
-        accMap[inventoryAccount.id].credits += cogsAmt;
-      }
+      if (cogsAccount) { ensure(cogsAccount.id); accMap[cogsAccount.id].debits += cogsAmt; }
+      if (inventoryAccount) { ensure(inventoryAccount.id); accMap[inventoryAccount.id].credits += cogsAmt; }
     });
 
-    // === GASTOS (partida doble: Debit Gasto, Credit Caja/Banco) ===
+    // === GASTOS sin asiento contable (legacy) ===
     filteredExpenses.forEach((e: any) => {
+      const hasJournal = journalEntries.some((je: any) =>
+        je.notes && /auto-generado.*gasto/i.test(je.notes) &&
+        Math.abs(Number(je.total_debit_usd) - Number(e.amount_usd || 0)) < 0.02
+      );
+      if (hasJournal) return;
+
       const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
       const amount = Number(e.amount_usd || 0);
       if (!accId || amount === 0) return;
-      // Debit: Gasto
       ensure(accId);
       accMap[accId].debits += amount;
-      // Credit: Caja/Banco (salida de efectivo)
-      if (cashAccount) {
-        ensure(cashAccount.id);
-        accMap[cashAccount.id].credits += amount;
-      }
+      if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].credits += amount; }
     });
 
-    // === COSTOS (partida doble: Debit Costo, Credit CxP o Caja) ===
+    // === COSTOS sin asiento contable (legacy) ===
     filteredCosts.forEach((c: any) => {
+      const hasJournal = journalEntries.some((je: any) =>
+        je.notes && /auto-generado.*costo/i.test(je.notes) &&
+        Math.abs(Number(je.total_debit_usd) - Number(c.amount_usd || 0)) < 0.02
+      );
+      if (hasJournal) return;
+
       const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
       const amount = Number(c.amount_usd || 0);
       if (!accId || amount === 0) return;
-      // Debit: Costo
       ensure(accId);
       accMap[accId].debits += amount;
-      // Credit: Cuentas por Pagar o Caja/Banco
       const counterAcct = cxpAccount || cashAccount;
-      if (counterAcct) {
-        ensure(counterAcct.id);
-        accMap[counterAcct.id].credits += amount;
-      }
+      if (counterAcct) { ensure(counterAcct.id); accMap[counterAcct.id].credits += amount; }
     });
 
-    // === ASIENTOS MANUALES (journal entries) ===
+    // === TODOS LOS ASIENTOS CONTABLES (journal entries) ===
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
     filteredJournals.forEach((je: any) => {
       je.journal_entry_lines?.forEach((line: any) => {
@@ -186,7 +197,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
       })
       .filter(r => showEmpty || r.debits > 0 || r.credits > 0);
 
-    // Sort by type order then code
     result.sort((a, b) => {
       const ta = TYPE_ORDER.indexOf(a.account_type);
       const tb = TYPE_ORDER.indexOf(b.account_type);
@@ -195,7 +205,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount, filterByDate]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {
