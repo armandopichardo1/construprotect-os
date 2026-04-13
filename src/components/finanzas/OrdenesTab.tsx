@@ -299,6 +299,10 @@ export function OrdenesTab() {
                 <div className="space-y-4">
                   {/* Action buttons */}
                   <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                      onClick={() => { setEditShipment(detailOrder); setDetailOrder(null); }}>
+                      <Pencil className="w-3.5 h-3.5" /> Editar Orden
+                    </Button>
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) > 0 && (
                       <Button size="sm" variant="default" className="gap-1.5 text-xs" disabled={receiving}
                         onClick={() => receiveShipment(detailOrder)}>
@@ -308,7 +312,7 @@ export function OrdenesTab() {
                     )}
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) === 0 && (
                       <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-1.5">
-                        ⚠️ Sin ítems — edita este envío en Inventario &gt; Envíos para agregar productos antes de recibir.
+                        ⚠️ Sin ítems — usa "Editar Orden" para agregar productos antes de recibir.
                       </p>
                     )}
                     {payStatus !== 'paid' && (
