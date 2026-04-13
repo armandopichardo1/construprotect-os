@@ -71,6 +71,14 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
     },
   });
 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-for-template'],
+    queryFn: async () => {
+      const { data } = await supabase.from('products').select('sku, name, unit_cost_usd, price_list_usd').eq('is_active', true).order('sku');
+      return data || [];
+    },
+  });
+
   // Editing state for preview
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Record<string, any>>({});
@@ -120,32 +128,81 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   };
 
   const downloadTemplate = () => {
-    let headers: string[] = [];
-    let example: (string | number)[] = [];
+    const wb = XLSX.utils.book_new();
 
     switch (txType) {
-      case 'expense':
-        headers = EXPENSE_HEADERS;
-        example = ['Pago internet oficina', 'utilities', 50];
+      case 'expense': {
+        const rows: (string | number)[][] = [EXPENSE_HEADERS];
+        rows.push(['Pago internet oficina', 'utilities', 50]);
+        rows.push(['Compra materiales', 'purchases', 200]);
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = EXPENSE_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 18) }));
+        XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+        // Reference sheet with valid categories
+        const catRows: string[][] = [['Categorías Válidas'], ...EXPENSE_CATS.map(c => [c])];
+        const catWs = XLSX.utils.aoa_to_sheet(catRows);
+        catWs['!cols'] = [{ wch: 20 }];
+        XLSX.utils.book_append_sheet(wb, catWs, 'Categorías');
         break;
-      case 'cost':
-        headers = COST_HEADERS;
-        example = ['Flete contenedor China', 'freight', 1200];
+      }
+      case 'cost': {
+        const rows: (string | number)[][] = [COST_HEADERS];
+        rows.push(['Flete contenedor China', 'freight', 1200]);
+        rows.push(['Seguro mercancía', 'insurance', 350]);
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = COST_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 18) }));
+        XLSX.utils.book_append_sheet(wb, ws, 'Costos');
+        const catRows: string[][] = [['Categorías Válidas'], ...COST_CATS.map(c => [c])];
+        const catWs = XLSX.utils.aoa_to_sheet(catRows);
+        catWs['!cols'] = [{ wch: 20 }];
+        XLSX.utils.book_append_sheet(wb, catWs, 'Categorías');
         break;
-      case 'sale':
-        headers = SALE_HEADERS;
-        example = ['PIR-6060-BG', 100, 28.0];
+      }
+      case 'sale': {
+        const rows: (string | number)[][] = [SALE_HEADERS];
+        if (products.length > 0) {
+          products.forEach(p => {
+            rows.push([p.sku, 1, p.price_list_usd || 0]);
+          });
+        } else {
+          rows.push(['PIR-6060-BG', 100, 28.0]);
+        }
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = SALE_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 18) }));
+        XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+        // Product reference sheet
+        if (products.length > 0) {
+          const refRows: (string | number)[][] = [['SKU', 'Nombre', 'Precio Lista USD']];
+          products.forEach(p => refRows.push([p.sku, p.name, p.price_list_usd || 0]));
+          const refWs = XLSX.utils.aoa_to_sheet(refRows);
+          refWs['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 18 }];
+          XLSX.utils.book_append_sheet(wb, refWs, 'Productos Ref');
+        }
         break;
-      case 'purchase':
-        headers = PURCHASE_HEADERS;
-        example = ['PIR-6060-BG', 100, 12.5];
+      }
+      case 'purchase': {
+        const rows: (string | number)[][] = [PURCHASE_HEADERS];
+        if (products.length > 0) {
+          products.forEach(p => {
+            rows.push([p.sku, 1, p.unit_cost_usd || 0]);
+          });
+        } else {
+          rows.push(['PIR-6060-BG', 100, 12.5]);
+        }
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = PURCHASE_HEADERS.map(h => ({ wch: Math.max(h.length + 2, 18) }));
+        XLSX.utils.book_append_sheet(wb, ws, 'Compras');
+        if (products.length > 0) {
+          const refRows: (string | number)[][] = [['SKU', 'Nombre', 'Costo USD']];
+          products.forEach(p => refRows.push([p.sku, p.name, p.unit_cost_usd || 0]));
+          const refWs = XLSX.utils.aoa_to_sheet(refRows);
+          refWs['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 18 }];
+          XLSX.utils.book_append_sheet(wb, refWs, 'Productos Ref');
+        }
         break;
+      }
     }
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 14) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, TX_LABELS[txType].label);
     XLSX.writeFile(wb, `plantilla_${txType}.xlsx`);
   };
 
