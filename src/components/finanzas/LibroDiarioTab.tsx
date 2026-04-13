@@ -67,6 +67,16 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  const { data: chartAccounts = [] } = useQuery({
+    queryKey: ['chart-of-accounts-diario'],
+    queryFn: async () => {
+      const { data } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true).order('code');
+      return data || [];
+    },
+  });
+
+  const defaults = useMemo(() => getDefaultAccounts(chartAccounts), [chartAccounts]);
+
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => {
       if (prev === field) {
