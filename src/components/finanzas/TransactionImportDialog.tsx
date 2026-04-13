@@ -431,52 +431,88 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
           </div>
         )}
 
-        {step === 'preview' && (
+        {step === 'preview' && (() => {
+          // Compute totals for preview
+          let totalAmtRaw = 0;
+          let totalUsd = 0;
+          let totalDop = 0;
+
+          if (txType === 'expense' || txType === 'cost') {
+            totalAmtRaw = validRows.reduce((s, r) => s + Number(r.raw._amt || 0), 0);
+            totalUsd = txCurrency === 'USD' ? totalAmtRaw : totalAmtRaw / exchangeRate;
+            totalDop = txCurrency === 'DOP' ? totalAmtRaw : totalAmtRaw * exchangeRate;
+          } else {
+            // sale/purchase: sum qty * price
+            totalUsd = validRows.reduce((s, r) => s + (Number(r.raw._qty || 0) * Number(r.raw._price || 0)), 0);
+            totalDop = totalUsd * exchangeRate;
+          }
+          const itbisUsd = txType === 'sale' ? totalUsd * 0.18 : 0;
+          const grandTotalUsd = totalUsd + itbisUsd;
+          const grandTotalDop = grandTotalUsd * exchangeRate;
+
+          return (
           <div className="space-y-4">
-            {/* Summary of tx-level fields */}
-            <div className="rounded-xl bg-muted/50 border border-border p-2.5 text-xs space-y-1">
-              <div className="flex justify-between"><span className="text-muted-foreground">Fecha:</span><span className="font-medium">{txDate}</span></div>
-              {(txType === 'expense' || txType === 'cost') && txVendor && (
-                <div className="flex justify-between"><span className="text-muted-foreground">Proveedor:</span><span className="font-medium">{txVendor}</span></div>
-              )}
-              {txType === 'sale' && txInvoiceRef && (
-                <div className="flex justify-between"><span className="text-muted-foreground">Factura:</span><span className="font-medium">{txInvoiceRef}</span></div>
-              )}
-              {txType === 'purchase' && txVendor && (
-                <div className="flex justify-between"><span className="text-muted-foreground">Proveedor:</span><span className="font-medium">{txVendor}</span></div>
-              )}
+            {/* Receipt-style header */}
+            <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{TX_LABELS[txType].icon}</span>
+                <p className="text-sm font-bold text-foreground">{TX_LABELS[txType].label}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className="flex justify-between col-span-2 sm:col-span-1">
+                  <span className="text-muted-foreground">Fecha:</span>
+                  <span className="font-medium">{txDate}</span>
+                </div>
+                {(txType === 'expense' || txType === 'cost') && txVendor && (
+                  <div className="flex justify-between col-span-2 sm:col-span-1">
+                    <span className="text-muted-foreground">Proveedor:</span>
+                    <span className="font-medium">{txVendor}</span>
+                  </div>
+                )}
+                {(txType === 'expense' || txType === 'cost') && (
+                  <div className="flex justify-between col-span-2 sm:col-span-1">
+                    <span className="text-muted-foreground">Moneda:</span>
+                    <span className="font-medium">{txCurrency}</span>
+                  </div>
+                )}
+                {txType === 'sale' && (
+                  <>
+                    {txClient && <div className="flex justify-between col-span-2 sm:col-span-1"><span className="text-muted-foreground">Cliente:</span><span className="font-medium">{txClient}</span></div>}
+                    {txInvoiceRef && <div className="flex justify-between col-span-2 sm:col-span-1"><span className="text-muted-foreground">Factura:</span><span className="font-medium">{txInvoiceRef}</span></div>}
+                    <div className="flex justify-between col-span-2 sm:col-span-1"><span className="text-muted-foreground">Estado pago:</span><span className="font-medium">{txPaymentStatus}</span></div>
+                  </>
+                )}
+                {txType === 'purchase' && (
+                  <>
+                    {txVendor && <div className="flex justify-between col-span-2 sm:col-span-1"><span className="text-muted-foreground">Proveedor:</span><span className="font-medium">{txVendor}</span></div>}
+                    {txNotes && <div className="flex justify-between col-span-2"><span className="text-muted-foreground">Notas:</span><span className="font-medium truncate ml-2">{txNotes}</span></div>}
+                  </>
+                )}
+                <div className="flex justify-between col-span-2 sm:col-span-1">
+                  <span className="text-muted-foreground">Tasa cambio:</span>
+                  <span className="font-medium">{exchangeRate.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-muted p-2">
-                <p className="text-lg font-bold">{rows.length}</p>
-                <p className="text-[10px] text-muted-foreground">Total filas</p>
-              </div>
-              <div className="rounded-xl bg-success/10 p-2">
-                <p className="text-lg font-bold text-success">{validRows.length}</p>
-                <p className="text-[10px] text-muted-foreground">Válidas</p>
-              </div>
-              <div className="rounded-xl bg-destructive/10 p-2">
-                <p className="text-lg font-bold text-destructive">{errorRows.length}</p>
-                <p className="text-[10px] text-muted-foreground">Errores</p>
-              </div>
-            </div>
-
+            {/* Validation counts */}
             {errorRows.length > 0 && (
-              <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-3 space-y-1 max-h-32 overflow-y-auto">
-                <p className="text-xs font-semibold text-destructive">Errores:</p>
+              <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-3 space-y-1 max-h-28 overflow-y-auto">
+                <p className="text-xs font-semibold text-destructive">{errorRows.length} fila(s) con error (no se importarán):</p>
                 {errorRows.slice(0, 10).map((r, i) => (
                   <p key={i} className="text-[10px] text-muted-foreground">Fila {rows.indexOf(r) + 2}: {r.error}</p>
                 ))}
               </div>
             )}
 
+            {/* Detailed line items */}
             {validRows.length > 0 && (
               <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto max-h-48">
+                <div className="overflow-x-auto max-h-52">
                   <table className="w-full text-xs">
-                    <thead className="bg-muted">
+                    <thead className="bg-muted sticky top-0">
                       <tr>
+                        <th className="px-2 py-1.5 text-left text-muted-foreground font-medium w-6">#</th>
                         {txType === 'expense' || txType === 'cost' ? (
                           <>
                             <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Descripción</th>
@@ -487,25 +523,28 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                           <>
                             <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">SKU</th>
                             <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Cant.</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">{txType === 'sale' ? 'Precio' : 'Costo'} USD</th>
+                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">{txType === 'sale' ? 'Precio' : 'Costo'}</th>
+                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Subtotal</th>
                           </>
                         )}
                       </tr>
                     </thead>
                     <tbody>
-                      {validRows.slice(0, 8).map((r, i) => (
+                      {validRows.map((r, i) => (
                         <tr key={i} className="border-t border-border">
+                          <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
                           {txType === 'expense' || txType === 'cost' ? (
                             <>
-                              <td className="px-2 py-1.5 truncate max-w-[150px]">{String(r.raw._desc)}</td>
-                              <td className="px-2 py-1.5 text-muted-foreground">{String(r.raw._cat)}</td>
-                              <td className="px-2 py-1.5 text-right font-mono">{Number(r.raw._amt).toFixed(2)}</td>
+                              <td className="px-2 py-1 truncate max-w-[180px]">{String(r.raw._desc)}</td>
+                              <td className="px-2 py-1 text-muted-foreground">{String(r.raw._cat)}</td>
+                              <td className="px-2 py-1 text-right font-mono">{Number(r.raw._amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </>
                           ) : (
                             <>
-                              <td className="px-2 py-1.5 font-mono">{String(r.raw._sku)}</td>
-                              <td className="px-2 py-1.5 text-right">{String(r.raw._qty)}</td>
-                              <td className="px-2 py-1.5 text-right font-mono">${Number(r.raw._price).toFixed(2)}</td>
+                              <td className="px-2 py-1 font-mono">{String(r.raw._sku)}</td>
+                              <td className="px-2 py-1 text-right">{Number(r.raw._qty)}</td>
+                              <td className="px-2 py-1 text-right font-mono">${Number(r.raw._price).toFixed(2)}</td>
+                              <td className="px-2 py-1 text-right font-mono font-medium">${(Number(r.raw._qty) * Number(r.raw._price)).toFixed(2)}</td>
                             </>
                           )}
                         </tr>
@@ -513,20 +552,47 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                     </tbody>
                   </table>
                 </div>
-                {validRows.length > 8 && (
-                  <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted">...y {validRows.length - 8} más</p>
-                )}
               </div>
             )}
 
+            {/* Totals summary */}
+            <div className="rounded-xl bg-muted/70 border border-border p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-foreground mb-2">Resumen a registrar:</p>
+              {txType === 'sale' && (
+                <>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">ITBIS (18%):</span><span className="font-mono">${itbisUsd.toFixed(2)}</span></div>
+                  <div className="border-t border-border my-1" />
+                  <div className="flex justify-between text-sm font-bold"><span>Total USD:</span><span className="font-mono">${grandTotalUsd.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${grandTotalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
+                </>
+              )}
+              {txType === 'purchase' && (
+                <>
+                  <div className="flex justify-between text-sm font-bold"><span>Total compra USD:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${totalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Se creará 1 orden de compra con {validRows.length} producto(s)</p>
+                </>
+              )}
+              {(txType === 'expense' || txType === 'cost') && (
+                <>
+                  <div className="flex justify-between text-xs"><span className="text-muted-foreground">Líneas:</span><span className="font-medium">{validRows.length}</span></div>
+                  <div className="flex justify-between text-sm font-bold"><span>Total ({txCurrency}):</span><span className="font-mono">{txCurrency === 'USD' ? '$' : 'RD$'}{totalAmtRaw.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente {txCurrency === 'USD' ? 'RD$' : 'USD'}:</span><span className="font-mono">{txCurrency === 'USD' ? `RD$${totalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : `$${totalUsd.toFixed(2)}`}</span></div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Se registrarán {validRows.length} {txType === 'expense' ? 'gasto(s)' : 'costo(s)'} individuales</p>
+                </>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={reset}>Cancelar</Button>
-              <Button className="flex-1" onClick={handleImport} disabled={validRows.length === 0}>
-                Importar {validRows.length} líneas
+              <Button className="flex-1 gap-1.5" onClick={handleImport} disabled={validRows.length === 0}>
+                <Check className="w-3.5 h-3.5" /> Aprobar y Registrar
               </Button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {step === 'importing' && (
           <div className="py-8 text-center space-y-3">
