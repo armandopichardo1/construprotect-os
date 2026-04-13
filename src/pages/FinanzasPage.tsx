@@ -117,7 +117,7 @@ export default function FinanzasPage() {
   const { data: sales = [] } = useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*, contacts(contact_name, company_name), sale_items(*, products(name, sku))').order('date', { ascending: false });
+      const { data, error } = await supabase.from('sales').select('*, contacts(contact_name, company_name), sale_items(*, products(name, sku)), chart_of_accounts(code, description)').order('date', { ascending: false });
       if (error) throw error;
       return data;
     },
