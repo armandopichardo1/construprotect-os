@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import { formatUSD, formatDOP } from '@/lib/format';
-import { buildExpenseJournalLines, buildCostJournalLines, createAutoJournal } from '@/lib/account-mapping';
+import { buildExpenseJournalLines, buildCostJournalLines, buildSaleJournalLines, createAutoJournal } from '@/lib/account-mapping';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -804,10 +804,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
             line_total_usd: i.line_total_usd, margin_pct: i.margin_pct || 0,
           })));
         }
-        toast.success('Venta registrada');
+        // Auto journal entry for sale
+        const saleLines = buildSaleJournalLines(accounts, preview.data.total_usd, preview.data.subtotal_usd, preview.data.itbis_usd, 'pending');
+        const contactName = preview.data.contact_name || '';
+        await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
+        toast.success('Venta registrada con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       }
 
       setHistory(prev => [{
