@@ -3,6 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
+import {
+  getDefaultAccounts, buildAccountAccumulator,
+  accumulateSales, accumulateCOGS, accumulateExpenses, accumulateCosts, accumulateJournalEntries,
+  findExpenseAccount, findCostAccount, isDebitNatural,
+} from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,31 +33,7 @@ interface AccountBalance {
   description: string;
   account_type: string;
   classification: string;
-  balance: number; // positive = natural direction
-}
-
-// Helpers reused from BalanceComprobacionTab logic
-function findExpenseAccount(accounts: any[], category: string) {
-  const map: Record<string, string[]> = {
-    payroll: ['601', '600'], rent: ['631', '630'], utilities: ['632', '633'],
-    insurance: ['640'], maintenance: ['636', '637'], warehouse: ['631', '630'],
-    software: ['642', '643', '644', '645'], accounting: ['641'],
-    marketing: ['621', '622', '620'], shipping: ['635'], customs: ['635'],
-    travel: ['623', '610'], samples: ['625'], office: ['634', '630'],
-    bank_fees: ['639'], purchases: ['500'], other: ['639', '630'],
-  };
-  const prefixes = map[category] || ['630'];
-  for (const prefix of prefixes) {
-    const match = accounts.find((a: any) => a.code?.startsWith(prefix) && (a.account_type === 'Gasto' || a.account_type === 'Gastos No Operacionales'));
-    if (match) return match;
-  }
-  return accounts.find((a: any) => a.account_type === 'Gasto');
-}
-
-function findCostAccount(accounts: any[], category: string) {
-  const prefix = '50';
-  return accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Costo') ||
-    accounts.find((a: any) => a.account_type === 'Costo');
+  balance: number;
 }
 
 export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: EstadoSituacionTabProps) {
