@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
+import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { toast } from 'sonner';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -36,6 +37,7 @@ export function OrdenesTab() {
   const [detailType, setDetailType] = useState<ViewMode>('compras');
   const [payShipment, setPayShipment] = useState<any>(null);
   const [editShipment, setEditShipment] = useState<any>(null);
+  const [editSale, setEditSale] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
@@ -449,6 +451,13 @@ export function OrdenesTab() {
                 <DialogDescription>Detalle de la orden de venta.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Action buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                    onClick={() => { setEditSale(detailOrder); setDetailOrder(null); }}>
+                    <Pencil className="w-3.5 h-3.5" /> Editar Venta
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 text-xs">
                     <User className="w-3.5 h-3.5 text-muted-foreground" />
@@ -557,6 +566,18 @@ export function OrdenesTab() {
           }
         }}
         editShipment={editShipment}
+      />
+
+      {/* Edit Sale Dialog */}
+      <SaleEditDialog
+        open={!!editSale}
+        onOpenChange={v => {
+          if (!v) {
+            setEditSale(null);
+            queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+          }
+        }}
+        sale={editSale}
       />
     </div>
   );
