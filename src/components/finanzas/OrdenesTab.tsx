@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard } from 'lucide-react';
+import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
+import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
 import { toast } from 'sonner';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ export function OrdenesTab() {
   const [detailOrder, setDetailOrder] = useState<any>(null);
   const [detailType, setDetailType] = useState<ViewMode>('compras');
   const [payShipment, setPayShipment] = useState<any>(null);
+  const [editShipment, setEditShipment] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
@@ -297,6 +299,10 @@ export function OrdenesTab() {
                 <div className="space-y-4">
                   {/* Action buttons */}
                   <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                      onClick={() => { setEditShipment(detailOrder); setDetailOrder(null); }}>
+                      <Pencil className="w-3.5 h-3.5" /> Editar Orden
+                    </Button>
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) > 0 && (
                       <Button size="sm" variant="default" className="gap-1.5 text-xs" disabled={receiving}
                         onClick={() => receiveShipment(detailOrder)}>
@@ -306,7 +312,7 @@ export function OrdenesTab() {
                     )}
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) === 0 && (
                       <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-1.5">
-                        ⚠️ Sin ítems — edita este envío en Inventario &gt; Envíos para agregar productos antes de recibir.
+                        ⚠️ Sin ítems — usa "Editar Orden" para agregar productos antes de recibir.
                       </p>
                     )}
                     {payStatus !== 'paid' && (
@@ -538,6 +544,19 @@ export function OrdenesTab() {
           }
         }} 
         shipment={payShipment} 
+      />
+
+      {/* Edit Shipment Dialog */}
+      <ShipmentDialog
+        open={!!editShipment}
+        onOpenChange={v => {
+          if (!v) {
+            setEditShipment(null);
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['shipments'] });
+          }
+        }}
+        editShipment={editShipment}
       />
     </div>
   );
