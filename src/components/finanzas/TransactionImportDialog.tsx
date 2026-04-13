@@ -75,6 +75,17 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
     if (editingIdx === globalIdx) setEditingIdx(null);
   };
 
+  const addNewRow = () => {
+    const newRow: ParsedRow = (txType === 'expense' || txType === 'cost')
+      ? { raw: { _desc: '', _cat: 'other', _amt: 0 }, valid: true }
+      : { raw: { _sku: '', _qty: 1, _price: 0 }, valid: true };
+    setRows(prev => [...prev, newRow]);
+    // Auto-enter edit mode on the new row
+    const newIdx = rows.length;
+    setEditDraft({ ...newRow.raw });
+    setEditingIdx(newIdx);
+  };
+
   // Transaction-level fields (not in Excel)
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
   const [txVendor, setTxVendor] = useState('');
