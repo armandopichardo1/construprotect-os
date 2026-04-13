@@ -442,8 +442,7 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     </div>
   );
 }
-    rent: ['631', '630'],
-    utilities: ['632', '633'],
+
     insurance: ['640'],
     maintenance: ['636', '637'],
     warehouse: ['631', '630'],
