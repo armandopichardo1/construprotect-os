@@ -407,6 +407,14 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Duplicate Dialog */}
+      <JournalEntryDuplicateDialog
+        open={!!duplicateEntry}
+        onOpenChange={(v) => { if (!v) setDuplicateEntry(null); }}
+        sourceEntry={duplicateEntry}
+        rate={rate}
+      />
     </div>
   );
 }
