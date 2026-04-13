@@ -54,6 +54,27 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
+  // Editing state for preview
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<Record<string, any>>({});
+
+  const startEdit = (globalIdx: number) => {
+    const row = rows[globalIdx];
+    setEditDraft({ ...row.raw });
+    setEditingIdx(globalIdx);
+  };
+
+  const saveEdit = (globalIdx: number) => {
+    setRows(prev => prev.map((r, i) => i === globalIdx ? { ...r, raw: { ...r.raw, ...editDraft } } : r));
+    setEditingIdx(null);
+    setEditDraft({});
+  };
+
+  const deleteRow = (globalIdx: number) => {
+    setRows(prev => prev.filter((_, i) => i !== globalIdx));
+    if (editingIdx === globalIdx) setEditingIdx(null);
+  };
+
   // Transaction-level fields (not in Excel)
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
   const [txVendor, setTxVendor] = useState('');
