@@ -111,13 +111,51 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
           })));
         }
       } else {
-        const { data: shipment, error } = await supabase.from('shipments').insert(payload).select().single();
+        const { data: shipment, error } = await supabase.from('shipments').insert(payload).select('*, shipment_items(*, products(name, sku))').single();
         if (error) throw error;
         if (items.length > 0) {
           await supabase.from('shipment_items').insert(items.filter(i => i.product_id).map(i => ({
             shipment_id: shipment.id, product_id: i.product_id,
             quantity_ordered: i.quantity_ordered, unit_cost_usd: i.unit_cost_usd,
           })));
+        }
+        // Generate PO journal entry: Debit Inv-in-Transit, Credit CxP
+        if (totalCost > 0) {
+          try {
+            const { data: accts } = await supabase.from('chart_of_accounts')
+              .select('id, code, description, account_type')
+              .eq('is_active', true).order('code');
+            const accounts = accts || [];
+            const transitAcct = accounts.find(a =>
+              a.account_type === 'Activo' && (
+                a.description?.toLowerCase().includes('tránsito') ||
+                a.description?.toLowerCase().includes('transito') ||
+                a.code?.startsWith('14') || a.code?.startsWith('13')
+              )
+            ) || accounts.find(a => a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar'));
+            const cxpAcct = accounts.find(a =>
+              a.code?.startsWith('21') || a.code?.startsWith('20') ||
+              (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
+            );
+            if (transitAcct && cxpAcct) {
+              const desc = `Orden de compra — PO ${poNumber || shipment.id.slice(0, 8)} — ${selectedSupplier?.name}`;
+              const { data: entry } = await supabase.from('journal_entries').insert({
+                description: desc,
+                total_debit_usd: totalCost,
+                total_credit_usd: totalCost,
+                notes: `Auto-generado al crear PO`,
+              }).select().single();
+              if (entry) {
+                await supabase.from('journal_entry_lines').insert([
+                  { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Inventario en tránsito' },
+                  { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación con proveedor' },
+                ]);
+              }
+            }
+            queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+          } catch (e) {
+            console.error('Error creating PO journal entry:', e);
+          }
         }
       }
       toast.success(isEdit ? 'Envío actualizado' : 'Envío creado');
