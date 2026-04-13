@@ -1554,6 +1554,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           </div>
         </div>
       </div>
+      </div>
+
+      <TransactionImportDialog open={importOpen} onOpenChange={setImportOpen} exchangeRate={xr} />
     </div>
   );
 }
