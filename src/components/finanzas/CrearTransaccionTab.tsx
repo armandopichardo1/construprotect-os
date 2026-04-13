@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
 import { formatUSD, formatDOP } from '@/lib/format';
+import { buildExpenseJournalLines, buildCostJournalLines, createAutoJournal } from '@/lib/account-mapping';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
