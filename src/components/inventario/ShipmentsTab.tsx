@@ -41,40 +41,7 @@ export function ShipmentsTab() {
     queryClient.invalidateQueries({ queryKey: ['shipments'] });
   };
 
-  /** Generate journal entry for PO creation: Debit Inv-in-Transit, Credit CxP */
-  const createPOJournalEntry = async (shipment: any) => {
-    const totalCost = Number(shipment.total_cost_usd || 0);
-    if (totalCost <= 0) return;
-
-    try {
-      const accounts = await fetchAccounts();
-      const transitAcct = findTransitAccount(accounts);
-      const cxpAcct = findCxPAccount(accounts);
-
-      if (transitAcct && cxpAcct) {
-        const desc = `Orden de compra — PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
-        const items = shipment.shipment_items || [];
-        const { data: entry } = await supabase.from('journal_entries').insert({
-          description: desc,
-          total_debit_usd: totalCost,
-          total_credit_usd: totalCost,
-          notes: `Auto-generado al crear PO. Productos: ${items.map((i: any) => `${i.products?.name || i.product_id} x${i.quantity_ordered}`).join(', ')}`,
-        }).select().single();
-
-        if (entry) {
-          await supabase.from('journal_entry_lines').insert([
-            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Compras en tránsito' },
-            { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación con proveedor' },
-          ]);
-        }
-      }
-      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-    } catch (e) {
-      console.error('Error creating PO journal entry:', e);
-    }
-  };
-
-  const receiveShipment = async (shipment: any) => {
+  /** Receive shipment: update inventory, WAC, and generate receipt journal entry */
     const items = shipment.shipment_items || [];
     if (items.length === 0) { toast.error('Sin productos para recibir'); return; }
 
