@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Building2, Scale, TrendingUp, Landmark } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { cn } from '@/lib/utils';
+import { buildAccountAccumulator, isDebitNatural } from '@/lib/account-mapping';
 
 const TOOLTIP_STYLE = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
@@ -28,31 +29,7 @@ interface AccountBalance {
   description: string;
   account_type: string;
   classification: string;
-  balance: number; // positive = natural direction
-}
-
-// Helpers reused from BalanceComprobacionTab logic
-function findExpenseAccount(accounts: any[], category: string) {
-  const map: Record<string, string[]> = {
-    payroll: ['601', '600'], rent: ['631', '630'], utilities: ['632', '633'],
-    insurance: ['640'], maintenance: ['636', '637'], warehouse: ['631', '630'],
-    software: ['642', '643', '644', '645'], accounting: ['641'],
-    marketing: ['621', '622', '620'], shipping: ['635'], customs: ['635'],
-    travel: ['623', '610'], samples: ['625'], office: ['634', '630'],
-    bank_fees: ['639'], purchases: ['500'], other: ['639', '630'],
-  };
-  const prefixes = map[category] || ['630'];
-  for (const prefix of prefixes) {
-    const match = accounts.find((a: any) => a.code?.startsWith(prefix) && (a.account_type === 'Gasto' || a.account_type === 'Gastos No Operacionales'));
-    if (match) return match;
-  }
-  return accounts.find((a: any) => a.account_type === 'Gasto');
-}
-
-function findCostAccount(accounts: any[], category: string) {
-  const prefix = '50';
-  return accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Costo') ||
-    accounts.find((a: any) => a.account_type === 'Costo');
+  balance: number;
 }
 
 export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: EstadoSituacionTabProps) {
@@ -78,79 +55,14 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
     });
   }, [saleItems, period, filterByDate]);
 
-  const findAccount = (prefix: string) => accounts.find((a: any) => a.code?.startsWith(prefix));
-  const incomeAccount = findAccount('41') || findAccount('40');
-  const cxcAccount = findAccount('121') || findAccount('12');
-  const cogsAccount = findAccount('50') || accounts.find((a: any) => a.account_type === 'Costo');
-  const inventoryAccount = findAccount('131') || findAccount('13');
-  const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
-  const cxpAccount = findAccount('201') || findAccount('20');
-
-  // Compute balances same as BalanceComprobacion but only for Balance General accounts
   const { balanceRows, totalActivos, totalPasivos, totalCapital, netIncome } = useMemo(() => {
-    const accMap: Record<string, { debits: number; credits: number }> = {};
-    const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
-
-    // VENTAS
-    filteredSales.forEach((s: any) => {
-      const incId = s.account_id || incomeAccount?.id;
-      const amount = Number(s.total_usd || 0);
-      if (!incId || amount === 0) return;
-      ensure(incId);
-      accMap[incId].credits += amount;
-      if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        if (cxcAccount) { ensure(cxcAccount.id); accMap[cxcAccount.id].debits += amount; }
-      } else if (s.payment_status === 'paid') {
-        if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].debits += amount; }
-      }
-    });
-
-    // COGS
-    filteredSaleItems.forEach((si: any) => {
-      const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
-      if (cogsAmt === 0) return;
-      if (cogsAccount) { ensure(cogsAccount.id); accMap[cogsAccount.id].debits += cogsAmt; }
-      if (inventoryAccount) { ensure(inventoryAccount.id); accMap[inventoryAccount.id].credits += cogsAmt; }
-    });
-
-    // GASTOS
-    filteredExpenses.forEach((e: any) => {
-      const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
-      const amount = Number(e.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      ensure(accId);
-      accMap[accId].debits += amount;
-      if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].credits += amount; }
-    });
-
-    // COSTOS
-    filteredCosts.forEach((c: any) => {
-      const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
-      const amount = Number(c.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      ensure(accId);
-      accMap[accId].debits += amount;
-      const counterAcct = cxpAccount || cashAccount;
-      if (counterAcct) { ensure(counterAcct.id); accMap[counterAcct.id].credits += amount; }
-    });
-
-    // JOURNAL ENTRIES
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
-    filteredJournals.forEach((je: any) => {
-      je.journal_entry_lines?.forEach((line: any) => {
-        if (!line.account_id) return;
-        ensure(line.account_id);
-        accMap[line.account_id].debits += Number(line.debit_usd || 0);
-        accMap[line.account_id].credits += Number(line.credit_usd || 0);
-      });
-    });
+    const accMap = buildAccountAccumulator(accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, filteredJournals);
 
-    // Calculate net balance per account
     const rows: AccountBalance[] = accounts
       .map((a: any) => {
         const entry = accMap[a.id] || { debits: 0, credits: 0 };
-        const isDebitNatural = ['Activo', 'Costo', 'Gasto', 'Gastos No Operacionales'].includes(a.account_type);
-        const balance = isDebitNatural ? entry.debits - entry.credits : entry.credits - entry.debits;
+        const balance = isDebitNatural(a.account_type) ? entry.debits - entry.credits : entry.credits - entry.debits;
         return {
           id: a.id,
           code: a.code || '',
@@ -162,28 +74,22 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
       })
       .filter(r => Math.abs(r.balance) > 0.005);
 
-    // Activos
     const activos = rows.filter(r => r.account_type === 'Activo');
     const pasivos = rows.filter(r => r.account_type === 'Pasivo');
     const capital = rows.filter(r => r.account_type === 'Capital');
 
-    // Net income = ingresos - costos - gastos (for Estado de Resultados accounts)
     const ingresos = rows.filter(r => r.account_type === 'Ingreso' || r.account_type === 'Ingresos No Operacionales');
     const gastosYCostos = rows.filter(r => ['Costo', 'Gasto', 'Gastos No Operacionales'].includes(r.account_type));
     const ni = ingresos.reduce((s, r) => s + r.balance, 0) - gastosYCostos.reduce((s, r) => s + r.balance, 0);
 
-    const tActivos = activos.reduce((s, r) => s + r.balance, 0);
-    const tPasivos = pasivos.reduce((s, r) => s + r.balance, 0);
-    const tCapital = capital.reduce((s, r) => s + r.balance, 0);
-
     return {
       balanceRows: { activos, pasivos, capital },
-      totalActivos: tActivos,
-      totalPasivos: tPasivos,
-      totalCapital: tCapital,
+      totalActivos: activos.reduce((s, r) => s + r.balance, 0),
+      totalPasivos: pasivos.reduce((s, r) => s + r.balance, 0),
+      totalCapital: capital.reduce((s, r) => s + r.balance, 0),
       netIncome: ni,
     };
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount, filterByDate]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, filterByDate]);
 
   const patrimonio = totalCapital + netIncome;
   const pasivoPlusPatrimonio = totalPasivos + patrimonio;
