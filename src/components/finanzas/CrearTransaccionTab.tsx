@@ -383,8 +383,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         });
       });
     } else if (manualType === 'purchase' && purchaseTotal > 0) {
-      const invAcct = accounts.find((a: any) => a.code?.startsWith('14') || a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('inventar')));
-      const cxpAcct = accounts.find((a: any) => a.code?.startsWith('21') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
+      // Purchases create shipments → debit Compras en Tránsito (13200), credit CxP
+      const invAcct = accounts.find((a: any) => a.code?.startsWith('132')) || accounts.find((a: any) => a.code?.startsWith('13') || (a.account_type === 'Activo' && a.description?.toLowerCase().includes('tránsito')));
+      const cxpAcct = accounts.find((a: any) => a.code?.startsWith('201') || a.code?.startsWith('20') || (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar')));
       if (invAcct) lines.push({ accountCode: invAcct.code, accountName: invAcct.description, accountType: invAcct.account_type, accountId: invAcct.id, debit: purchaseTotal, credit: 0 });
       else lines.push({ accountName: 'Inventario / Mercancía', accountType: 'Activo', debit: purchaseTotal, credit: 0 });
       if (cxpAcct) lines.push({ accountCode: cxpAcct.code, accountName: cxpAcct.description, accountType: cxpAcct.account_type, accountId: cxpAcct.id, debit: 0, credit: purchaseTotal });
@@ -414,10 +415,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amount) > 0)) {
       const amtUsd = getAmountUsd(amount);
       const expAcct = accountId ? getAcct(accountId) : null;
+      // Expenses → counter is Cash/Banco; Costs → counter is CxP Proveedores
       const cashAcct = accounts.find((a: any) => a.code?.startsWith('103') || a.code?.startsWith('104') || a.code?.startsWith('10'));
+      const cxpAcct = accounts.find((a: any) => a.code?.startsWith('201') || a.code?.startsWith('20'));
+      const counterAcct = manualType === 'cost' ? (cxpAcct || cashAcct) : cashAcct;
       if (expAcct) lines.push({ accountCode: expAcct.code, accountName: expAcct.description, accountType: expAcct.account_type, accountId: expAcct.id, debit: amtUsd, credit: 0 });
       else lines.push({ accountName: manualType === 'expense' ? 'Cuenta de Gasto' : 'Cuenta de Costo', accountType: manualType === 'expense' ? 'Gasto' : 'Costo', debit: amtUsd, credit: 0 });
-      if (cashAcct) lines.push({ accountCode: cashAcct.code, accountName: cashAcct.description, accountType: cashAcct.account_type, accountId: cashAcct.id, debit: 0, credit: amtUsd });
+      if (counterAcct) lines.push({ accountCode: counterAcct.code, accountName: counterAcct.description, accountType: counterAcct.account_type, accountId: counterAcct.id, debit: 0, credit: amtUsd });
     }
 
     // Apply overrides
