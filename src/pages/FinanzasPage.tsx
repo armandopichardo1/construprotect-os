@@ -628,11 +628,25 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
     });
     await supabase.from('sale_items').insert(saleItemsData);
 
+    // Auto-create journal entry for new sales
+    if (!isEdit) {
+      try {
+        const { data: accts } = await supabase.from('chart_of_accounts').select('id, code, description, account_type').eq('is_active', true);
+        if (accts) {
+          const { buildSaleJournalLines, createAutoJournal } = await import('@/lib/account-mapping');
+          const lines = buildSaleJournalLines(accts, total, subtotal, itbis, 'pending');
+          const clientName = contacts.find((c: any) => c.id === contactId)?.contact_name || '';
+          await createAutoJournal(`Venta ${invoiceRef || saleId.slice(0, 8)} — ${clientName}`, lines, { exchangeRate: xr });
+        }
+      } catch { /* journal creation is best-effort */ }
+    }
+
     setSaving(false);
-    toast.success(isEdit ? 'Venta actualizada' : 'Venta registrada');
+    toast.success(isEdit ? 'Venta actualizada' : 'Venta registrada con asiento contable');
     queryClient.invalidateQueries({ queryKey: ['sales'] });
     queryClient.invalidateQueries({ queryKey: ['sale-items'] });
     queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     onOpenChange(false);
   };
 
@@ -850,10 +864,21 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
       ? await supabase.from('expenses').update(payload).eq('id', editExpense.id)
       : await supabase.from('expenses').insert(payload);
 
+    if (error) { toast.error('Error al guardar'); setSaving(false); return; }
+
+    // Auto-create journal entry for new expenses
+    if (!isEdit) {
+      try {
+        const { buildExpenseJournalLines, createAutoJournal } = await import('@/lib/account-mapping');
+        const lines = buildExpenseJournalLines(accounts, payload.account_id, form.category, payload.amount_usd);
+        await createAutoJournal(`Gasto: ${payload.description} — ${payload.vendor || 'N/A'}`, lines, { exchangeRate: xr });
+      } catch { /* best-effort */ }
+    }
+
     setSaving(false);
-    if (error) { toast.error('Error al guardar'); return; }
-    toast.success(isEdit ? 'Gasto actualizado' : 'Gasto registrado');
+    toast.success(isEdit ? 'Gasto actualizado' : 'Gasto registrado con asiento contable');
     queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     onOpenChange(false);
   };
 
@@ -1060,10 +1085,21 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
       ? await supabase.from('costs').update(payload).eq('id', editCost.id)
       : await supabase.from('costs').insert(payload);
 
+    if (error) { toast.error('Error al guardar'); setSaving(false); return; }
+
+    // Auto-create journal entry for new costs
+    if (!isEdit) {
+      try {
+        const { buildCostJournalLines, createAutoJournal } = await import('@/lib/account-mapping');
+        const lines = buildCostJournalLines(accounts, payload.account_id, form.category, payload.amount_usd);
+        await createAutoJournal(`Costo: ${payload.description} — ${payload.vendor || 'N/A'}`, lines, { exchangeRate: xr });
+      } catch { /* best-effort */ }
+    }
+
     setSaving(false);
-    if (error) { toast.error('Error al guardar'); return; }
-    toast.success(isEdit ? 'Costo actualizado' : 'Costo registrado');
+    toast.success(isEdit ? 'Costo actualizado' : 'Costo registrado con asiento contable');
     queryClient.invalidateQueries({ queryKey: ['costs'] });
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     onOpenChange(false);
   };
 
