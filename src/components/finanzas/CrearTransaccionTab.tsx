@@ -1478,7 +1478,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         )}
                       </div>
                     ))}
-                    <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 p-2 border-t border-border bg-muted/30">
+                    <div className="grid grid-cols-[100px_1fr_90px_90px_32px] gap-2 p-2 border-t border-border bg-muted/30">
                       <span className="text-xs font-bold">Totales</span>
                       <div className="text-right">
                         <span className={cn('text-xs font-mono font-bold block', !journalIsBalanced && 'text-destructive')}>
