@@ -505,50 +505,95 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
               </div>
             )}
 
-            {/* Detailed line items */}
+            {/* Editable line items */}
             {validRows.length > 0 && (
               <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto max-h-52">
+                <div className="overflow-x-auto max-h-60">
                   <table className="w-full text-xs">
                     <thead className="bg-muted sticky top-0">
                       <tr>
-                        <th className="px-2 py-1.5 text-left text-muted-foreground font-medium w-6">#</th>
+                        <th className="px-1.5 py-1.5 text-left text-muted-foreground font-medium w-6">#</th>
                         {txType === 'expense' || txType === 'cost' ? (
                           <>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Descripción</th>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">Cat.</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Monto ({txCurrency})</th>
+                            <th className="px-1.5 py-1.5 text-left text-muted-foreground font-medium">Descripción</th>
+                            <th className="px-1.5 py-1.5 text-left text-muted-foreground font-medium w-24">Cat.</th>
+                            <th className="px-1.5 py-1.5 text-right text-muted-foreground font-medium w-24">Monto</th>
                           </>
                         ) : (
                           <>
-                            <th className="px-2 py-1.5 text-left text-muted-foreground font-medium">SKU</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Cant.</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">{txType === 'sale' ? 'Precio' : 'Costo'}</th>
-                            <th className="px-2 py-1.5 text-right text-muted-foreground font-medium">Subtotal</th>
+                            <th className="px-1.5 py-1.5 text-left text-muted-foreground font-medium">SKU</th>
+                            <th className="px-1.5 py-1.5 text-right text-muted-foreground font-medium w-16">Cant.</th>
+                            <th className="px-1.5 py-1.5 text-right text-muted-foreground font-medium w-24">{txType === 'sale' ? 'Precio' : 'Costo'}</th>
+                            <th className="px-1.5 py-1.5 text-right text-muted-foreground font-medium w-24">Subtotal</th>
                           </>
                         )}
+                        <th className="px-1 py-1.5 w-16"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {validRows.map((r, i) => (
-                        <tr key={i} className="border-t border-border">
-                          <td className="px-2 py-1 text-muted-foreground">{i + 1}</td>
-                          {txType === 'expense' || txType === 'cost' ? (
-                            <>
-                              <td className="px-2 py-1 truncate max-w-[180px]">{String(r.raw._desc)}</td>
-                              <td className="px-2 py-1 text-muted-foreground">{String(r.raw._cat)}</td>
-                              <td className="px-2 py-1 text-right font-mono">{Number(r.raw._amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-2 py-1 font-mono">{String(r.raw._sku)}</td>
-                              <td className="px-2 py-1 text-right">{Number(r.raw._qty)}</td>
-                              <td className="px-2 py-1 text-right font-mono">${Number(r.raw._price).toFixed(2)}</td>
-                              <td className="px-2 py-1 text-right font-mono font-medium">${(Number(r.raw._qty) * Number(r.raw._price)).toFixed(2)}</td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
+                      {validRows.map((r, i) => {
+                        const globalIdx = rows.indexOf(r);
+                        const isEditing = editingIdx === globalIdx;
+                        
+                        if (isEditing) {
+                          return (
+                            <tr key={i} className="border-t border-primary/30 bg-primary/5">
+                              <td className="px-1.5 py-1 text-muted-foreground">{i + 1}</td>
+                              {txType === 'expense' || txType === 'cost' ? (
+                                <>
+                                  <td className="px-1 py-1"><Input value={String(editDraft._desc || '')} onChange={e => setEditDraft(d => ({ ...d, _desc: e.target.value }))} className="h-6 text-xs px-1.5" /></td>
+                                  <td className="px-1 py-1">
+                                    <Select value={String(editDraft._cat || 'other')} onValueChange={v => setEditDraft(d => ({ ...d, _cat: v }))}>
+                                      <SelectTrigger className="h-6 text-xs px-1.5"><SelectValue /></SelectTrigger>
+                                      <SelectContent>{(txType === 'expense' ? EXPENSE_CATS : COST_CATS).map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                  </td>
+                                  <td className="px-1 py-1"><Input type="number" step="0.01" value={editDraft._amt ?? ''} onChange={e => setEditDraft(d => ({ ...d, _amt: e.target.value === '' ? '' : Number(e.target.value) }))} className="h-6 text-xs px-1.5 text-right font-mono" /></td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-1 py-1"><Input value={String(editDraft._sku || '')} onChange={e => setEditDraft(d => ({ ...d, _sku: e.target.value }))} className="h-6 text-xs px-1.5 font-mono" /></td>
+                                  <td className="px-1 py-1"><Input type="number" value={editDraft._qty ?? ''} onChange={e => setEditDraft(d => ({ ...d, _qty: e.target.value === '' ? '' : Number(e.target.value) }))} className="h-6 text-xs px-1.5 text-right" /></td>
+                                  <td className="px-1 py-1"><Input type="number" step="0.01" value={editDraft._price ?? ''} onChange={e => setEditDraft(d => ({ ...d, _price: e.target.value === '' ? '' : Number(e.target.value) }))} className="h-6 text-xs px-1.5 text-right font-mono" /></td>
+                                  <td className="px-1 py-1 text-right font-mono font-medium text-muted-foreground">${((Number(editDraft._qty) || 0) * (Number(editDraft._price) || 0)).toFixed(2)}</td>
+                                </>
+                              )}
+                              <td className="px-1 py-1">
+                                <div className="flex gap-0.5">
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveEdit(globalIdx)}><Save className="w-3 h-3 text-success" /></Button>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingIdx(null)}><X className="w-3 h-3" /></Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr key={i} className="border-t border-border group hover:bg-muted/30">
+                            <td className="px-1.5 py-1 text-muted-foreground">{i + 1}</td>
+                            {txType === 'expense' || txType === 'cost' ? (
+                              <>
+                                <td className="px-1.5 py-1 truncate max-w-[180px]">{String(r.raw._desc)}</td>
+                                <td className="px-1.5 py-1 text-muted-foreground">{String(r.raw._cat)}</td>
+                                <td className="px-1.5 py-1 text-right font-mono">{Number(r.raw._amt).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-1.5 py-1 font-mono">{String(r.raw._sku)}</td>
+                                <td className="px-1.5 py-1 text-right">{Number(r.raw._qty)}</td>
+                                <td className="px-1.5 py-1 text-right font-mono">${Number(r.raw._price).toFixed(2)}</td>
+                                <td className="px-1.5 py-1 text-right font-mono font-medium">${(Number(r.raw._qty) * Number(r.raw._price)).toFixed(2)}</td>
+                              </>
+                            )}
+                            <td className="px-1 py-1">
+                              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => startEdit(globalIdx)}><Pencil className="w-3 h-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => deleteRow(globalIdx)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
