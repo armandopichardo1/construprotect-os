@@ -257,10 +257,38 @@ export default function DashboardPage() {
     },
   });
 
-  // Net Cash Flow: actual cash movements (paid sales as inflows, expenses + costs as outflows)
+  // Net Cash Flow: derived from journal entry lines touching cash accounts (10000-10499)
+  // Falls back to sales/expenses/costs if no journal entries exist
+  const isCashAccount = (code: string | null | undefined) =>
+    code != null && /^10[0-4]\d{2}$/.test(code);
+
   const { data: netCashFlow } = useQuery({
     queryKey: ['dashboard-net-cashflow'],
     queryFn: async () => {
+      // Try journal-entry based (most accurate)
+      const { data: journalEntries } = await supabase
+        .from('journal_entries')
+        .select('id, date, journal_entry_lines(debit_usd, credit_usd, chart_of_accounts(code))');
+
+      let jeInflows = 0;
+      let jeOutflows = 0;
+      let hasJournalData = false;
+
+      for (const je of (journalEntries || [])) {
+        for (const line of (je.journal_entry_lines || [])) {
+          const code = (line as any).chart_of_accounts?.code;
+          if (!isCashAccount(code)) continue;
+          hasJournalData = true;
+          jeInflows += Number((line as any).debit_usd || 0);
+          jeOutflows += Number((line as any).credit_usd || 0);
+        }
+      }
+
+      if (hasJournalData) {
+        return { inflows: jeInflows, outflows: jeOutflows, net: jeInflows - jeOutflows };
+      }
+
+      // Fallback: sales/expenses/costs
       const [{ data: sales }, { data: expenses }, { data: costs }] = await Promise.all([
         supabase.from('sales').select('total_usd, payment_status'),
         supabase.from('expenses').select('amount_usd'),
