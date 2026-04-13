@@ -336,7 +336,7 @@ export default function FinanzasPage() {
           </div>
         )}
 
-        {tab === 'Libro Diario' && <LibroDiarioTab sales={sales} expenses={expenses} costs={costs} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Libro Diario' && <LibroDiarioTab journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
 
         {tab === 'Ventas' && (
           <div className="space-y-6">
@@ -363,8 +363,8 @@ export default function FinanzasPage() {
           })), 'costos', 'Costos');
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
-        {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
-        {tab === 'Situación' && <EstadoSituacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Balance' && <BalanceComprobacionTab journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Situación' && <EstadoSituacionTab journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} costs={costs} journalEntries={journalEntries} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
