@@ -407,6 +407,12 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Edit Dialog */}
+      <JournalEntryEditDialog
+        open={!!editEntry}
+        onOpenChange={(v) => { if (!v) setEditEntry(null); }}
+        journalEntry={editEntry}
+      />
     </div>
   );
 }
