@@ -545,6 +545,19 @@ export function OrdenesTab() {
         }} 
         shipment={payShipment} 
       />
+
+      {/* Edit Shipment Dialog */}
+      <ShipmentDialog
+        open={!!editShipment}
+        onOpenChange={v => {
+          if (!v) {
+            setEditShipment(null);
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['shipments'] });
+          }
+        }}
+        editShipment={editShipment}
+      />
     </div>
   );
 }
