@@ -467,8 +467,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   // Helper to create journal entry from computed preview lines
   const createJournalFromPreview = async (desc: string, notes?: string) => {
     if (previewLines.length < 2) return;
-    const totalD = previewLines.reduce((s, l) => s + l.debit, 0);
-    const totalC = previewLines.reduce((s, l) => s + l.credit, 0);
+    const totalD = Math.round(previewLines.reduce((s, l) => s + l.debit, 0) * 100) / 100;
+    const totalC = Math.round(previewLines.reduce((s, l) => s + l.credit, 0) * 100) / 100;
     
     const entryPayload: any = {
       description: desc,
