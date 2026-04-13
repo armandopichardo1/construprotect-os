@@ -55,6 +55,22 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['sale-contacts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('id, contact_name, company_name');
+      return data || [];
+    },
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data } = await supabase.from('suppliers').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+  });
+
   // Editing state for preview
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Record<string, any>>({});
