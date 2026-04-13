@@ -361,6 +361,10 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">
+                      <button onClick={() => setEditEntry(e.raw)} title="Editar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => setDuplicateEntry(e.raw)} title="Duplicar asiento"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
                         <Copy className="w-3.5 h-3.5" />
