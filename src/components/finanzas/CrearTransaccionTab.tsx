@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { TransactionImportDialog } from './TransactionImportDialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
@@ -15,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen, ArrowLeftRight } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen, ArrowLeftRight, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { AccountingPreview } from './AccountingPreview';
 
@@ -129,6 +130,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const latestXr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
   const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('DOP');
+  const [importOpen, setImportOpen] = useState(false);
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
@@ -199,12 +201,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [invoiceRef, setInvoiceRef] = useState('');
   const [priceTier, setPriceTier] = useState('list');
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0 }]);
 
   // Purchase-specific state
   const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
   const [purchaseSupplierName, setPurchaseSupplierName] = useState('');
-  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([{ product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const [purchaseNotes, setPurchaseNotes] = useState('');
 
   // Credit note state
@@ -255,7 +257,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   // Purchase computed
   const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
 
-  const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+  const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const removePurchaseItem = (i: number) => setPurchaseItems(prev => prev.filter((_, idx) => idx !== i));
   const updatePurchaseItem = (i: number, field: string, value: any) => {
     setPurchaseItems(prev => prev.map((item, idx) => {
@@ -302,7 +304,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 1, unit_price_usd: 0 }]);
+  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0 }]);
   const removeSaleItem = (i: number) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
@@ -442,9 +444,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setAmount(''); setManualDate(undefined); setCustomRate(''); setEditingRate(false);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
-    setSaleItems([{ product_id: '', quantity: 1, unit_price_usd: 0 }]);
+    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0 }]);
     setPurchaseSupplierId(''); setPurchaseSupplierName('');
-    setPurchaseItems([{ product_id: '', quantity: 1, unit_cost_usd: 0 }]);
+    setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
     setCnSupplierId(''); setCnSupplierName('');
     setCnAmount(''); setCnReason(''); setCnNotes('');
@@ -941,7 +943,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         {label && <Label className="text-xs">{label}{required ? ' *' : ''}</Label>}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">{currencySymbol}</span>
-          <Input type="number" min="0" step={currencyBase === 'USD' ? '0.01' : '1'} value={value}
+          <Input type="number" min="0" step={currencyBase === 'USD' ? '0.01' : '1'} value={value || ''}
             onChange={e => onChange(e.target.value)} placeholder="0.00"
             className={cn('text-sm', currencyBase === 'USD' ? 'pl-7' : 'pl-10')} />
         </div>
@@ -955,21 +957,27 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   };
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Main input area */}
       <div className="lg:col-span-2 space-y-5">
-        {/* Mode toggle */}
-        <div className="flex gap-1 rounded-xl bg-muted p-0.5 w-fit">
-          <button onClick={() => setMode('manual')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <FileText className="w-3.5 h-3.5" /> Manual
-          </button>
-          <button onClick={() => setMode('ai')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <Sparkles className="w-3.5 h-3.5" /> Con IA
-          </button>
+        {/* Mode toggle + bulk import */}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 rounded-xl bg-muted p-0.5">
+            <button onClick={() => setMode('manual')}
+              className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              <FileText className="w-3.5 h-3.5" /> Manual
+            </button>
+            <button onClick={() => setMode('ai')}
+              className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              <Sparkles className="w-3.5 h-3.5" /> Con IA
+            </button>
+          </div>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setImportOpen(true)}>
+            <Upload className="w-3.5 h-3.5" /> Carga Masiva
+          </Button>
         </div>
 
         {/* ========== AI MODE ========== */}
@@ -1154,31 +1162,32 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <Label className="text-xs">Productos *</Label>
                   {saleItems.map((item, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <Select value={item.product_id} onValueChange={v => updateSaleItem(i, 'product_id', v)}>
-                          <SelectTrigger className="text-xs"><SelectValue placeholder="Producto" /></SelectTrigger>
-                          <SelectContent>
-                            {products.map((p: any) => (
-                              <SelectItem key={p.id} value={p.id} className="text-xs">{p.sku} — {p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
+                      <div className="flex-1 min-w-[140px]">
+                        <SearchableSelect
+                          options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
+                          value={item.product_id}
+                          onValueChange={v => updateSaleItem(i, 'product_id', v)}
+                          placeholder="Producto"
+                          searchPlaceholder="Buscar producto..."
+                          emptyMessage="No se encontró producto"
+                          className="text-xs"
+                        />
                       </div>
-                      <Input type="number" min={1} value={item.quantity}
-                        onChange={e => updateSaleItem(i, 'quantity', parseInt(e.target.value) || 1)}
-                        className="w-16 text-xs" />
-                      <div className="relative w-24">
+                      <Input type="number" min={0} value={item.quantity || ''}
+                        onChange={e => updateSaleItem(i, 'quantity', parseInt(e.target.value) || 0)}
+                        className="w-20 text-xs" placeholder="Cant." />
+                      <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
                         <Input type="number" min={0} step={0.01}
-                          value={currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100}
+                          value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
                           onChange={e => {
                             const val = parseFloat(e.target.value) || 0;
                             updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
-                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} />
+                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
                       </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatBase(currencyBase === 'USD' ? item.unit_price_usd * item.quantity : item.unit_price_usd * item.quantity * xr)}</span>
+                      <span className="text-xs font-mono w-24 text-right shrink-0">{item.unit_price_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_price_usd * item.quantity : item.unit_price_usd * item.quantity * xr) : '—'}</span>
                       {saleItems.length > 1 && (
                         <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1241,8 +1250,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <Label className="text-xs">Productos * <span className="text-[10px] text-muted-foreground font-normal">(precios en USD)</span></Label>
                   {purchaseItems.map((item, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <div className="flex-1">
+                    <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
+                      <div className="flex-1 min-w-[140px]">
                         <SearchableSelect
                           options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
                           value={item.product_id}
@@ -1253,20 +1262,20 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           className="text-xs"
                         />
                       </div>
-                      <Input type="number" min={1} value={item.quantity}
-                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 1)}
-                        className="w-16 text-xs" placeholder="Cant." />
-                      <div className="relative w-24">
+                      <Input type="number" min={0} value={item.quantity || ''}
+                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 0)}
+                        className="w-20 text-xs" placeholder="Cant." />
+                      <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
                         <Input type="number" min={0} step={0.01}
-                          value={currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100}
+                          value={item.unit_cost_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100)}
                           onChange={e => {
                             const val = parseFloat(e.target.value) || 0;
                             updatePurchaseItem(i, 'unit_cost_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
-                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="Costo" />
+                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
                       </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatBase(currencyBase === 'USD' ? item.unit_cost_usd * item.quantity : item.unit_cost_usd * item.quantity * xr)}</span>
+                      <span className="text-xs font-mono w-24 text-right shrink-0">{item.unit_cost_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_cost_usd * item.quantity : item.unit_cost_usd * item.quantity * xr) : '—'}</span>
                       {purchaseItems.length > 1 && (
                         <button onClick={() => removePurchaseItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1546,6 +1555,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      <TransactionImportDialog open={importOpen} onOpenChange={setImportOpen} exchangeRate={xr} />
+    </>
   );
 }
