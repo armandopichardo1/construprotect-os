@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
+import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { toast } from 'sonner';
 
 const STATUS_LABELS: Record<string, string> = {
