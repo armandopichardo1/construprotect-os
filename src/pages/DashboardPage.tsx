@@ -257,6 +257,24 @@ export default function DashboardPage() {
     },
   });
 
+  // Net Cash Flow: actual cash movements (paid sales as inflows, expenses + costs as outflows)
+  const { data: netCashFlow } = useQuery({
+    queryKey: ['dashboard-net-cashflow'],
+    queryFn: async () => {
+      const [{ data: sales }, { data: expenses }, { data: costs }] = await Promise.all([
+        supabase.from('sales').select('total_usd, payment_status'),
+        supabase.from('expenses').select('amount_usd'),
+        supabase.from('costs').select('amount_usd'),
+      ]);
+      const inflows = (sales || [])
+        .filter((s: any) => s.payment_status === 'paid')
+        .reduce((sum: number, s: any) => sum + Number(s.total_usd || 0), 0);
+      const expenseOutflows = (expenses || []).reduce((sum: number, e: any) => sum + Number(e.amount_usd || 0), 0);
+      const costOutflows = (costs || []).reduce((sum: number, c: any) => sum + Number(c.amount_usd || 0), 0);
+      return { inflows, outflows: expenseOutflows + costOutflows, net: inflows - expenseOutflows - costOutflows };
+    },
+  });
+
   const { data: clientTrends } = useQuery({
     queryKey: ['dashboard-client-trends'],
     queryFn: async () => {
