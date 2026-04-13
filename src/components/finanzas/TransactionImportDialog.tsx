@@ -255,6 +255,42 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
               <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
             </div>
 
+            {/* Format guide per category */}
+            <div className="rounded-xl bg-muted p-3 space-y-2">
+              <p className="text-xs font-semibold text-foreground">Formato esperado — {TX_LABELS[txType].label}:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(txType === 'expense' ? EXPENSE_HEADERS : txType === 'cost' ? COST_HEADERS : txType === 'sale' ? SALE_HEADERS : PURCHASE_HEADERS).map((h, i) => (
+                  <span key={h} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/15 text-primary">
+                    {h}
+                  </span>
+                ))}
+              </div>
+              {(txType === 'expense' || txType === 'cost') && (
+                <div className="mt-1.5 space-y-1">
+                  <p className="text-[10px] text-muted-foreground font-medium">Categorías válidas:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(txType === 'expense' ? EXPENSE_CATS : COST_CATS).map(c => (
+                      <span key={c} className="rounded-full px-1.5 py-0.5 text-[9px] bg-card text-muted-foreground border border-border">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {txType === 'sale' && (
+                <div className="mt-1.5 space-y-1">
+                  <p className="text-[10px] text-muted-foreground font-medium">Estados de pago válidos:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {['pending', 'paid', 'partial', 'overdue', 'cancelled'].map(s => (
+                      <span key={s} className="rounded-full px-1.5 py-0.5 text-[9px] bg-card text-muted-foreground border border-border">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {txType === 'purchase' && (
+                <p className="text-[10px] text-muted-foreground mt-1">El SKU del producto debe existir en el catálogo. Se creará una orden de compra por cada fila.</p>
+              )}
+              <p className="text-[10px] text-muted-foreground">Fecha en formato YYYY-MM-DD. Columnas en español o inglés.</p>
+            </div>
+
             <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={downloadTemplate}>
               <Download className="w-3.5 h-3.5" /> Descargar plantilla {TX_LABELS[txType].label}
             </Button>
