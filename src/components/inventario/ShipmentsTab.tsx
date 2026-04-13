@@ -42,6 +42,7 @@ export function ShipmentsTab() {
   };
 
   /** Receive shipment: update inventory, WAC, and generate receipt journal entry */
+  const receiveShipment = async (shipment: any) => {
     const items = shipment.shipment_items || [];
     if (items.length === 0) { toast.error('Sin productos para recibir'); return; }
 
