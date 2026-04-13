@@ -191,14 +191,16 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             break;
           }
           case 'purchase': {
-            const { data: prod } = await supabase.from('products').select('id').eq('sku', d._sku).maybeSingle();
+            const sku = String(d._sku || '');
+            const { data: prod } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle();
             if (!prod) { failed++; continue; }
             const totalCost = Number(d._qty) * Number(d._cost);
-            const shipPayload: any = { supplier_name: d._supplier, po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`, total_cost_usd: totalCost, status: 'ordered' as any, notes: d._notes || null };
+            const shipPayload: any = { supplier_name: String(d._supplier || ''), po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`, total_cost_usd: totalCost, status: 'ordered' as any, notes: String(d._notes || '') || null };
             if (dateVal) shipPayload.order_date = dateVal;
             const { data: ship, error: se } = await supabase.from('shipments').insert(shipPayload).select('id').single();
             if (se || !ship) throw se;
-            await supabase.from('shipment_items').insert({ shipment_id: ship.id, product_id: prod.id, quantity_ordered: d._qty, quantity_received: 0, unit_cost_usd: d._cost });
+            const shipItemPayload: any = { shipment_id: ship.id, product_id: prod.id, quantity_ordered: Number(d._qty), quantity_received: 0, unit_cost_usd: Number(d._cost) };
+            await supabase.from('shipment_items').insert(shipItemPayload);
             break;
           }
         }
