@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
 import { JournalEntryDuplicateDialog } from './JournalEntryDuplicateDialog';
+import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
 interface JournalEntry {
   id: string;
