@@ -274,8 +274,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
 
       {/* Table */}
       <TooltipProvider delayDuration={200}>
-      <div className="rounded-2xl bg-card border border-border overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
-        <Table wrapperClassName="overflow-visible">
+      <div className="rounded-2xl bg-card border border-border overflow-auto max-h-[calc(100vh-320px)]">
+        <Table wrapperClassName="overflow-auto">
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               <SortableHead field="date">Fecha</SortableHead>
