@@ -443,8 +443,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
   );
 }
 
-// Helper: map expense category to account
-function findExpenseAccount(accounts: any[], category: string) {
   // Maps to actual chart of accounts codes (6xxxx series)
   const map: Record<string, string[]> = {
     payroll: ['601', '600'],
