@@ -703,6 +703,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       const { error } = await supabase.from(table).insert(row);
       if (error) throw error;
 
+      // Auto-create journal entry for expense/cost
+      const txDesc = `${manualType === 'expense' ? 'Gasto' : 'Costo'} — ${description.trim()}${vendor ? ` — ${vendor.trim()}` : ''} — ${formatUSD(finalUsd)}`;
+      try {
+        await createJournalFromPreview(txDesc, `Auto-generado por ${manualType === 'expense' ? 'gasto' : 'costo'}. Categoría: ${category}`);
+      } catch (je) { console.error('Journal entry for expense/cost failed:', je); }
+
       toast.success(manualType === 'expense' ? 'Gasto registrado' : 'Costo registrado');
       queryClient.invalidateQueries({ queryKey: [table] });
 
