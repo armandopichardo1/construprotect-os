@@ -697,7 +697,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       const { error } = await supabase.from(table).insert(row);
       if (error) throw error;
 
-      toast.success(manualType === 'expense' ? 'Gasto registrado' : 'Costo registrado');
+      // Auto journal entry for expense/cost
+      const jeDesc = `${manualType === 'expense' ? 'Gasto' : 'Costo'}: ${description.trim()} — ${vendor || 'N/A'}`;
+      await createJournalFromPreview(jeDesc, `Auto-generado. Monto: ${formatUSD(finalUsd)}`);
+
+      toast.success(manualType === 'expense' ? 'Gasto registrado con asiento contable' : 'Costo registrado con asiento contable');
       queryClient.invalidateQueries({ queryKey: [table] });
 
       setHistory(prev => [{ type: manualType, description, amount: formatUSD(finalUsd), timestamp: new Date() }, ...prev].slice(0, 5));
