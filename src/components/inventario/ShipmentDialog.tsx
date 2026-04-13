@@ -120,30 +120,71 @@ export function ShipmentDialog({ open, onOpenChange, editShipment }: ShipmentDia
             quantity_ordered: i.quantity_ordered, unit_cost_usd: i.unit_cost_usd,
           })));
         }
-        // Generate PO journal entry: Debit Inv-in-Transit, Credit CxP
+        // Generate journal entries for PO
         if (totalCost > 0) {
           try {
             const accounts = await fetchAccounts();
             const transitAcct = findTransitAccount(accounts);
             const cxpAcct = findCxPAccount(accounts);
-            if (transitAcct && cxpAcct) {
-              const desc = `Orden de compra — PO ${poNumber || shipment.id.slice(0, 8)} — ${selectedSupplier?.name}`;
+            const freightAcct = findFreightAccount(accounts);
+            const customsAcct = findCustomsAccount(accounts);
+
+            // 1. Product cost → Compras en Tránsito / CxP
+            if (transitAcct && cxpAcct && productCost > 0) {
+              const desc = `Compra — PO ${poNumber || shipment.id.slice(0, 8)} — ${selectedSupplier?.name}`;
               const { data: entry } = await supabase.from('journal_entries').insert({
                 description: desc,
-                total_debit_usd: totalCost,
-                total_credit_usd: totalCost,
-                notes: `Auto-generado al crear PO`,
+                total_debit_usd: productCost,
+                total_credit_usd: productCost,
+                notes: `Auto-generado al crear PO. Costo de productos.`,
               }).select().single();
               if (entry) {
                 await supabase.from('journal_entry_lines').insert([
-                  { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: totalCost, credit_usd: 0, description: 'Compras en tránsito' },
-                  { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: totalCost, description: 'Obligación con proveedor' },
+                  { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: productCost, credit_usd: 0, description: 'Compras en tránsito' },
+                  { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: productCost, description: 'Obligación con proveedor' },
                 ]);
               }
             }
+
+            // 2. Freight cost → Freight account / CxP
+            const freightVal = Number(shippingCost) || 0;
+            if (freightAcct && cxpAcct && freightVal > 0) {
+              const desc = `Freight — PO ${poNumber || shipment.id.slice(0, 8)} — ${selectedSupplier?.name}`;
+              const { data: entry } = await supabase.from('journal_entries').insert({
+                description: desc,
+                total_debit_usd: freightVal,
+                total_credit_usd: freightVal,
+                notes: `Auto-generado. Costo de flete/envío internacional.`,
+              }).select().single();
+              if (entry) {
+                await supabase.from('journal_entry_lines').insert([
+                  { journal_entry_id: entry.id, account_id: freightAcct.id, debit_usd: freightVal, credit_usd: 0, description: 'Freight / Shipping' },
+                  { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: freightVal, description: 'Obligación flete' },
+                ]);
+              }
+            }
+
+            // 3. Customs cost → Customs account / CxP
+            const customsVal = Number(customsCost) || 0;
+            if (customsAcct && cxpAcct && customsVal > 0) {
+              const desc = `Gastos aduanales — PO ${poNumber || shipment.id.slice(0, 8)} — ${selectedSupplier?.name}`;
+              const { data: entry } = await supabase.from('journal_entries').insert({
+                description: desc,
+                total_debit_usd: customsVal,
+                total_credit_usd: customsVal,
+                notes: `Auto-generado. Gastos aduanales/DGA.`,
+              }).select().single();
+              if (entry) {
+                await supabase.from('journal_entry_lines').insert([
+                  { journal_entry_id: entry.id, account_id: customsAcct.id, debit_usd: customsVal, credit_usd: 0, description: 'Impuestos DGA / Aduanas' },
+                  { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: customsVal, description: 'Obligación aduanal' },
+                ]);
+              }
+            }
+
             queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
           } catch (e) {
-            console.error('Error creating PO journal entry:', e);
+            console.error('Error creating PO journal entries:', e);
           }
         }
       }
