@@ -181,8 +181,10 @@ export type Database = {
           created_at: string
           currency: string | null
           description: string
+          financial_statement: string | null
           id: string
           is_active: boolean
+          normal_balance: string | null
           parent_id: string | null
           updated_at: string
         }
@@ -193,8 +195,10 @@ export type Database = {
           created_at?: string
           currency?: string | null
           description: string
+          financial_statement?: string | null
           id?: string
           is_active?: boolean
+          normal_balance?: string | null
           parent_id?: string | null
           updated_at?: string
         }
@@ -205,8 +209,10 @@ export type Database = {
           created_at?: string
           currency?: string | null
           description?: string
+          financial_statement?: string | null
           id?: string
           is_active?: boolean
+          normal_balance?: string | null
           parent_id?: string | null
           updated_at?: string
         }
