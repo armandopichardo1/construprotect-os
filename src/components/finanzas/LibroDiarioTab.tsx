@@ -82,27 +82,20 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
 
     sales.forEach((s: any) => {
       const exRate = Number(s.exchange_rate) || rate;
-      const amt = Number(s.total_usd || 0);
-      const isPaid = s.payment_status === 'paid';
-      // Double entry: Debit CxC or Caja, Credit Ingresos
-      const debitAcctName = isPaid ? 'Efectivo en Banco' : 'Cuentas por Cobrar Clientes';
-      const debitAcctCode = isPaid ? '10300' : '12100';
-      const creditAcctCode = s.chart_of_accounts?.code || '40000';
-      const creditAcctName = s.chart_of_accounts?.description || 'Ingresos';
       all.push({
         id: s.id,
         date: s.date,
         type: 'sale',
         description: `Venta ${s.invoice_ref || ''}`.trim(),
         category: 'Venta',
-        account_code: debitAcctCode,
-        account_name: debitAcctName,
-        credit_account_code: creditAcctCode,
-        credit_account_name: creditAcctName,
-        debit_usd: amt,
-        credit_usd: amt,
-        debit_dop: Number(s.total_dop) || amt * exRate,
-        credit_dop: Number(s.total_dop) || amt * exRate,
+        account_code: s.chart_of_accounts?.code || '',
+        account_name: s.chart_of_accounts?.description || 'Cuentas por Cobrar',
+        credit_account_code: '',
+        credit_account_name: 'Ingresos por Ventas',
+        debit_usd: 0,
+        credit_usd: Number(s.total_usd || 0),
+        debit_dop: 0,
+        credit_dop: Number(s.total_dop) || Number(s.total_usd || 0) * exRate,
         exchange_rate: exRate,
         vendor_client: s.contacts?.contact_name || '—',
         ref: s.invoice_ref || '',
@@ -112,8 +105,6 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
 
     expenses.forEach((e: any) => {
       const exRate = Number(e.exchange_rate) || rate;
-      const amt = Number(e.amount_usd || 0);
-      // Double entry: Debit Gasto, Credit Caja/Banco
       all.push({
         id: e.id,
         date: e.date,
@@ -122,12 +113,12 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         category: e.category,
         account_code: e.chart_of_accounts?.code || '',
         account_name: e.chart_of_accounts?.description || e.category,
-        credit_account_code: '10300',
-        credit_account_name: 'Efectivo en Banco',
-        debit_usd: amt,
-        credit_usd: amt,
-        debit_dop: Number(e.amount_dop) || amt * exRate,
-        credit_dop: Number(e.amount_dop) || amt * exRate,
+        credit_account_code: '',
+        credit_account_name: 'Efectivo / Banco',
+        debit_usd: Number(e.amount_usd || 0),
+        credit_usd: 0,
+        debit_dop: Number(e.amount_dop) || Number(e.amount_usd || 0) * exRate,
+        credit_dop: 0,
         exchange_rate: exRate,
         vendor_client: e.vendor || '—',
         ref: '',
@@ -137,8 +128,6 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
 
     costs.forEach((c: any) => {
       const exRate = Number(c.exchange_rate) || rate;
-      const amt = Number(c.amount_usd || 0);
-      // Double entry: Debit Costo, Credit CxP o Caja
       all.push({
         id: c.id,
         date: c.date,
@@ -147,12 +136,12 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         category: c.category,
         account_code: c.chart_of_accounts?.code || '',
         account_name: c.chart_of_accounts?.description || c.category,
-        credit_account_code: '20100',
-        credit_account_name: 'Cuentas por Pagar Proveedores',
-        debit_usd: amt,
-        credit_usd: amt,
-        debit_dop: Number(c.amount_dop) || amt * exRate,
-        credit_dop: Number(c.amount_dop) || amt * exRate,
+        credit_account_code: '',
+        credit_account_name: 'Efectivo / Banco',
+        debit_usd: Number(c.amount_usd || 0),
+        credit_usd: 0,
+        debit_dop: Number(c.amount_dop) || Number(c.amount_usd || 0) * exRate,
+        credit_dop: 0,
         exchange_rate: exRate,
         vendor_client: c.vendor || '—',
         ref: '',
