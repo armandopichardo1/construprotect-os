@@ -251,7 +251,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
           const itbis = subtotal * 0.18;
           const total = subtotal + itbis;
           const salePayload: any = {
-            date: txDate,
+254:             date: txDate,
             subtotal_usd: subtotal,
             itbis_usd: itbis,
             total_usd: total,
@@ -259,6 +259,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             exchange_rate: exchangeRate,
             payment_status: txPaymentStatus || 'pending',
             invoice_ref: txInvoiceRef || null,
+            contact_id: txClient || null,
           };
           const { data: sale, error: se } = await supabase.from('sales').insert(salePayload).select('id').single();
           if (se || !sale) { failed += lineItems.length; break; }
