@@ -88,6 +88,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [duplicateEntry, setDuplicateEntry] = useState<any>(null);
+  const [editEntry, setEditEntry] = useState<any>(null);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
