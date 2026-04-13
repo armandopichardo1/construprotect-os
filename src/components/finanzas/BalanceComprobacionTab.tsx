@@ -443,8 +443,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
   );
 }
 
-  // Maps to actual chart of accounts codes (6xxxx series)
-  const map: Record<string, string[]> = {
     payroll: ['601', '600'],
     rent: ['631', '630'],
     utilities: ['632', '633'],
