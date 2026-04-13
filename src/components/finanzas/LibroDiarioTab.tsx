@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
 import { JournalEntryDuplicateDialog } from './JournalEntryDuplicateDialog';
+import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
 interface JournalEntry {
   id: string;
@@ -87,6 +88,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [duplicateEntry, setDuplicateEntry] = useState<any>(null);
+  const [editEntry, setEditEntry] = useState<any>(null);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -359,6 +361,10 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">
+                      <button onClick={() => setEditEntry(e.raw)} title="Editar asiento"
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => setDuplicateEntry(e.raw)} title="Duplicar asiento"
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10">
                         <Copy className="w-3.5 h-3.5" />
@@ -417,6 +423,14 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
         open={!!duplicateEntry}
         onOpenChange={(v) => { if (!v) setDuplicateEntry(null); }}
         sourceEntry={duplicateEntry}
+        rate={rate}
+      />
+
+      {/* Edit Dialog */}
+      <JournalEntryEditDialog
+        open={!!editEntry}
+        onOpenChange={(v) => { if (!v) setEditEntry(null); }}
+        entry={editEntry}
         rate={rate}
       />
     </div>
