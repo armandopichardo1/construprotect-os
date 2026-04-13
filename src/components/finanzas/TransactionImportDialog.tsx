@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Upload, Download, Loader2, Check, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Upload, Download, Loader2, Check, Pencil, Trash2, X, Save, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Props {
