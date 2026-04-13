@@ -960,18 +960,23 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Main input area */}
       <div className="lg:col-span-2 space-y-5">
-        {/* Mode toggle */}
-        <div className="flex gap-1 rounded-xl bg-muted p-0.5 w-fit">
-          <button onClick={() => setMode('manual')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <FileText className="w-3.5 h-3.5" /> Manual
-          </button>
-          <button onClick={() => setMode('ai')}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
-              mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
-            <Sparkles className="w-3.5 h-3.5" /> Con IA
-          </button>
+        {/* Mode toggle + bulk import */}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 rounded-xl bg-muted p-0.5">
+            <button onClick={() => setMode('manual')}
+              className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                mode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              <FileText className="w-3.5 h-3.5" /> Manual
+            </button>
+            <button onClick={() => setMode('ai')}
+              className={cn('rounded-lg px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5',
+                mode === 'ai' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+              <Sparkles className="w-3.5 h-3.5" /> Con IA
+            </button>
+          </div>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setImportOpen(true)}>
+            <Upload className="w-3.5 h-3.5" /> Carga Masiva
+          </Button>
         </div>
 
         {/* ========== AI MODE ========== */}
