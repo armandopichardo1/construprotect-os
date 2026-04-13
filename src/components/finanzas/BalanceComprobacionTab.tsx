@@ -3,6 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
+import {
+  getDefaultAccounts, buildAccountAccumulator,
+  accumulateSales, accumulateCOGS, accumulateExpenses, accumulateCosts, accumulateJournalEntries,
+  findExpenseAccount, findCostAccount,
+} from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -72,106 +77,22 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
   }, [saleItems, period, filterByDate]);
 
-  // Find default accounts by code prefix
-  const findAccount = (prefix: string) => accounts.find((a: any) => a.code?.startsWith(prefix));
-  const incomeAccount = findAccount('41') || findAccount('40');
-  const cxcAccount = findAccount('121') || findAccount('12');
-  const cogsAccount = findAccount('50') || accounts.find((a: any) => a.account_type === 'Costo');
-  const inventoryAccount = findAccount('131') || findAccount('13');
-  const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
-  const cxpAccount = findAccount('201') || findAccount('20');
+  const defaults = useMemo(() => getDefaultAccounts(accounts), [accounts]);
 
   const rows = useMemo(() => {
-    const accMap: Record<string, { debits: number; credits: number }> = {};
-    const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
+    const acc = buildAccountAccumulator();
 
-    // === VENTAS (partida doble completa) ===
-    filteredSales.forEach((s: any) => {
-      const incId = s.account_id || incomeAccount?.id;
-      const amount = Number(s.total_usd || 0);
-      if (!incId || amount === 0) return;
+    accumulateSales(filteredSales, defaults, acc);
+    accumulateCOGS(filteredSaleItems, defaults, acc);
+    accumulateExpenses(filteredExpenses, accounts, defaults, acc);
+    accumulateCosts(filteredCosts, accounts, defaults, acc);
 
-      // Credit: Ingreso
-      ensure(incId);
-      accMap[incId].credits += amount;
-
-      if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        // Debit: CxC (venta pendiente de cobro)
-        if (cxcAccount) {
-          ensure(cxcAccount.id);
-          accMap[cxcAccount.id].debits += amount;
-        }
-      } else if (s.payment_status === 'paid') {
-        // Debit: Caja/Banco (venta cobrada)
-        if (cashAccount) {
-          ensure(cashAccount.id);
-          accMap[cashAccount.id].debits += amount;
-        }
-      }
-    });
-
-    // === COGS / Inventario (partida doble) ===
-    filteredSaleItems.forEach((si: any) => {
-      const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
-      if (cogsAmt === 0) return;
-      // Debit: Costo de Ventas
-      if (cogsAccount) {
-        ensure(cogsAccount.id);
-        accMap[cogsAccount.id].debits += cogsAmt;
-      }
-      // Credit: Inventarios
-      if (inventoryAccount) {
-        ensure(inventoryAccount.id);
-        accMap[inventoryAccount.id].credits += cogsAmt;
-      }
-    });
-
-    // === GASTOS (partida doble: Debit Gasto, Credit Caja/Banco) ===
-    filteredExpenses.forEach((e: any) => {
-      const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
-      const amount = Number(e.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      // Debit: Gasto
-      ensure(accId);
-      accMap[accId].debits += amount;
-      // Credit: Caja/Banco (salida de efectivo)
-      if (cashAccount) {
-        ensure(cashAccount.id);
-        accMap[cashAccount.id].credits += amount;
-      }
-    });
-
-    // === COSTOS (partida doble: Debit Costo, Credit CxP o Caja) ===
-    filteredCosts.forEach((c: any) => {
-      const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
-      const amount = Number(c.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      // Debit: Costo
-      ensure(accId);
-      accMap[accId].debits += amount;
-      // Credit: Cuentas por Pagar o Caja/Banco
-      const counterAcct = cxpAccount || cashAccount;
-      if (counterAcct) {
-        ensure(counterAcct.id);
-        accMap[counterAcct.id].credits += amount;
-      }
-    });
-
-    // === ASIENTOS MANUALES (journal entries) ===
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
-    filteredJournals.forEach((je: any) => {
-      je.journal_entry_lines?.forEach((line: any) => {
-        if (!line.account_id) return;
-        ensure(line.account_id);
-        accMap[line.account_id].debits += Number(line.debit_usd || 0);
-        accMap[line.account_id].credits += Number(line.credit_usd || 0);
-      });
-    });
+    accumulateJournalEntries(filteredJournals, acc);
 
-    // Build rows
     const result: AccountRow[] = accounts
       .map((a: any) => {
-        const entry = accMap[a.id] || { debits: 0, credits: 0 };
+        const entry = acc.accMap[a.id] || { debits: 0, credits: 0 };
         const diff = entry.debits - entry.credits;
         return {
           id: a.id,
@@ -186,7 +107,6 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
       })
       .filter(r => showEmpty || r.debits > 0 || r.credits > 0);
 
-    // Sort by type order then code
     result.sort((a, b) => {
       const ta = TYPE_ORDER.indexOf(a.account_type);
       const tb = TYPE_ORDER.indexOf(b.account_type);
@@ -195,16 +115,16 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
     });
 
     return result;
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, showEmpty, defaults, filterByDate, journalEntries]);
 
   // Unmapped count
   const unmappedCount = useMemo(() => {
     let count = 0;
-    filteredSales.forEach((s: any) => { if (!s.account_id && !incomeAccount) count++; });
+    filteredSales.forEach((s: any) => { if (!s.account_id && !defaults.income) count++; });
     filteredExpenses.forEach((e: any) => { if (!e.account_id && !findExpenseAccount(accounts, e.category)) count++; });
     filteredCosts.forEach((c: any) => { if (!c.account_id && !findCostAccount(accounts, c.category)) count++; });
     return count;
-  }, [filteredSales, filteredExpenses, filteredCosts, accounts, incomeAccount]);
+  }, [filteredSales, filteredExpenses, filteredCosts, accounts, defaults]);
 
   const totalDebits = rows.reduce((s, r) => s + r.debits, 0);
   const totalCredits = rows.reduce((s, r) => s + r.credits, 0);
@@ -438,42 +358,4 @@ export function BalanceComprobacionTab({ sales, expenses, costs, saleItems, jour
   );
 }
 
-// Helper: map expense category to account
-function findExpenseAccount(accounts: any[], category: string) {
-  // Maps to actual chart of accounts codes (6xxxx series)
-  const map: Record<string, string[]> = {
-    payroll: ['601', '600'],
-    rent: ['631', '630'],
-    utilities: ['632', '633'],
-    insurance: ['640'],
-    maintenance: ['636', '637'],
-    warehouse: ['631', '630'],
-    software: ['642', '643', '644', '645'],
-    accounting: ['641'],
-    marketing: ['621', '622', '620'],
-    shipping: ['635'],
-    customs: ['635'],
-    travel: ['623', '610'],
-    samples: ['625'],
-    office: ['634', '630'],
-    bank_fees: ['639'],
-    purchases: ['500'],
-    other: ['639', '630'],
-  };
-  const prefixes = map[category] || ['630'];
-  for (const prefix of prefixes) {
-    const match = accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Gasto');
-    if (match) return match;
-  }
-  return accounts.find((a: any) => a.account_type === 'Gasto');
-}
 
-function findCostAccount(accounts: any[], category: string) {
-  const map: Record<string, string> = {
-    freight: '50', customs: '50', raw_materials: '50', packaging: '50',
-    labor: '50', logistics: '50', warehousing: '50', insurance: '50', other: '50',
-  };
-  const prefix = map[category] || '50';
-  return accounts.find((a: any) => a.code?.startsWith(prefix) && a.account_type === 'Costo') ||
-    accounts.find((a: any) => a.account_type === 'Costo');
-}

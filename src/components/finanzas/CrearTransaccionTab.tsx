@@ -652,7 +652,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         });
         await supabase.from('sale_items').insert(itemsData);
 
-        toast.success('Venta registrada');
+        // Auto journal entry for sale
+        const saleDesc = `Venta ${invoiceRef || sale.id.slice(0, 8)} — ${contacts.find(c => c.id === contactId)?.contact_name || 'Cliente'}`;
+        await createJournalFromPreview(saleDesc, `Auto-generado por venta. Total: ${formatUSD(totalSale)}`);
+
+        toast.success('Venta registrada con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
@@ -693,7 +697,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       const { error } = await supabase.from(table).insert(row);
       if (error) throw error;
 
-      toast.success(manualType === 'expense' ? 'Gasto registrado' : 'Costo registrado');
+      // Auto journal entry for expense/cost
+      const jeDesc = `${manualType === 'expense' ? 'Gasto' : 'Costo'}: ${description.trim()} — ${vendor || 'N/A'}`;
+      await createJournalFromPreview(jeDesc, `Auto-generado. Monto: ${formatUSD(finalUsd)}`);
+
+      toast.success(manualType === 'expense' ? 'Gasto registrado con asiento contable' : 'Costo registrado con asiento contable');
       queryClient.invalidateQueries({ queryKey: [table] });
 
       setHistory(prev => [{ type: manualType, description, amount: formatUSD(finalUsd), timestamp: new Date() }, ...prev].slice(0, 5));
