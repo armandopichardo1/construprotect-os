@@ -3,12 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatUSD } from '@/lib/format';
+import { fetchAccounts, findTransitAccount, findInventoryAccount, findCxPAccount } from '@/lib/accounting-utils';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ShipmentDialog } from './ShipmentDialog';
 import { ShipmentPaymentDialog } from './ShipmentPaymentDialog';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, PackageCheck, CreditCard, Badge } from 'lucide-react';
+import { Plus, Pencil, Trash2, PackageCheck, CreditCard } from 'lucide-react';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 const STATUS_STEPS = ['ordered', 'in_transit', 'customs', 'warehouse', 'received'];
