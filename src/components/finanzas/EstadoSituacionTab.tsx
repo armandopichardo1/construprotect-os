@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatUSD } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import {
-  buildAccountAccumulator, accumulateJournalEntries, isDebitNatural,
+  buildAccountAccumulator, accumulateJournalEntries,
 } from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
@@ -52,7 +52,9 @@ export function EstadoSituacionTab({ journalEntries = [], rate }: EstadoSituacio
     const rows: AccountBalance[] = accounts
       .map((a: any) => {
         const entry = acc.accMap[a.id] || { debits: 0, credits: 0 };
-        const balance = isDebitNatural(a.account_type) ? entry.debits - entry.credits : entry.credits - entry.debits;
+        // Use normal_balance field to handle contra-assets (e.g. Depreciation Acumulada)
+        const debitNatural = a.normal_balance === 'Débito';
+        const balance = debitNatural ? entry.debits - entry.credits : entry.credits - entry.debits;
         return {
           id: a.id,
           code: a.code || '',
