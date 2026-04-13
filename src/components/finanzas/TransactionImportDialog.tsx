@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Upload, Download, Loader2, Check, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Upload, Download, Loader2, Check, Pencil, Trash2, X, Save, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Props {
@@ -73,6 +73,17 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const deleteRow = (globalIdx: number) => {
     setRows(prev => prev.filter((_, i) => i !== globalIdx));
     if (editingIdx === globalIdx) setEditingIdx(null);
+  };
+
+  const addNewRow = () => {
+    const newRow: ParsedRow = (txType === 'expense' || txType === 'cost')
+      ? { raw: { _desc: '', _cat: 'other', _amt: 0 }, valid: true }
+      : { raw: { _sku: '', _qty: 1, _price: 0 }, valid: true };
+    setRows(prev => [...prev, newRow]);
+    // Auto-enter edit mode on the new row
+    const newIdx = rows.length;
+    setEditDraft({ ...newRow.raw });
+    setEditingIdx(newIdx);
   };
 
   // Transaction-level fields (not in Excel)
@@ -527,9 +538,10 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             )}
 
             {/* Editable line items */}
-            {validRows.length > 0 && (
-              <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto max-h-60">
+            {validRows.length > 0 ? (
+              <div className="space-y-2">
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="overflow-x-auto max-h-60">
                   <table className="w-full text-xs">
                     <thead className="bg-muted sticky top-0">
                       <tr>
@@ -618,9 +630,19 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                     </tbody>
                   </table>
                 </div>
+                </div>
+              <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={addNewRow}>
+                <Plus className="w-3.5 h-3.5" /> Añadir línea
+              </Button>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-xs text-muted-foreground mb-2">No hay líneas cargadas</p>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={addNewRow}>
+                  <Plus className="w-3.5 h-3.5" /> Añadir línea manualmente
+                </Button>
               </div>
             )}
-
             {/* Totals summary */}
             <div className="rounded-xl bg-muted/70 border border-border p-3 space-y-1.5">
               <p className="text-xs font-semibold text-foreground mb-2">Resumen a registrar:</p>
