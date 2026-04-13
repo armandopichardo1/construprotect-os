@@ -1530,6 +1530,9 @@ export type Database = {
           id: string
           notes: string | null
           order_date: string
+          payment_account_id: string | null
+          payment_date: string | null
+          payment_status: string
           po_number: string | null
           shipping_cost_usd: number | null
           status: Database["public"]["Enums"]["shipment_status"]
@@ -1547,6 +1550,9 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          payment_account_id?: string | null
+          payment_date?: string | null
+          payment_status?: string
           po_number?: string | null
           shipping_cost_usd?: number | null
           status?: Database["public"]["Enums"]["shipment_status"]
@@ -1564,6 +1570,9 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          payment_account_id?: string | null
+          payment_date?: string | null
+          payment_status?: string
           po_number?: string | null
           shipping_cost_usd?: number | null
           status?: Database["public"]["Enums"]["shipment_status"]
@@ -1573,6 +1582,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shipments_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shipments_supplier_id_fkey"
             columns: ["supplier_id"]
