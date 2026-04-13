@@ -62,10 +62,13 @@ function inferType(desc: string): JournalEntry['type'] {
 function extractVendorClient(desc: string): string {
   const parts = desc.split('—');
   if (parts.length > 1) {
-    const candidate = parts[parts.length - 1].trim();
-    // Skip if it looks like an amount
-    if (!candidate.startsWith('$') && !candidate.startsWith('RD$')) return candidate;
-    if (parts.length > 2) return parts[1].trim();
+    // Try the second part first (format: "Type ... — Name — Amount")
+    for (let i = 1; i < parts.length; i++) {
+      const candidate = parts[i].trim();
+      // Skip if it looks like an amount (RD$, $, or purely numeric)
+      if (candidate.startsWith('$') || candidate.startsWith('RD$') || /^[\d,.]+$/.test(candidate)) continue;
+      return candidate;
+    }
   }
   return '—';
 }
