@@ -635,6 +635,19 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
         if (accts) {
           const { buildSaleJournalLines, createAutoJournal } = await import('@/lib/account-mapping');
           const lines = buildSaleJournalLines(accts, total, subtotal, itbis, 'pending');
+
+          // Add COGS lines: Debit Costo de Ventas, Credit Mercancía
+          const totalCogs = items.reduce((s, i) => {
+            const prod = products.find((p: any) => p.id === i.product_id);
+            return s + (Number(prod?.unit_cost_usd || 0) * i.quantity);
+          }, 0);
+          if (totalCogs > 0) {
+            const cogsAcct = accts.find((a: any) => a.code === '50000' || (a.code?.startsWith('500') && a.account_type === 'Costo'));
+            const merchAcct = accts.find((a: any) => a.code === '13100' || (a.code?.startsWith('131') && a.account_type === 'Activo'));
+            if (cogsAcct) lines.push({ accountId: cogsAcct.id, debit: totalCogs, credit: 0 });
+            if (merchAcct) lines.push({ accountId: merchAcct.id, debit: 0, credit: totalCogs });
+          }
+
           const clientName = contacts.find((c: any) => c.id === contactId)?.contact_name || '';
           await createAutoJournal(`Venta ${invoiceRef || saleId.slice(0, 8)} — ${clientName}`, lines, { exchangeRate: xr });
         }
