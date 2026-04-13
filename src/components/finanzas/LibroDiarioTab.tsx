@@ -103,7 +103,14 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const entries: JournalEntry[] = useMemo(() => {
     const all: JournalEntry[] = [];
 
-    journalEntries.forEach((je: any) => {
+    // Sort journal entries by date DESC then by created_at DESC for same-date entries
+    const sorted = [...journalEntries].sort((a: any, b: any) => {
+      const dateCmp = (b.date || '').localeCompare(a.date || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+
+    sorted.forEach((je: any) => {
       const lines = je.journal_entry_lines || [];
       const debitLines = lines.filter((l: any) => Number(l.debit_usd) > 0);
       const creditLines = lines.filter((l: any) => Number(l.credit_usd) > 0);
