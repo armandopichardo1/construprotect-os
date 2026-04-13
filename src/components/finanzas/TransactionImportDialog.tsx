@@ -457,9 +457,14 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
               )}
             </div>
 
-            <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={downloadTemplate}>
-              <Download className="w-3.5 h-3.5" /> Descargar plantilla {TX_LABELS[txType].label}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={downloadTemplate}>
+                <Download className="w-3.5 h-3.5" /> Descargar plantilla
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => setStep('preview')}>
+                <Plus className="w-3.5 h-3.5" /> Crear manualmente
+              </Button>
+            </div>
           </div>
         )}
 
