@@ -35,6 +35,7 @@ export function OrdenesTab() {
   const [detailOrder, setDetailOrder] = useState<any>(null);
   const [detailType, setDetailType] = useState<ViewMode>('compras');
   const [payShipment, setPayShipment] = useState<any>(null);
+  const [editShipment, setEditShipment] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
