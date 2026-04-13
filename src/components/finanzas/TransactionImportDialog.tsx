@@ -251,7 +251,7 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
           const itbis = subtotal * 0.18;
           const total = subtotal + itbis;
           const salePayload: any = {
-254:             date: txDate,
+date: txDate,
             subtotal_usd: subtotal,
             itbis_usd: itbis,
             total_usd: total,
