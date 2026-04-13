@@ -997,7 +997,7 @@ function CuentasMaestra() {
         <Button size="sm" variant="ghost" onClick={collapseAll} className="text-xs">Colapsar</Button>
         <span className="text-xs text-muted-foreground">{filtered.length} cuentas</span>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => exportToExcel(accounts.map(a => ({ Código: a.code, Descripción: a.description, Clasificación: a.classification, Tipo: a.account_type, Moneda: a.currency })), 'catalogo_cuentas', 'Cuentas')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
+          <Button size="sm" variant="outline" onClick={() => exportToExcel(accounts.map(a => ({ Código: a.code, Descripción: a.description, Clasificación: a.classification, Tipo: a.account_type, 'Estado Financiero': (a as any).financial_statement, Efecto: (a as any).normal_balance, Moneda: a.currency })), 'catalogo_cuentas', 'Cuentas')}><Download className="w-3.5 h-3.5 mr-1" />Excel</Button>
           <Button size="sm" onClick={() => setEditing({ code: '', description: '', classification: '', account_type: 'Gasto', currency: '', parent_id: '' })}><Plus className="w-3.5 h-3.5 mr-1" />Nueva</Button>
         </div>
       </div>
