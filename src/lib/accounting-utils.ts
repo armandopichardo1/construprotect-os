@@ -49,3 +49,36 @@ export function findCxPAccount(accounts: AccountMatch[]): AccountMatch | undefin
       (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
     );
 }
+
+/** Find "Freight / Shipping Internacional" cost account (50200) */
+export function findFreightAccount(accounts: AccountMatch[]): AccountMatch | undefined {
+  return accounts.find(a => a.code === '50200')
+    || accounts.find(a =>
+      a.account_type === 'Costo' && (
+        a.description?.toLowerCase().includes('freight') ||
+        a.description?.toLowerCase().includes('shipping') ||
+        a.description?.toLowerCase().includes('flete')
+      )
+    );
+}
+
+/** Find "Impuestos DGA / Gestiones Aduanales" cost account (50300 or 50400) */
+export function findCustomsAccount(accounts: AccountMatch[]): AccountMatch | undefined {
+  return accounts.find(a => a.code === '50300')
+    || accounts.find(a => a.code === '50400')
+    || accounts.find(a =>
+      a.account_type === 'Costo' && (
+        a.description?.toLowerCase().includes('aduana') ||
+        a.description?.toLowerCase().includes('dga') ||
+        a.description?.toLowerCase().includes('customs')
+      )
+    );
+}
+
+/** Find "Tarjeta de Crédito" liability account (20400) */
+export function findCreditCardAccount(accounts: AccountMatch[]): AccountMatch | undefined {
+  return accounts.find(a => a.code === '20400')
+    || accounts.find(a =>
+      a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('tarjeta')
+    );
+}
