@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Search, Download, Save, Trash2 } from 'lucide-react';
+import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
@@ -23,6 +23,8 @@ interface JournalEntry {
   category: string;
   account_code: string;
   account_name: string;
+  credit_account_code: string;
+  credit_account_name: string;
   debit_usd: number;
   credit_usd: number;
   debit_dop: number;
@@ -39,6 +41,9 @@ const TYPE_LABELS: Record<string, { label: string; emoji: string; color: string 
   cost: { label: 'Costo', emoji: '🏭', color: 'text-warning' },
   journal: { label: 'Asiento', emoji: '📒', color: 'text-primary' },
 };
+
+type SortField = 'date' | 'type' | 'description' | 'account_name' | 'credit_account_name' | 'vendor_client' | 'debit_usd' | 'credit_usd' | 'debit_dop';
+type SortDir = 'asc' | 'desc';
 
 interface Props {
   sales: any[];
@@ -58,6 +63,19 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
   const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState({ description: '', amount_usd: '', amount_dop: '', date: '', category: '' });
   const [saving, setSaving] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = useCallback((field: SortField) => {
+    setSortField(prev => {
+      if (prev === field) {
+        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        return field;
+      }
+      setSortDir('desc');
+      return field;
+    });
+  }, []);
 
   const entries: JournalEntry[] = useMemo(() => {
     const all: JournalEntry[] = [];
@@ -71,7 +89,9 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         description: `Venta ${s.invoice_ref || ''}`.trim(),
         category: 'Venta',
         account_code: s.chart_of_accounts?.code || '',
-        account_name: s.chart_of_accounts?.description || 'Ingresos por Ventas',
+        account_name: s.chart_of_accounts?.description || 'Cuentas por Cobrar',
+        credit_account_code: '',
+        credit_account_name: 'Ingresos por Ventas',
         debit_usd: 0,
         credit_usd: Number(s.total_usd || 0),
         debit_dop: 0,
@@ -93,6 +113,8 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         category: e.category,
         account_code: e.chart_of_accounts?.code || '',
         account_name: e.chart_of_accounts?.description || e.category,
+        credit_account_code: '',
+        credit_account_name: 'Efectivo / Banco',
         debit_usd: Number(e.amount_usd || 0),
         credit_usd: 0,
         debit_dop: Number(e.amount_dop) || Number(e.amount_usd || 0) * exRate,
@@ -114,6 +136,8 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         category: c.category,
         account_code: c.chart_of_accounts?.code || '',
         account_name: c.chart_of_accounts?.description || c.category,
+        credit_account_code: '',
+        credit_account_name: 'Efectivo / Banco',
         debit_usd: Number(c.amount_usd || 0),
         credit_usd: 0,
         debit_dop: Number(c.amount_dop) || Number(c.amount_usd || 0) * exRate,
@@ -130,14 +154,19 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
       const totalDebit = Number(je.total_debit_usd || 0);
       const totalCredit = Number(je.total_credit_usd || 0);
       const exRate = Number(je.exchange_rate) || rate;
+      const lines = je.journal_entry_lines || [];
+      const debitLines = lines.filter((l: any) => Number(l.debit_usd) > 0);
+      const creditLines = lines.filter((l: any) => Number(l.credit_usd) > 0);
       all.push({
         id: je.id,
         date: je.date,
         type: 'journal',
         description: je.description,
         category: 'Asiento Manual',
-        account_code: '',
-        account_name: je.journal_entry_lines?.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
+        account_code: debitLines.map((l: any) => l.chart_of_accounts?.code).filter(Boolean).join(', '),
+        account_name: debitLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
+        credit_account_code: creditLines.map((l: any) => l.chart_of_accounts?.code).filter(Boolean).join(', '),
+        credit_account_name: creditLines.map((l: any) => l.chart_of_accounts?.description).filter(Boolean).join(' / ') || 'Asiento',
         debit_usd: totalDebit,
         credit_usd: totalCredit,
         debit_dop: totalDebit * exRate,
@@ -149,7 +178,7 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
       });
     });
 
-    return all.sort((a, b) => b.date.localeCompare(a.date));
+    return all;
   }, [sales, expenses, costs, journalEntries, rate]);
 
   const filtered = useMemo(() => {
@@ -161,12 +190,28 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         e.description.toLowerCase().includes(q) ||
         e.vendor_client.toLowerCase().includes(q) ||
         e.account_name.toLowerCase().includes(q) ||
+        e.credit_account_name.toLowerCase().includes(q) ||
         e.ref.toLowerCase().includes(q) ||
         e.category.toLowerCase().includes(q)
       );
     }
+    // Sort
+    items.sort((a, b) => {
+      let cmp = 0;
+      const fa = sortField;
+      if (fa === 'date') cmp = a.date.localeCompare(b.date);
+      else if (fa === 'type') cmp = a.type.localeCompare(b.type);
+      else if (fa === 'description') cmp = a.description.localeCompare(b.description);
+      else if (fa === 'account_name') cmp = a.account_name.localeCompare(b.account_name);
+      else if (fa === 'credit_account_name') cmp = a.credit_account_name.localeCompare(b.credit_account_name);
+      else if (fa === 'vendor_client') cmp = a.vendor_client.localeCompare(b.vendor_client);
+      else if (fa === 'debit_usd') cmp = a.debit_usd - b.debit_usd;
+      else if (fa === 'credit_usd') cmp = a.credit_usd - b.credit_usd;
+      else if (fa === 'debit_dop') cmp = (a.debit_dop || a.credit_dop) - (b.debit_dop || b.credit_dop);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
     return items;
-  }, [entries, typeFilter, searchQuery, filterByDate]);
+  }, [entries, typeFilter, searchQuery, filterByDate, sortField, sortDir]);
 
   const totals = useMemo(() => ({
     debit_usd: filtered.reduce((s, e) => s + e.debit_usd, 0),
@@ -174,6 +219,23 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
     debit_dop: filtered.reduce((s, e) => s + e.debit_dop, 0),
     credit_dop: filtered.reduce((s, e) => s + e.credit_dop, 0),
   }), [filtered]);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-30" />;
+    return sortDir === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5" />;
+  };
+
+  const SortableHead = ({ field, children, className }: { field: SortField; children: React.ReactNode; className?: string }) => (
+    <TableHead
+      className={cn('text-[10px] font-semibold cursor-pointer select-none hover:text-foreground transition-colors', className)}
+      onClick={() => toggleSort(field)}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {children}
+        <SortIcon field={field} />
+      </span>
+    </TableHead>
+  );
 
   const openEdit = (entry: JournalEntry) => {
     setEditEntry(entry);
@@ -274,14 +336,16 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
       Fecha: e.date,
       Tipo: TYPE_LABELS[e.type].label,
       Descripción: e.description,
-      Cuenta: e.account_name,
-      'Código Cuenta': e.account_code,
+      'Proveedor/Cliente': e.vendor_client,
+      'Cuenta Débito': e.account_name,
+      'Código Débito': e.account_code,
+      'Cuenta Crédito': e.credit_account_name,
+      'Código Crédito': e.credit_account_code,
       'Débito USD': e.debit_usd || '',
       'Crédito USD': e.credit_usd || '',
       'Débito DOP': e.debit_dop || '',
       'Crédito DOP': e.credit_dop || '',
       'Tasa Cambio': e.exchange_rate,
-      'Proveedor/Cliente': e.vendor_client,
       Referencia: e.ref,
     })), 'libro-diario', 'Libro Diario');
   };
@@ -339,14 +403,15 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
         <Table wrapperClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
-              <TableHead className="text-[10px] font-semibold">Fecha</TableHead>
-              <TableHead className="text-[10px] font-semibold">Tipo</TableHead>
-              <TableHead className="text-[10px] font-semibold">Descripción</TableHead>
-              <TableHead className="text-[10px] font-semibold hidden md:table-cell">Cuenta</TableHead>
-              <TableHead className="text-[10px] font-semibold hidden lg:table-cell">Proveedor/Cliente</TableHead>
-              <TableHead className="text-[10px] font-semibold text-right">Débito USD</TableHead>
-              <TableHead className="text-[10px] font-semibold text-right">Crédito USD</TableHead>
-              <TableHead className="text-[10px] font-semibold text-right hidden md:table-cell">DOP</TableHead>
+              <SortableHead field="date">Fecha</SortableHead>
+              <SortableHead field="type">Tipo</SortableHead>
+              <SortableHead field="description">Descripción</SortableHead>
+              <SortableHead field="vendor_client" className="hidden lg:table-cell">Proveedor/Cliente</SortableHead>
+              <SortableHead field="account_name" className="hidden md:table-cell">Cta. Débito</SortableHead>
+              <SortableHead field="credit_account_name" className="hidden md:table-cell">Cta. Crédito</SortableHead>
+              <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
+              <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
+              <SortableHead field="debit_dop" className="text-right hidden md:table-cell">DOP</SortableHead>
               <TableHead className="text-[10px] font-semibold w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -360,10 +425,13 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
                     <span className={cn('text-[10px] font-medium', cfg.color)}>{cfg.emoji} {cfg.label}</span>
                   </TableCell>
                   <TableCell className="text-xs py-1.5 max-w-[200px] truncate">{entry.description}</TableCell>
-                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell truncate max-w-[150px]">
+                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden lg:table-cell">{entry.vendor_client}</TableCell>
+                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
                     {entry.account_code ? `${entry.account_code} · ` : ''}{entry.account_name}
                   </TableCell>
-                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden lg:table-cell">{entry.vendor_client}</TableCell>
+                  <TableCell className="text-xs py-1.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
+                    {entry.credit_account_code ? `${entry.credit_account_code} · ` : ''}{entry.credit_account_name}
+                  </TableCell>
                   <TableCell className="text-xs py-1.5 text-right font-mono">
                     {entry.debit_usd > 0 ? formatUSD(entry.debit_usd) : ''}
                   </TableCell>
@@ -388,7 +456,10 @@ export function LibroDiarioTab({ sales, expenses, costs, journalEntries = [], ra
             })}
             {filtered.length > 0 && (
               <TableRow className="bg-muted/30 font-semibold">
-                <TableCell colSpan={5} className="text-xs py-2 text-right">TOTALES</TableCell>
+                <TableCell colSpan={4} className="text-xs py-2 text-right hidden lg:table-cell">TOTALES</TableCell>
+                <TableCell colSpan={4} className="text-xs py-2 text-right lg:hidden">TOTALES</TableCell>
+                <TableCell className="text-xs py-2 hidden md:table-cell" />
+                <TableCell className="text-xs py-2 hidden md:table-cell" />
                 <TableCell className="text-xs py-2 text-right font-mono">{formatUSD(totals.debit_usd)}</TableCell>
                 <TableCell className="text-xs py-2 text-right font-mono">{formatUSD(totals.credit_usd)}</TableCell>
                 <TableCell className="text-xs py-2 text-right font-mono text-muted-foreground hidden md:table-cell">
