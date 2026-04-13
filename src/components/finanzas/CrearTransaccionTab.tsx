@@ -652,7 +652,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         });
         await supabase.from('sale_items').insert(itemsData);
 
-        toast.success('Venta registrada');
+        // Auto journal entry for sale
+        const saleDesc = `Venta ${invoiceRef || sale.id.slice(0, 8)} — ${contacts.find(c => c.id === contactId)?.contact_name || 'Cliente'}`;
+        await createJournalFromPreview(saleDesc, `Auto-generado por venta. Total: ${formatUSD(totalSale)}`);
+
+        toast.success('Venta registrada con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
