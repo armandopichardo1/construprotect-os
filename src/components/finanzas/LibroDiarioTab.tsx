@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Copy } from 'lucide-react';
+import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Copy, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
@@ -304,11 +304,15 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           <TableBody>
             {filtered.map(e => {
               const tl = TYPE_LABELS[e.type] || TYPE_LABELS.journal;
+              const unbalanced = Math.abs(e.debit_usd - e.credit_usd) >= 0.01;
               return (
-                <TableRow key={e.id}>
+                <TableRow key={e.id} className={cn(unbalanced && 'bg-destructive/5 border-l-2 border-l-destructive')}>
                   <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">{e.date}</TableCell>
                   <TableCell>
-                    <span className={cn('text-[10px] font-medium', tl.color)}>{tl.emoji} {tl.label}</span>
+                    <span className={cn('text-[10px] font-medium', tl.color)}>
+                      {unbalanced && <Tooltip><TooltipTrigger asChild><AlertTriangle className="w-3 h-3 text-destructive inline mr-0.5" /></TooltipTrigger><TooltipContent className="text-xs">Descuadre: {formatUSD(Math.abs(e.debit_usd - e.credit_usd))}</TooltipContent></Tooltip>}
+                      {tl.emoji} {tl.label}
+                    </span>
                   </TableCell>
                   <TableCell className="text-xs max-w-[200px]">
                     <Tooltip>
