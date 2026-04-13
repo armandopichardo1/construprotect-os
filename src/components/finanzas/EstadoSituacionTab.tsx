@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatUSD, getGlobalExchangeRate } from '@/lib/format';
+import { formatUSD } from '@/lib/format';
 import { exportToExcel } from '@/lib/export-utils';
 import {
-  getDefaultAccounts, buildAccountAccumulator,
-  accumulateSales, accumulateCOGS, accumulateExpenses, accumulateCosts, accumulateJournalEntries,
-  findExpenseAccount, findCostAccount, isDebitNatural,
+  buildAccountAccumulator, accumulateJournalEntries, isDebitNatural,
 } from '@/lib/account-mapping';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { KpiCard } from '@/components/KpiCard';
@@ -19,10 +17,6 @@ import { cn } from '@/lib/utils';
 const TOOLTIP_STYLE = { background: 'hsl(222, 20%, 10%)', border: '1px solid hsl(222, 20%, 20%)', borderRadius: 8, fontSize: 12 };
 
 interface EstadoSituacionTabProps {
-  sales: any[];
-  expenses: any[];
-  costs: any[];
-  saleItems: any[];
   journalEntries?: any[];
   rate: number;
 }
@@ -36,7 +30,7 @@ interface AccountBalance {
   balance: number;
 }
 
-export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalEntries = [], rate }: EstadoSituacionTabProps) {
+export function EstadoSituacionTab({ journalEntries = [], rate }: EstadoSituacionTabProps) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
 
   const { data: accounts = [] } = useQuery({
@@ -48,27 +42,10 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
     },
   });
 
-  const filteredSales = filterByDate(sales);
-  const filteredExpenses = filterByDate(expenses);
-  const filteredCosts = filterByDate(costs);
-  const filteredSaleItems = useMemo(() => {
-    if (period === 'all') return saleItems;
-    return saleItems.filter((si: any) => {
-      const d = si.sales?.date;
-      return d && filterByDate([{ date: d }]).length > 0;
-    });
-  }, [saleItems, period, filterByDate]);
-
-  const defaults = useMemo(() => getDefaultAccounts(accounts), [accounts]);
-
   const { balanceRows, totalActivos, totalPasivos, totalCapital, netIncome } = useMemo(() => {
     const acc = buildAccountAccumulator();
 
-    accumulateSales(filteredSales, defaults, acc);
-    accumulateCOGS(filteredSaleItems, defaults, acc);
-    accumulateExpenses(filteredExpenses, accounts, defaults, acc);
-    accumulateCosts(filteredCosts, accounts, defaults, acc);
-
+    // ONLY source from journal entries — the single source of truth
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
     accumulateJournalEntries(filteredJournals, acc);
 
@@ -106,13 +83,12 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
       totalCapital: tCapital,
       netIncome: ni,
     };
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, defaults, filterByDate]);
+  }, [accounts, journalEntries, filterByDate]);
 
   const patrimonio = totalCapital + netIncome;
   const pasivoPlusPatrimonio = totalPasivos + patrimonio;
   const isBalanced = Math.abs(totalActivos - pasivoPlusPatrimonio) < 0.01;
 
-  // Group activos by classification
   const groupByClassification = (items: AccountBalance[]) => {
     const groups: Record<string, AccountBalance[]> = {};
     items.forEach(r => {
@@ -127,7 +103,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
   const pasivoGroups = groupByClassification(balanceRows.pasivos);
   const capitalGroups = groupByClassification(balanceRows.capital);
 
-  // Charts
   const compositionData = [
     { name: 'Activos', value: totalActivos, color: 'hsl(217, 91%, 60%)' },
     { name: 'Pasivos', value: totalPasivos, color: 'hsl(0, 84%, 60%)' },
@@ -198,7 +173,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard title="Total Activos" value={formatUSD(totalActivos)} icon={Building2} variant="primary" />
         <KpiCard title="Total Pasivos" value={formatUSD(totalPasivos)} icon={Landmark} variant="destructive" />
@@ -208,7 +182,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
           subtitle={`Activos: ${formatUSD(totalActivos)} | P+Pat: ${formatUSD(pasivoPlusPatrimonio)}`} />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-2xl bg-card border border-border p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Estructura del Balance</h3>
@@ -254,7 +227,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
         </div>
       </div>
 
-      {/* Filters & Export */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
         <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
@@ -262,7 +234,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
         </Button>
       </div>
 
-      {/* Balance Sheet */}
       <div className="rounded-2xl bg-card border border-border overflow-hidden">
         <div className="p-4 border-b border-border">
           <h2 className="text-sm font-bold text-foreground">Estado de Situación Financiera</h2>
@@ -275,7 +246,6 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
           {renderSection('Patrimonio', capitalGroups, patrimonio, 'hsl(160, 84%, 39%)', { label: 'Resultado del Período', value: netIncome })}
         </div>
 
-        {/* Equation check */}
         <div className={cn('p-4 flex items-center justify-between', isBalanced ? 'bg-success/10' : 'bg-destructive/10')}>
           <div>
             <p className="text-xs font-bold">{isBalanced ? '✓ Ecuación contable cuadrada' : '⚠ Ecuación contable descuadrada'}</p>
