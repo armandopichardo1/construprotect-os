@@ -726,6 +726,8 @@ function CuentasMaestra() {
         return;
       }
     }
+    const fsMap: Record<string, string> = { Activo: 'Balance General', Pasivo: 'Balance General', Capital: 'Balance General', Ingreso: 'Estado de Resultados', 'Ingresos No Operacionales': 'Estado de Resultados', Costo: 'Estado de Resultados', Gasto: 'Estado de Resultados', 'Gastos No Operacionales': 'Estado de Resultados' };
+    const nbMap: Record<string, string> = { Activo: 'Débito', Pasivo: 'Crédito', Capital: 'Crédito', Ingreso: 'Crédito', 'Ingresos No Operacionales': 'Crédito', Costo: 'Débito', Gasto: 'Débito', 'Gastos No Operacionales': 'Débito' };
     const payload = { 
       code: formData.code || null, 
       description: formData.description, 
@@ -733,6 +735,8 @@ function CuentasMaestra() {
       account_type: formData.account_type, 
       currency: formData.currency || null,
       parent_id: formData.parent_id || null,
+      financial_statement: fsMap[formData.account_type] || 'Sin asignar',
+      normal_balance: nbMap[formData.account_type] || 'Sin asignar',
     };
     if (formData.id) {
       const { error } = await supabase.from('chart_of_accounts').update(payload).eq('id', formData.id);
@@ -955,6 +959,12 @@ function CuentasMaestra() {
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.classification || '—'}</TableCell>
       <TableCell><span className={cn('text-[10px] px-2 py-0.5 rounded-full', typeColors[a.account_type] || 'bg-muted text-muted-foreground')}>{a.account_type}</span></TableCell>
+      <TableCell className="text-xs text-muted-foreground">{a.financial_statement || '—'}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        <span className={cn('text-[10px] px-2 py-0.5 rounded-full', a.normal_balance === 'Débito' ? 'bg-primary/10 text-primary' : a.normal_balance === 'Crédito' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground')}>
+          {a.normal_balance || '—'}
+        </span>
+      </TableCell>
       <TableCell className="text-xs text-muted-foreground">{a.currency || '—'}</TableCell>
       <TableCell className={cn('text-xs text-right font-mono', balance > 0 ? (hasKids ? 'font-bold text-foreground' : 'text-muted-foreground') : 'text-muted-foreground/50')}>
         {balance > 0 ? `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
@@ -1002,6 +1012,8 @@ function CuentasMaestra() {
             <TableHead className="text-xs">Descripción</TableHead>
             <TableHead className="text-xs">Clasificación</TableHead>
             <TableHead className="text-xs">Tipo</TableHead>
+            <TableHead className="text-xs">Estado Financiero</TableHead>
+            <TableHead className="text-xs">Efecto</TableHead>
             <TableHead className="text-xs">Moneda</TableHead>
             <TableHead className="text-xs text-right">Saldo (RD$)</TableHead>
             <TableHead className="text-xs w-20"></TableHead>
