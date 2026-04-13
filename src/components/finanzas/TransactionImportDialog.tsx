@@ -538,9 +538,9 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
             )}
 
             {/* Editable line items */}
-            {validRows.length > 0 && (
+            {validRows.length > 0 ? (
+              <div className="space-y-2">
               <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto max-h-60">
                   <table className="w-full text-xs">
                     <thead className="bg-muted sticky top-0">
                       <tr>
