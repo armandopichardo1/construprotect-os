@@ -61,11 +61,9 @@ export function ShipmentPaymentDialog({ open, onOpenChange, shipment }: Props) {
         payment_account_id: accountId,
       } as any).eq('id', shipment.id);
 
-      // Find CxP account
-      const cxpAcct = accounts.find(a =>
-        a.code?.startsWith('21') || a.code?.startsWith('20') ||
-        (a.account_type === 'Pasivo' && a.description?.toLowerCase().includes('pagar'))
-      );
+      // Find CxP account using shared helper
+      const allAccounts = await fetchAccounts();
+      const cxpAcct = findCxPAccount(allAccounts);
 
       if (cxpAcct) {
         const desc = `Pago PO ${shipment.po_number || shipment.id.slice(0, 8)} — ${shipment.supplier_name}`;
