@@ -410,7 +410,15 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Cliente</label>
-                      <Input value={txClient} onChange={e => setTxClient(e.target.value)} placeholder="Nombre del cliente" className="h-8 text-xs" />
+                      <SearchableSelect
+                        options={contacts.map((c: any) => ({ value: c.id, label: c.contact_name + (c.company_name ? ` — ${c.company_name}` : '') }))}
+                        value={txClient}
+                        onValueChange={setTxClient}
+                        placeholder="Seleccionar cliente"
+                        searchPlaceholder="Buscar cliente..."
+                        emptyMessage="No encontrado"
+                        className="h-8 text-xs"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Estado de Pago</label>
