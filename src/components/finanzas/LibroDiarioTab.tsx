@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel } from '@/lib/export-utils';
 
@@ -61,10 +62,13 @@ function inferType(desc: string): JournalEntry['type'] {
 function extractVendorClient(desc: string): string {
   const parts = desc.split('—');
   if (parts.length > 1) {
-    const candidate = parts[parts.length - 1].trim();
-    // Skip if it looks like an amount
-    if (!candidate.startsWith('$') && !candidate.startsWith('RD$')) return candidate;
-    if (parts.length > 2) return parts[1].trim();
+    // Try the second part first (format: "Type ... — Name — Amount")
+    for (let i = 1; i < parts.length; i++) {
+      const candidate = parts[i].trim();
+      // Skip if it looks like an amount (RD$, $, or purely numeric)
+      if (candidate.startsWith('$') || candidate.startsWith('RD$') || /^[\d,.]+$/.test(candidate)) continue;
+      return candidate;
+    }
   }
   return '—';
 }
@@ -269,6 +273,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       </div>
 
       {/* Table */}
+      <TooltipProvider delayDuration={200}>
       <div className="rounded-2xl bg-card border border-border overflow-hidden max-h-[calc(100vh-320px)] overflow-auto">
         <Table wrapperClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
@@ -277,7 +282,9 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
               <SortableHead field="type">Tipo</SortableHead>
               <SortableHead field="description">Descripción</SortableHead>
               <SortableHead field="vendor_client">Prov./Cliente</SortableHead>
+              <TableHead className="text-[10px] font-semibold">Cód. D</TableHead>
               <SortableHead field="account_name">Cuenta Débito</SortableHead>
+              <TableHead className="text-[10px] font-semibold">Cód. C</TableHead>
               <SortableHead field="credit_account_name">Cuenta Crédito</SortableHead>
               <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
               <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
@@ -294,17 +301,45 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   <TableCell>
                     <span className={cn('text-[10px] font-medium', tl.color)}>{tl.emoji} {tl.label}</span>
                   </TableCell>
-                  <TableCell className="text-xs max-w-[200px] truncate">{e.description}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{e.vendor_client}</TableCell>
-                  <TableCell className="text-xs max-w-[150px] truncate">
-                    <span className="text-muted-foreground font-mono text-[10px]">{e.account_code}</span>
-                    {e.account_code && ' '}
-                    {e.account_name}
+                  <TableCell className="text-xs max-w-[200px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block truncate">{e.description}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">{e.description}</TooltipContent>
+                    </Tooltip>
                   </TableCell>
-                  <TableCell className="text-xs max-w-[150px] truncate">
-                    <span className="text-muted-foreground font-mono text-[10px]">{e.credit_account_code}</span>
-                    {e.credit_account_code && ' '}
-                    {e.credit_account_name}
+                  <TableCell className="text-xs text-muted-foreground max-w-[120px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block truncate">{e.vendor_client}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">{e.vendor_client}</TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{e.account_code || '—'}</TableCell>
+                  <TableCell className="text-xs max-w-[130px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block truncate">{e.account_name}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        {e.account_code && <span className="font-mono text-muted-foreground">{e.account_code} — </span>}
+                        {e.account_name}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{e.credit_account_code || '—'}</TableCell>
+                  <TableCell className="text-xs max-w-[130px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block truncate">{e.credit_account_name}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        {e.credit_account_code && <span className="font-mono text-muted-foreground">{e.credit_account_code} — </span>}
+                        {e.credit_account_name}
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.debit_usd > 0 ? formatUSD(e.debit_usd) : '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
@@ -320,14 +355,14 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={12} className="text-center text-sm text-muted-foreground py-8">
                   No hay asientos contables registrados
                 </TableCell>
               </TableRow>
             )}
             {filtered.length > 0 && (
               <TableRow className="font-bold bg-muted/30">
-                <TableCell colSpan={6} className="text-xs font-bold">TOTALES</TableCell>
+                <TableCell colSpan={8} className="text-xs font-bold">TOTALES</TableCell>
                 <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.debit_usd)}</TableCell>
                 <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.credit_usd)}</TableCell>
                 <TableCell className="text-xs text-right font-bold font-mono text-muted-foreground">{formatDOP(totals.debit_dop)}</TableCell>
@@ -337,6 +372,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </TableBody>
         </Table>
       </div>
+      </TooltipProvider>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteEntry} onOpenChange={(v) => { if (!v) setDeleteEntry(null); }}>
