@@ -130,6 +130,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const latestXr = Number(rate?.usd_sell) || 60.76;
   const [mode, setMode] = useState<Mode>('manual');
   const [currencyBase, setCurrencyBase] = useState<CurrencyBase>('DOP');
+  const [importOpen, setImportOpen] = useState(false);
 
   // Shared data queries
   const { data: accounts = [] } = useQuery({
