@@ -31,6 +31,7 @@ import { BreakEvenTab } from '@/components/finanzas/BreakEvenTab';
 import { DatePeriodFilter, useDatePeriodFilter } from '@/components/finanzas/DatePeriodFilter';
 import { LibroDiarioTab } from '@/components/finanzas/LibroDiarioTab';
 import { BalanceComprobacionTab } from '@/components/finanzas/BalanceComprobacionTab';
+import { EstadoSituacionTab } from '@/components/finanzas/EstadoSituacionTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 import { PricingTab } from '@/components/finanzas/PricingTab';
 import { OrdenesTab } from '@/components/finanzas/OrdenesTab';
@@ -363,6 +364,7 @@ export default function FinanzasPage() {
         }} />}
         {tab === 'P&L' && <PLTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} />}
         {tab === 'Balance' && <BalanceComprobacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
+        {tab === 'Situación' && <EstadoSituacionTab sales={sales} expenses={expenses} costs={costs} saleItems={saleItems} journalEntries={journalEntries} rate={Number(latestRate?.usd_sell || 60)} />}
         {tab === 'Reportes' && <ReportesTab sales={sales} saleItems={saleItems} expenses={expenses} costs={costs} rate={latestRate} rateForMonth={rateForMonth} />}
         {tab === 'Flujo Caja' && <CashFlowTab sales={sales} expenses={expenses} costs={costs} journalEntries={journalEntries} />}
         {tab === 'Break-Even' && <BreakEvenTab sales={sales} saleItems={saleItems} expenses={expenses} />}
