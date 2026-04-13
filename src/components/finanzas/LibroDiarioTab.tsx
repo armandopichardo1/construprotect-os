@@ -372,6 +372,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </TableBody>
         </Table>
       </div>
+      </TooltipProvider>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteEntry} onOpenChange={(v) => { if (!v) setDeleteEntry(null); }}>
