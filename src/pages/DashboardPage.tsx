@@ -391,11 +391,13 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         {(() => {
-          const netCashFlow = (revenueData?.totalRevenue || 0) - (revenueData?.totalCogs || 0) - (revenueData?.totalDirectCosts || 0) - (revenueData?.totalExpenses || 0);
+          const cashNet = netCashFlow?.net || 0;
+          const cashIn = netCashFlow?.inflows || 0;
+          const cashOut = netCashFlow?.outflows || 0;
           return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             <KpiCard title="Ingresos Total" value={fmt(revenueData?.totalRevenue || 0)} icon={DollarSign} variant="primary" />
-            <KpiCard title="Flujo Caja Neto" value={fmt(netCashFlow)} icon={TrendingUp} variant={netCashFlow >= 0 ? 'success' : 'destructive'} subtitle={`USD ${formatUSD(netCashFlow)}`} />
+            <KpiCard title="Flujo Caja Neto" value={fmt(cashNet)} icon={TrendingUp} variant={cashNet >= 0 ? 'success' : 'destructive'} subtitle={`Entradas: ${formatUSD(cashIn)} | Salidas: ${formatUSD(cashOut)}`} />
             <KpiCard title="Margen Bruto" value={`${margin.toFixed(1)}%`} icon={TrendingUp} variant="success" />
             <KpiCard title="Margen Neto" value={`${netMargin.toFixed(1)}%`} icon={BarChart3} variant={netMargin >= 0 ? 'success' : 'destructive'} subtitle={`Gastos: ${fmt(revenueData?.totalExpenses || 0)}`} />
             <KpiCard title="Valor Inventario" value={fmt(inventoryStats?.totalValue || 0)} icon={Warehouse} />
