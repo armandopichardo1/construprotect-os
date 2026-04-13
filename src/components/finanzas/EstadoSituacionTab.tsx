@@ -59,79 +59,23 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
     });
   }, [saleItems, period, filterByDate]);
 
-  const findAccount = (prefix: string) => accounts.find((a: any) => a.code?.startsWith(prefix));
-  const incomeAccount = findAccount('41') || findAccount('40');
-  const cxcAccount = findAccount('121') || findAccount('12');
-  const cogsAccount = findAccount('50') || accounts.find((a: any) => a.account_type === 'Costo');
-  const inventoryAccount = findAccount('131') || findAccount('13');
-  const cashAccount = findAccount('103') || findAccount('104') || findAccount('10');
-  const cxpAccount = findAccount('201') || findAccount('20');
+  const defaults = useMemo(() => getDefaultAccounts(accounts), [accounts]);
 
-  // Compute balances same as BalanceComprobacion but only for Balance General accounts
   const { balanceRows, totalActivos, totalPasivos, totalCapital, netIncome } = useMemo(() => {
-    const accMap: Record<string, { debits: number; credits: number }> = {};
-    const ensure = (id: string) => { if (!accMap[id]) accMap[id] = { debits: 0, credits: 0 }; };
+    const acc = buildAccountAccumulator();
 
-    // VENTAS
-    filteredSales.forEach((s: any) => {
-      const incId = s.account_id || incomeAccount?.id;
-      const amount = Number(s.total_usd || 0);
-      if (!incId || amount === 0) return;
-      ensure(incId);
-      accMap[incId].credits += amount;
-      if (['pending', 'overdue', 'partial'].includes(s.payment_status)) {
-        if (cxcAccount) { ensure(cxcAccount.id); accMap[cxcAccount.id].debits += amount; }
-      } else if (s.payment_status === 'paid') {
-        if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].debits += amount; }
-      }
-    });
+    accumulateSales(filteredSales, defaults, acc);
+    accumulateCOGS(filteredSaleItems, defaults, acc);
+    accumulateExpenses(filteredExpenses, accounts, defaults, acc);
+    accumulateCosts(filteredCosts, accounts, defaults, acc);
 
-    // COGS
-    filteredSaleItems.forEach((si: any) => {
-      const cogsAmt = Number(si.unit_cost_usd || 0) * Number(si.quantity || 0);
-      if (cogsAmt === 0) return;
-      if (cogsAccount) { ensure(cogsAccount.id); accMap[cogsAccount.id].debits += cogsAmt; }
-      if (inventoryAccount) { ensure(inventoryAccount.id); accMap[inventoryAccount.id].credits += cogsAmt; }
-    });
-
-    // GASTOS
-    filteredExpenses.forEach((e: any) => {
-      const accId = e.account_id || findExpenseAccount(accounts, e.category)?.id;
-      const amount = Number(e.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      ensure(accId);
-      accMap[accId].debits += amount;
-      if (cashAccount) { ensure(cashAccount.id); accMap[cashAccount.id].credits += amount; }
-    });
-
-    // COSTOS
-    filteredCosts.forEach((c: any) => {
-      const accId = c.account_id || findCostAccount(accounts, c.category)?.id;
-      const amount = Number(c.amount_usd || 0);
-      if (!accId || amount === 0) return;
-      ensure(accId);
-      accMap[accId].debits += amount;
-      const counterAcct = cxpAccount || cashAccount;
-      if (counterAcct) { ensure(counterAcct.id); accMap[counterAcct.id].credits += amount; }
-    });
-
-    // JOURNAL ENTRIES
     const filteredJournals = filterByDate(journalEntries.map((je: any) => ({ ...je, date: je.date })));
-    filteredJournals.forEach((je: any) => {
-      je.journal_entry_lines?.forEach((line: any) => {
-        if (!line.account_id) return;
-        ensure(line.account_id);
-        accMap[line.account_id].debits += Number(line.debit_usd || 0);
-        accMap[line.account_id].credits += Number(line.credit_usd || 0);
-      });
-    });
+    accumulateJournalEntries(filteredJournals, acc);
 
-    // Calculate net balance per account
     const rows: AccountBalance[] = accounts
       .map((a: any) => {
-        const entry = accMap[a.id] || { debits: 0, credits: 0 };
-        const isDebitNatural = ['Activo', 'Costo', 'Gasto', 'Gastos No Operacionales'].includes(a.account_type);
-        const balance = isDebitNatural ? entry.debits - entry.credits : entry.credits - entry.debits;
+        const entry = acc.accMap[a.id] || { debits: 0, credits: 0 };
+        const balance = isDebitNatural(a.account_type) ? entry.debits - entry.credits : entry.credits - entry.debits;
         return {
           id: a.id,
           code: a.code || '',
@@ -143,12 +87,10 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
       })
       .filter(r => Math.abs(r.balance) > 0.005);
 
-    // Activos
     const activos = rows.filter(r => r.account_type === 'Activo');
     const pasivos = rows.filter(r => r.account_type === 'Pasivo');
     const capital = rows.filter(r => r.account_type === 'Capital');
 
-    // Net income = ingresos - costos - gastos (for Estado de Resultados accounts)
     const ingresos = rows.filter(r => r.account_type === 'Ingreso' || r.account_type === 'Ingresos No Operacionales');
     const gastosYCostos = rows.filter(r => ['Costo', 'Gasto', 'Gastos No Operacionales'].includes(r.account_type));
     const ni = ingresos.reduce((s, r) => s + r.balance, 0) - gastosYCostos.reduce((s, r) => s + r.balance, 0);
@@ -164,7 +106,7 @@ export function EstadoSituacionTab({ sales, expenses, costs, saleItems, journalE
       totalCapital: tCapital,
       netIncome: ni,
     };
-  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, incomeAccount, cxcAccount, cogsAccount, inventoryAccount, cashAccount, cxpAccount, filterByDate]);
+  }, [accounts, filteredSales, filteredExpenses, filteredCosts, filteredSaleItems, journalEntries, defaults, filterByDate]);
 
   const patrimonio = totalCapital + netIncome;
   const pasivoPlusPatrimonio = totalPasivos + patrimonio;
