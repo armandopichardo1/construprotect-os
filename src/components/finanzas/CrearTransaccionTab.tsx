@@ -1241,8 +1241,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <Label className="text-xs">Productos * <span className="text-[10px] text-muted-foreground font-normal">(precios en USD)</span></Label>
                   {purchaseItems.map((item, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <div className="flex-1">
+                    <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
+                      <div className="flex-1 min-w-[140px]">
                         <SearchableSelect
                           options={products.map((p: any) => ({ value: p.id, label: `${p.sku} — ${p.name}` }))}
                           value={item.product_id}
@@ -1253,20 +1253,20 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           className="text-xs"
                         />
                       </div>
-                      <Input type="number" min={1} value={item.quantity}
-                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 1)}
-                        className="w-16 text-xs" placeholder="Cant." />
-                      <div className="relative w-24">
+                      <Input type="number" min={0} value={item.quantity || ''}
+                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 0)}
+                        className="w-20 text-xs" placeholder="Cant." />
+                      <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
                         <Input type="number" min={0} step={0.01}
-                          value={currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100}
+                          value={item.unit_cost_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100)}
                           onChange={e => {
                             const val = parseFloat(e.target.value) || 0;
                             updatePurchaseItem(i, 'unit_cost_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
-                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="Costo" />
+                          className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
                       </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0">{formatBase(currencyBase === 'USD' ? item.unit_cost_usd * item.quantity : item.unit_cost_usd * item.quantity * xr)}</span>
+                      <span className="text-xs font-mono w-24 text-right shrink-0">{item.unit_cost_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_cost_usd * item.quantity : item.unit_cost_usd * item.quantity * xr) : '—'}</span>
                       {purchaseItems.length > 1 && (
                         <button onClick={() => removePurchaseItem(i)} className="p-1 text-muted-foreground hover:text-destructive">
                           <Trash2 className="w-3.5 h-3.5" />
