@@ -216,6 +216,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [cnAmount, setCnAmount] = useState(''); // in currencyBase
   const [cnReason, setCnReason] = useState('');
   const [cnNotes, setCnNotes] = useState('');
+  const [cnShipmentId, setCnShipmentId] = useState(''); // reference to existing order
 
   // Journal entry state
   const [journalLines, setJournalLines] = useState<JournalLine[]>([
