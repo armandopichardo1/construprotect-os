@@ -167,6 +167,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
+  const { data: shipments = [] } = useQuery({
+    queryKey: ['shipments-for-cn'],
+    queryFn: async () => {
+      const { data } = await supabase.from('shipments').select('id, po_number, supplier_name, supplier_id, total_cost_usd').order('created_at', { ascending: false }).limit(50);
+      return data || [];
+    },
+  });
+
   // AI state
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
