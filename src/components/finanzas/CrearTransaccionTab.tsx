@@ -371,7 +371,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Credit note USD amount (for preview/save)
   const cnAmountUsd = useMemo(() => {
-    const n = parseFloat(cnAmount) || 0;
+    const n = parseNum(cnAmount);
     return currencyBase === 'USD' ? n : n / xr;
   }, [cnAmount, currencyBase, xr]);
 
