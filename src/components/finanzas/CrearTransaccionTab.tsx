@@ -1051,9 +1051,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   return (
     <>
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
       {/* Main input area */}
-      <div className="lg:col-span-2 space-y-5">
+      <div className="space-y-5">
         {/* Mode toggle + bulk import */}
         <div className="flex items-center gap-3">
           <div className="flex gap-1 rounded-xl bg-muted p-0.5">
