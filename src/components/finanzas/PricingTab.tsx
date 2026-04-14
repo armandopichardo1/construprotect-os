@@ -246,7 +246,7 @@ export function PricingTab() {
             <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border flex items-center gap-1.5">
               <Pencil className="w-3 h-3" /> Haz click en precios o márgenes para editar · <Lock className="w-3 h-3" /> Costo = promedio ponderado de compras (automático)
             </div>
-            <div className="max-h-[calc(100vh-420px)] overflow-auto">
+            <div className="max-h-[calc(100vh-280px)] overflow-auto">
               <Table wrapperClassName="overflow-visible">
                 <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                   <TableRow>
