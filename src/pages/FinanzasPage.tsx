@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { cn } from '@/lib/utils';
-import { formatUSD, formatDOP, getGlobalExchangeRate } from '@/lib/format';
+import { formatUSD, formatDOP, getGlobalExchangeRate, parseNum } from '@/lib/format';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -697,8 +697,8 @@ function SaleFormDialog({ open, onOpenChange, queryClient, rate, editSale, prefi
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Producto" /></SelectTrigger>
                       <SelectContent>{products.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input type="number" value={item.quantity} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" placeholder="Cant." />
-                    <Input type="number" value={item.unit_price_usd} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price_usd: Number(e.target.value) } : it))} className="w-24" step="0.01" placeholder="Precio" />
+                    <Input type="number" value={item.quantity} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: parseNum(e.target.value, 1) } : it))} className="w-20" placeholder="Cant." />
+                    <Input type="number" value={item.unit_price_usd} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price_usd: parseNum(e.target.value) } : it))} className="w-24" step="0.01" placeholder="Precio" />
                     {items.length > 1 && (
                       <Button variant="ghost" size="sm" className="h-9 w-9 p-0 shrink-0" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>
                         <X className="w-3.5 h-3.5" />
@@ -943,8 +943,8 @@ function ExpenseFormDialog({ open, onOpenChange, queryClient, rate, editExpense 
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
-            <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
+            <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(parseNum(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
+            <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(parseNum(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Gasto'}</Button>
         </div>
@@ -1164,8 +1164,8 @@ function CostFormDialog({ open, onOpenChange, queryClient, rate, editCost }: any
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(Number(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
-            <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(Number(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
+            <div><Label className="text-xs">Monto USD</Label><Input type="number" step="0.01" value={form.amount_usd} onChange={e => setForm(f => ({ ...f, amount_usd: e.target.value, amount_dop: String(Math.round(parseNum(e.target.value) * xr * 100) / 100) }))} className="mt-1" /></div>
+            <div><Label className="text-xs">Monto DOP</Label><Input type="number" step="0.01" value={form.amount_dop} onChange={e => setForm(f => ({ ...f, amount_dop: e.target.value, amount_usd: String(Math.round(parseNum(e.target.value) / xr * 100) / 100) }))} className="mt-1" /></div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Registrar Costo'}</Button>
         </div>

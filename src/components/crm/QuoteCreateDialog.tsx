@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseNum } from '@/lib/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -177,13 +178,13 @@ export function QuoteCreateDialog({ open, onOpenChange, contacts, queryClient }:
                     </Select>
                   </div>
                   <div className="col-span-2">
-                    <Input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value) || 1)} className="h-7 text-[10px]" placeholder="Qty" />
+                    <Input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseNum(e.target.value, 1))} className="h-7 text-[10px]" placeholder="Qty" />
                   </div>
                   <div className="col-span-2">
-                    <Input type="number" step="0.01" value={item.unit_price_usd} onChange={e => updateItem(idx, 'unit_price_usd', Number(e.target.value) || 0)} className="h-7 text-[10px]" placeholder="Precio" />
+                    <Input type="number" step="0.01" value={item.unit_price_usd} onChange={e => updateItem(idx, 'unit_price_usd', parseNum(e.target.value))} className="h-7 text-[10px]" placeholder="Precio" />
                   </div>
                   <div className="col-span-2">
-                    <Input type="number" value={item.discount_pct} onChange={e => updateItem(idx, 'discount_pct', Number(e.target.value) || 0)} className="h-7 text-[10px]" placeholder="Desc%" />
+                    <Input type="number" value={item.discount_pct} onChange={e => updateItem(idx, 'discount_pct', parseNum(e.target.value))} className="h-7 text-[10px]" placeholder="Desc%" />
                   </div>
                   <div className="col-span-1">
                     {items.length > 1 && (

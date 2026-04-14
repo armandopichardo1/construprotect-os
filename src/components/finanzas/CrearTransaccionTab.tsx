@@ -3,7 +3,7 @@ import { TransactionImportDialog } from './TransactionImportDialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
-import { formatUSD, formatDOP } from '@/lib/format';
+import { formatUSD, formatDOP, parseNum } from '@/lib/format';
 import { buildExpenseJournalLines, buildCostJournalLines, buildSaleJournalLines, createAutoJournal } from '@/lib/account-mapping';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -243,11 +243,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Get USD value from amount field
   const getAmountUsd = (raw: string) => {
-    const n = parseFloat(raw) || 0;
+    const n = parseNum(raw);
     return currencyBase === 'USD' ? n : n / xr;
   };
   const getAmountDop = (raw: string) => {
-    const n = parseFloat(raw) || 0;
+    const n = parseNum(raw);
     return currencyBase === 'DOP' ? n : n * xr;
   };
 
@@ -257,9 +257,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
   };
 
-  const parseNum = (v: string) => parseFloat(v) || 0;
-  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + parseNum(l.debit), 0);
-  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + parseNum(l.credit), 0);
+  const _parseNum = (v: string) => parseNum(v);
+  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + _parseNum(l.debit), 0);
+  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + _parseNum(l.credit), 0);
   const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
   const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
@@ -371,7 +371,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Credit note USD amount (for preview/save)
   const cnAmountUsd = useMemo(() => {
-    const n = parseFloat(cnAmount) || 0;
+    const n = parseNum(cnAmount);
     return currencyBase === 'USD' ? n : n / xr;
   }, [cnAmount, currencyBase, xr]);
 
@@ -437,7 +437,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (merchAcct) lines.push({ accountCode: merchAcct.code, accountName: merchAcct.description, accountType: merchAcct.account_type, accountId: merchAcct.id, debit: 0, credit: totalCogs });
         else lines.push({ accountName: 'Mercancía para la Venta', accountType: 'Activo', debit: 0, credit: totalCogs });
       }
-    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amount) > 0)) {
+    } else if ((manualType === 'expense' || manualType === 'cost') && (parseNum(amount) > 0)) {
       const amtUsd = getAmountUsd(amount);
       const expAcct = accountId ? getAcct(accountId) : null;
       // Expenses → counter is Cash/Banco; Costs → counter is CxP Proveedores
@@ -705,7 +705,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     // Expense / Cost
     if (!description.trim()) { toast.error('Descripción requerida'); return; }
     if (!category) { toast.error('Selecciona una categoría'); return; }
-    const rawAmt = parseFloat(amount) || 0;
+    const rawAmt = parseNum(amount);
     if (rawAmt <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
@@ -1003,7 +1003,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Amount input component with auto-conversion display
   const AmountInput = ({ value, onChange, label, required }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean }) => {
-    const numVal = parseFloat(value) || 0;
+    const numVal = parseNum(value);
     return (
       <div className="space-y-1">
         {label && <Label className="text-xs">{label}{required ? ' *' : ''}</Label>}
@@ -1259,7 +1259,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         <Input type="number" min={0} step={0.01}
                           value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
                           onChange={e => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const val = parseNum(e.target.value);
                             updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
                           className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
@@ -1358,7 +1358,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         <Input type="number" min={0} step={0.01}
                           value={item.unit_cost_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100)}
                           onChange={e => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const val = parseNum(e.target.value);
                             updatePurchaseItem(i, 'unit_cost_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
                           className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
