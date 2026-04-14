@@ -258,8 +258,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   };
 
   const _parseNum = (v: string) => parseNum(v);
-  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + parseNum(l.debit), 0);
-  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + parseNum(l.credit), 0);
+  const journalTotalDebitRaw = journalLines.reduce((s, l) => s + _parseNum(l.debit), 0);
+  const journalTotalCreditRaw = journalLines.reduce((s, l) => s + _parseNum(l.credit), 0);
   const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
   const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
