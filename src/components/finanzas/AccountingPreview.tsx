@@ -143,8 +143,8 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           <span className="text-xs truncate">{l.accountCode ? `${l.accountCode} ` : ''}{l.accountName}</span>
         )}
         <div className="flex flex-col items-end shrink-0">
-          <span className="text-xs font-mono font-medium">{formatUSD(amount)}</span>
-          {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(amount * xr)}</span>}
+          <span className="text-xs font-mono font-medium">{xr > 0 ? formatDOP(amount * xr) : formatRawUSD(amount)}</span>
+          {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatRawUSD(amount)}</span>}
         </div>
       </div>
     );
