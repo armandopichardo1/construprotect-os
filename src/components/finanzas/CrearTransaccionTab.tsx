@@ -202,9 +202,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     return latestXr;
   }, [manualDate, rateForMonth, latestXr]);
 
-  const xr = customRate ? (parseFloat(customRate) || autoXr) : autoXr;
+  const xr = customRate ? (parseNum(customRate) || autoXr) : autoXr;
   const isHistoricalRate = autoXr !== latestXr && !customRate;
-  const isCustomRate = !!customRate && parseFloat(customRate) !== autoXr;
+  const isCustomRate = !!customRate && parseNum(customRate) !== autoXr;
   // Sale-specific manual state
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
