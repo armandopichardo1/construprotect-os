@@ -1001,8 +1001,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     </div>
   );
 
-  // Amount input component with auto-conversion display
-  const AmountInput = ({ value, onChange, label, required }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean }) => {
+  // Amount input - rendered inline to avoid remount on parent re-render
+  const renderAmountInput = (value: string, onChange: (v: string) => void, label?: string, required?: boolean) => {
     const numVal = parseNum(value);
     return (
       <div className="space-y-1">
@@ -1437,12 +1437,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   </Select>
                 </div>
 
-                <AmountInput
-                  value={cnAmount}
-                  onChange={setCnAmount}
-                  label={`Monto (${currencyBase})`}
-                  required
-                />
+                {renderAmountInput(cnAmount, setCnAmount, `Monto (${currencyBase})`, true)}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Razón / Concepto *</Label>
@@ -1509,12 +1504,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   />
                 </div>
 
-                <AmountInput
-                  value={amount}
-                  onChange={setAmount}
-                  label={`Monto (${currencyBase})`}
-                  required
-                />
+                {renderAmountInput(amount, setAmount, `Monto (${currencyBase})`, true)}
               </div>
             )}
 
