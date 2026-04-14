@@ -1252,7 +1252,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Productos *</Label>
+                  <Label className="text-xs">Productos / Servicios *</Label>
                   {saleItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
                        <div className="w-28 shrink-0">
@@ -1299,7 +1299,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={addSaleItem} className="gap-1 text-xs">
-                    <Plus className="w-3 h-3" /> Agregar Producto
+                    <Plus className="w-3 h-3" /> Agregar Producto / Servicio
                   </Button>
                 </div>
 
