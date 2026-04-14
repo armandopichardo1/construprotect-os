@@ -3,7 +3,7 @@ import { TransactionImportDialog } from './TransactionImportDialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { streamFinancialAI } from '@/lib/financial-ai';
-import { formatUSD, formatDOP } from '@/lib/format';
+import { formatUSD, formatDOP, parseNum } from '@/lib/format';
 import { buildExpenseJournalLines, buildCostJournalLines, buildSaleJournalLines, createAutoJournal } from '@/lib/account-mapping';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
