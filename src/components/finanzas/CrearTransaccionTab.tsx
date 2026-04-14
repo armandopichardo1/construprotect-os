@@ -1009,8 +1009,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         {label && <Label className="text-xs">{label}{required ? ' *' : ''}</Label>}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">{currencySymbol}</span>
-          <Input type="number" min="0" step={currencyBase === 'USD' ? '0.01' : '1'} value={value || ''}
-            onChange={e => onChange(e.target.value)} placeholder="0.00"
+          <Input type="text" inputMode="decimal" value={value || ''}
+            onChange={e => {
+              const v = e.target.value.replace(/[^0-9.,]/g, '');
+              onChange(v);
+            }} placeholder="0.00"
             className={cn('text-sm', currencyBase === 'USD' ? 'pl-7' : 'pl-10')} />
         </div>
         {numVal > 0 && (
