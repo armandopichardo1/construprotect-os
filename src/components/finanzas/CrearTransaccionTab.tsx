@@ -202,9 +202,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     return latestXr;
   }, [manualDate, rateForMonth, latestXr]);
 
-  const xr = customRate ? (parseFloat(customRate) || autoXr) : autoXr;
+  const xr = customRate ? (parseNum(customRate) || autoXr) : autoXr;
   const isHistoricalRate = autoXr !== latestXr && !customRate;
-  const isCustomRate = !!customRate && parseFloat(customRate) !== autoXr;
+  const isCustomRate = !!customRate && parseNum(customRate) !== autoXr;
   // Sale-specific manual state
   const [contactId, setContactId] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
@@ -1252,7 +1252,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         />
                       </div>
                       <Input type="number" min={0} value={item.quantity || ''}
-                        onChange={e => updateSaleItem(i, 'quantity', parseInt(e.target.value) || 0)}
+                        onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value, 0))}
                         className="w-20 text-xs" placeholder="Cant." />
                       <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
@@ -1351,7 +1351,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         />
                       </div>
                       <Input type="number" min={0} value={item.quantity || ''}
-                        onChange={e => updatePurchaseItem(i, 'quantity', parseInt(e.target.value) || 0)}
+                        onChange={e => updatePurchaseItem(i, 'quantity', parseNum(e.target.value, 0))}
                         className="w-20 text-xs" placeholder="Cant." />
                       <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
