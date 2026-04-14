@@ -337,7 +337,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
       if (idx !== i) return item;
-      const updated = { ...item, [field]: value };
+      const updated = { ...item, [field]: value, _priceDisplay: undefined };
       if (field === 'product_id') {
         // Check if it's a service (prefixed with svc:)
         if (typeof value === 'string' && value.startsWith('svc:')) {
