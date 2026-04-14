@@ -159,6 +159,21 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
+  const { data: services = [] } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data } = await supabase.from('services').select('id, sku, description, family, business_line').eq('is_active', true).order('description');
+      return data || [];
+    },
+  });
+
+  // Combined product + service options for sale selectors
+  const saleItemOptions = useMemo(() => {
+    const prodOpts = products.map((p: any) => ({ value: p.id, label: p.name, sku: p.sku, isService: false }));
+    const svcOpts = services.map((s: any) => ({ value: `svc:${s.id}`, label: `[SVC] ${s.description}`, sku: `[SVC] ${s.sku}`, isService: true }));
+    return [...prodOpts, ...svcOpts];
+  }, [products, services]);
+
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers'],
     queryFn: async () => {
