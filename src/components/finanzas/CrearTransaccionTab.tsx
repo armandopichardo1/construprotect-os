@@ -338,8 +338,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       if (idx !== i) return item;
       const updated = { ...item, [field]: value };
       if (field === 'product_id') {
-        const prod = products.find((p: any) => p.id === value);
-        updated.unit_price_usd = getPriceForTier(prod, priceTier);
+        // Check if it's a service (prefixed with svc:)
+        if (typeof value === 'string' && value.startsWith('svc:')) {
+          updated.unit_price_usd = 0; // user sets price manually for services
+        } else {
+          const prod = products.find((p: any) => p.id === value);
+          updated.unit_price_usd = getPriceForTier(prod, priceTier);
+        }
       }
       return updated;
     }));
