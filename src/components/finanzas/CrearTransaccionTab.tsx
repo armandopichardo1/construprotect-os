@@ -1277,15 +1277,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           className="text-xs"
                         />
                       </div>
-                      <Input type="number" min={0} value={item.quantity || ''}
-                        onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value, 0))}
+                       <Input type="text" inputMode="numeric" value={item.quantity || ''}
+                        onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9.,]/g, ''), 0))}
                         className="w-20 text-xs" placeholder="Cant." />
                       <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{currencySymbol}</span>
-                        <Input type="number" min={0} step={0.01}
+                        <Input type="text" inputMode="decimal"
                           value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
                           onChange={e => {
-                            const val = parseNum(e.target.value);
+                            const val = parseNum(e.target.value.replace(/[^0-9.,]/g, ''));
                             updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
                           className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
