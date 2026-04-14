@@ -671,7 +671,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
     if (manualType === 'sale') {
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
-      if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
+      if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos o servicios para todos los ítems'); return; }
 
       setManualSaving(true);
       const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
@@ -693,10 +693,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error || !sale) throw error || new Error('Error creando venta');
 
         const itemsData = saleItems.map(i => {
-          const prod = products.find((p: any) => p.id === i.product_id);
+          const isService = i.product_id.startsWith('svc:');
+          const realProductId = isService ? null : i.product_id;
+          const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
           return {
-            sale_id: sale.id, product_id: i.product_id, quantity: i.quantity,
+            sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
             unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
             line_total_usd: i.unit_price_usd * i.quantity,
             margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
