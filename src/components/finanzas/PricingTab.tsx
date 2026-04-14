@@ -142,6 +142,7 @@ function EditableCell({ value, type, field, productId, onSave, className, linked
 export function PricingTab() {
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
+  const [svcSearch, setSvcSearch] = useState('');
   const queryClient = useQueryClient();
 
   const { data: minMargin = DEFAULT_MIN_MARGIN } = useQuery({
@@ -173,10 +174,25 @@ export function PricingTab() {
     },
   });
 
+  const { data: services = [], isLoading: svcLoading } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('services').select('*').eq('is_active', true).order('description');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const filtered = products.filter(p => {
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCat = !catFilter || p.category === catFilter;
     return matchSearch && matchCat;
+  });
+
+  const filteredServices = services.filter(s => {
+    if (!svcSearch) return true;
+    const q = svcSearch.toLowerCase();
+    return s.description.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q) || (s.family || '').toLowerCase().includes(q);
   });
 
   const handleInlineSave = useCallback(async (productId: string, field: string, value: string) => {
@@ -199,132 +215,178 @@ export function PricingTab() {
   }, [queryClient]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Input placeholder="Buscar por nombre o SKU..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <div className="flex gap-2 overflow-x-auto">
-          <button onClick={() => setCatFilter('')}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${!catFilter ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
-            Todos ({products.length})
-          </button>
-          {categories.map(c => (
-            <button key={c} onClick={() => setCatFilter(c)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${catFilter === c ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
-              {c}
+    <div className="space-y-8">
+      {/* ===== PRODUCTS PRICING ===== */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          📦 Productos <span className="text-xs font-normal text-muted-foreground">— Precios y márgenes por tier</span>
+        </h3>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Input placeholder="Buscar por nombre o SKU..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
+          <div className="flex gap-2 overflow-x-auto">
+            <button onClick={() => setCatFilter('')}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${!catFilter ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
+              Todos ({products.length})
             </button>
-          ))}
+            {categories.map(c => (
+              <button key={c} onClick={() => setCatFilter(c)}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${catFilter === c ? 'bg-primary/15 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {isLoading ? (
+          <div className="text-center text-sm text-muted-foreground py-12">Cargando...</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-12">No hay productos</div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border flex items-center gap-1.5">
+              <Pencil className="w-3 h-3" /> Haz click en precios o márgenes para editar · <Lock className="w-3 h-3" /> Costo = promedio ponderado de compras (automático)
+            </div>
+            <div className="max-h-[calc(100vh-420px)] overflow-auto">
+              <Table wrapperClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                  <TableRow>
+                    <TableHead className="text-xs">SKU</TableHead>
+                    <TableHead className="text-xs">Producto</TableHead>
+                    <TableHead className="text-xs text-right">Costo WAC 🔒</TableHead>
+                    <TableHead className="text-xs text-right border-l border-border/50">Precio Lista</TableHead>
+                    <TableHead className="text-xs text-center">% Lista</TableHead>
+                    <TableHead className="text-xs text-right border-l border-border/50">Precio Arq.</TableHead>
+                    <TableHead className="text-xs text-center">% Arq.</TableHead>
+                    <TableHead className="text-xs text-right border-l border-border/50">Precio Proy.</TableHead>
+                    <TableHead className="text-xs text-center">% Proy.</TableHead>
+                    <TableHead className="text-xs text-right border-l border-border/50">Precio May.</TableHead>
+                    <TableHead className="text-xs text-center">% May.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(p => {
+                    const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
+                    const tiers = [
+                      { priceField: 'price_list_usd', marginField: 'margin_list_pct', priceVal: p.price_list_usd, marginVal: p.margin_list_pct, target: defaultList, label: 'Lista' },
+                      { priceField: 'price_architect_usd', marginField: 'margin_architect_pct', priceVal: p.price_architect_usd, marginVal: p.margin_architect_pct, target: defaultArchitect, label: 'Arquitecto' },
+                      { priceField: 'price_project_usd', marginField: 'margin_project_pct', priceVal: p.price_project_usd, marginVal: p.margin_project_pct, target: defaultProject, label: 'Proyecto' },
+                      { priceField: 'price_wholesale_usd', marginField: 'margin_wholesale_pct', priceVal: p.price_wholesale_usd, marginVal: p.margin_wholesale_pct, target: defaultWholesale, label: 'Mayorista' },
+                    ];
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
+                        <TableCell className="text-xs font-medium max-w-[140px] truncate" title={p.name}>{p.name}</TableCell>
+                        <TableCell className="text-xs text-right font-mono">
+                          <span className="inline-flex items-center gap-1 text-muted-foreground" title="Calculado automáticamente por recepciones">
+                            <Lock className="w-3 h-3 opacity-50" />
+                            {formatUSD(cost)}
+                          </span>
+                        </TableCell>
+                        {tiers.map(t => (
+                          <>
+                            <TableCell key={`${t.priceField}`} className="text-xs text-right font-mono font-medium text-primary border-l border-border/50">
+                              <EditableCell value={t.priceVal} type="currency" field={t.priceField} productId={p.id}
+                                onSave={handleInlineSave} linkedField={t.marginField} cost={cost}
+                                displayValue={formatUSD(Number(t.priceVal))} minMargin={minMargin} />
+                            </TableCell>
+                            <TableCell key={`${t.marginField}`} className="text-xs text-center">
+                              <EditableCell value={Number(t.marginVal)} type="margin" field={t.marginField} productId={p.id}
+                                onSave={handleInlineSave} linkedField={t.priceField} cost={cost} minMargin={minMargin}
+                                displayValue={<MarginCell cost={cost} price={Number(t.priceVal)} targetPct={Number(t.marginVal || t.target)} label={`Margen ${t.label}`} minMargin={minMargin} />} />
+                            </TableCell>
+                          </>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                {(() => {
+                  const margins = filtered.reduce((acc, p) => {
+                    const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
+                    const tiers = [
+                      { price: Number(p.price_list_usd), key: 'list' as const },
+                      { price: Number(p.price_architect_usd), key: 'arq' as const },
+                      { price: Number(p.price_project_usd), key: 'proy' as const },
+                      { price: Number(p.price_wholesale_usd), key: 'may' as const },
+                    ];
+                    for (const t of tiers) {
+                      const m = calcRealMargin(cost, t.price);
+                      if (m !== null) { acc[t.key].sum += m; acc[t.key].count++; }
+                      acc[`${t.key}Price` as any] = (acc[`${t.key}Price` as any] || 0) + t.price;
+                    }
+                    acc.costSum += Number(p.unit_cost_usd);
+                    return acc;
+                  }, { list: { sum: 0, count: 0 }, arq: { sum: 0, count: 0 }, proy: { sum: 0, count: 0 }, may: { sum: 0, count: 0 }, costSum: 0, listPrice: 0, arqPrice: 0, proyPrice: 0, mayPrice: 0 } as any);
+
+                  const n = filtered.length || 1;
+                  const formatAvg = (val: number | null) => {
+                    if (val === null) return <span className="text-muted-foreground">—</span>;
+                    return <span className={`font-mono font-semibold ${val < minMargin ? 'text-destructive' : val < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>{val.toFixed(1)}%</span>;
+                  };
+                  const avg = (obj: { sum: number; count: number }) => obj.count ? obj.sum / obj.count : null;
+
+                  return (
+                    <TableFooter>
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={2} className="text-xs font-semibold text-foreground">Promedio ({filtered.length} productos)</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold">{formatUSD(margins.costSum / n)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.listPrice / n)}</TableCell>
+                        <TableCell className="text-xs text-center">{formatAvg(avg(margins.list))}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.arqPrice / n)}</TableCell>
+                        <TableCell className="text-xs text-center">{formatAvg(avg(margins.arq))}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.proyPrice / n)}</TableCell>
+                        <TableCell className="text-xs text-center">{formatAvg(avg(margins.proy))}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.mayPrice / n)}</TableCell>
+                        <TableCell className="text-xs text-center">{formatAvg(avg(margins.may))}</TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  );
+                })()}
+              </Table>
+            </div>
+          </div>
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="text-center text-sm text-muted-foreground py-12">Cargando...</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center text-sm text-muted-foreground py-12">No hay productos</div>
-      ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border flex items-center gap-1.5">
-            <Pencil className="w-3 h-3" /> Haz click en precios o márgenes para editar · <Lock className="w-3 h-3" /> Costo = promedio ponderado de compras (automático)
-          </div>
-          <div className="max-h-[calc(100vh-320px)] overflow-auto">
-            <Table wrapperClassName="overflow-visible">
-              <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+      {/* ===== SERVICES SECTION ===== */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          🛠️ Servicios <span className="text-xs font-normal text-muted-foreground">— Disponibles para agregar en ventas</span>
+        </h3>
+        <Input placeholder="Buscar servicio..." value={svcSearch} onChange={e => setSvcSearch(e.target.value)} className="max-w-xs" />
+
+        {svcLoading ? (
+          <div className="text-center text-sm text-muted-foreground py-8">Cargando servicios...</div>
+        ) : filteredServices.length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-8">No hay servicios registrados</div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="text-[10px] text-muted-foreground px-4 py-1.5 bg-muted/30 border-b border-border">
+              Los servicios se agregan a ventas con precio manual. Gestiona servicios en <span className="font-semibold text-foreground">Maestras → Servicios</span>.
+            </div>
+            <Table>
+              <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs">SKU</TableHead>
-                  <TableHead className="text-xs">Producto</TableHead>
-                  <TableHead className="text-xs text-right">Costo WAC 🔒</TableHead>
-                  <TableHead className="text-xs text-right border-l border-border/50">Precio Lista</TableHead>
-                  <TableHead className="text-xs text-center">% Lista</TableHead>
-                  <TableHead className="text-xs text-right border-l border-border/50">Precio Arq.</TableHead>
-                  <TableHead className="text-xs text-center">% Arq.</TableHead>
-                  <TableHead className="text-xs text-right border-l border-border/50">Precio Proy.</TableHead>
-                  <TableHead className="text-xs text-center">% Proy.</TableHead>
-                  <TableHead className="text-xs text-right border-l border-border/50">Precio May.</TableHead>
-                  <TableHead className="text-xs text-center">% May.</TableHead>
+                  <TableHead className="text-xs">Descripción</TableHead>
+                  <TableHead className="text-xs">Familia</TableHead>
+                  <TableHead className="text-xs">Línea de Negocio</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(p => {
-                  const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
-                  const tiers = [
-                    { priceField: 'price_list_usd', marginField: 'margin_list_pct', priceVal: p.price_list_usd, marginVal: p.margin_list_pct, target: defaultList, label: 'Lista' },
-                    { priceField: 'price_architect_usd', marginField: 'margin_architect_pct', priceVal: p.price_architect_usd, marginVal: p.margin_architect_pct, target: defaultArchitect, label: 'Arquitecto' },
-                    { priceField: 'price_project_usd', marginField: 'margin_project_pct', priceVal: p.price_project_usd, marginVal: p.margin_project_pct, target: defaultProject, label: 'Proyecto' },
-                    { priceField: 'price_wholesale_usd', marginField: 'margin_wholesale_pct', priceVal: p.price_wholesale_usd, marginVal: p.margin_wholesale_pct, target: defaultWholesale, label: 'Mayorista' },
-                  ];
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{p.sku}</TableCell>
-                      <TableCell className="text-xs font-medium max-w-[140px] truncate" title={p.name}>{p.name}</TableCell>
-                      <TableCell className="text-xs text-right font-mono">
-                        <span className="inline-flex items-center gap-1 text-muted-foreground" title="Calculado automáticamente por recepciones">
-                          <Lock className="w-3 h-3 opacity-50" />
-                          {formatUSD(cost)}
-                        </span>
-                      </TableCell>
-                      {tiers.map(t => (
-                        <>
-                          <TableCell key={`${t.priceField}`} className="text-xs text-right font-mono font-medium text-primary border-l border-border/50">
-                            <EditableCell value={t.priceVal} type="currency" field={t.priceField} productId={p.id}
-                              onSave={handleInlineSave} linkedField={t.marginField} cost={cost}
-                              displayValue={formatUSD(Number(t.priceVal))} minMargin={minMargin} />
-                          </TableCell>
-                          <TableCell key={`${t.marginField}`} className="text-xs text-center">
-                            <EditableCell value={Number(t.marginVal)} type="margin" field={t.marginField} productId={p.id}
-                              onSave={handleInlineSave} linkedField={t.priceField} cost={cost} minMargin={minMargin}
-                              displayValue={<MarginCell cost={cost} price={Number(t.priceVal)} targetPct={Number(t.marginVal || t.target)} label={`Margen ${t.label}`} minMargin={minMargin} />} />
-                          </TableCell>
-                        </>
-                      ))}
-                    </TableRow>
-                  );
-                })}
+                {filteredServices.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell className="text-xs font-mono text-muted-foreground">{s.sku}</TableCell>
+                    <TableCell className="text-xs font-medium">{s.description}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.family || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.business_line || '—'}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
-              {(() => {
-                const margins = filtered.reduce((acc, p) => {
-                  const cost = Number(p.total_unit_cost_usd || p.unit_cost_usd);
-                  const tiers = [
-                    { price: Number(p.price_list_usd), key: 'list' as const },
-                    { price: Number(p.price_architect_usd), key: 'arq' as const },
-                    { price: Number(p.price_project_usd), key: 'proy' as const },
-                    { price: Number(p.price_wholesale_usd), key: 'may' as const },
-                  ];
-                  for (const t of tiers) {
-                    const m = calcRealMargin(cost, t.price);
-                    if (m !== null) { acc[t.key].sum += m; acc[t.key].count++; }
-                    acc[`${t.key}Price` as any] = (acc[`${t.key}Price` as any] || 0) + t.price;
-                  }
-                  acc.costSum += Number(p.unit_cost_usd);
-                  return acc;
-                }, { list: { sum: 0, count: 0 }, arq: { sum: 0, count: 0 }, proy: { sum: 0, count: 0 }, may: { sum: 0, count: 0 }, costSum: 0, listPrice: 0, arqPrice: 0, proyPrice: 0, mayPrice: 0 } as any);
-
-                const n = filtered.length || 1;
-                const formatAvg = (val: number | null) => {
-                  if (val === null) return <span className="text-muted-foreground">—</span>;
-                  return <span className={`font-mono font-semibold ${val < minMargin ? 'text-destructive' : val < 20 ? 'text-amber-500' : 'text-emerald-500'}`}>{val.toFixed(1)}%</span>;
-                };
-                const avg = (obj: { sum: number; count: number }) => obj.count ? obj.sum / obj.count : null;
-
-                return (
-                  <TableFooter>
-                    <TableRow className="bg-muted/30">
-                      <TableCell colSpan={2} className="text-xs font-semibold text-foreground">Promedio ({filtered.length} productos)</TableCell>
-                      <TableCell className="text-xs text-right font-mono font-semibold">{formatUSD(margins.costSum / n)}</TableCell>
-                      <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.listPrice / n)}</TableCell>
-                      <TableCell className="text-xs text-center">{formatAvg(avg(margins.list))}</TableCell>
-                      <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.arqPrice / n)}</TableCell>
-                      <TableCell className="text-xs text-center">{formatAvg(avg(margins.arq))}</TableCell>
-                      <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.proyPrice / n)}</TableCell>
-                      <TableCell className="text-xs text-center">{formatAvg(avg(margins.proy))}</TableCell>
-                      <TableCell className="text-xs text-right font-mono font-semibold text-primary border-l border-border/50">{formatUSD(margins.mayPrice / n)}</TableCell>
-                      <TableCell className="text-xs text-center">{formatAvg(avg(margins.may))}</TableCell>
-                    </TableRow>
-                  </TableFooter>
-                );
-              })()}
             </Table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
