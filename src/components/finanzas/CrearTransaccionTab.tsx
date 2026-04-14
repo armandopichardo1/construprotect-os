@@ -1400,17 +1400,39 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
-                    <SearchableSelect
-                      options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
-                      value={cnSupplierId}
-                      onValueChange={handleCnSupplier}
-                      placeholder="Seleccionar proveedor"
-                      searchPlaceholder="Buscar proveedor..."
-                      emptyMessage="No se encontró proveedor"
-                    />
+                    <Select value={cnSupplierId} onValueChange={handleCnSupplier}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Seleccionar proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <Input value={cnSupplierName} onChange={e => setCnSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
                   )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Referencia de Orden (opcional)</Label>
+                  <Select value={cnShipmentId} onValueChange={setCnShipmentId}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Vincular a orden existente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin referencia</SelectItem>
+                      {(cnSupplierId
+                        ? shipments.filter((s: any) => s.supplier_id === cnSupplierId || s.supplier_name === cnSupplierName)
+                        : shipments
+                      ).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.po_number || s.id.slice(0, 8)} — {s.supplier_name} — {formatUSD(Number(s.total_cost_usd || 0))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <AmountInput
