@@ -167,6 +167,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
+  const { data: shipments = [] } = useQuery({
+    queryKey: ['shipments-for-cn'],
+    queryFn: async () => {
+      const { data } = await supabase.from('shipments').select('id, po_number, supplier_name, supplier_id, total_cost_usd').order('created_at', { ascending: false }).limit(50);
+      return data || [];
+    },
+  });
+
   // AI state
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -216,6 +224,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [cnAmount, setCnAmount] = useState(''); // in currencyBase
   const [cnReason, setCnReason] = useState('');
   const [cnNotes, setCnNotes] = useState('');
+  const [cnShipmentId, setCnShipmentId] = useState(''); // reference to existing order
 
   // Journal entry state
   const [journalLines, setJournalLines] = useState<JournalLine[]>([
@@ -282,6 +291,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setCnSupplierId(id);
     const s = suppliers.find((s: any) => s.id === id);
     setCnSupplierName(s?.name || '');
+    // Reset shipment reference when supplier changes
+    setCnShipmentId('');
   };
 
   const getPriceForTier = (prod: any, tier: string) => {
@@ -468,7 +479,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
     setCnSupplierId(''); setCnSupplierName('');
-    setCnAmount(''); setCnReason(''); setCnNotes('');
+    setCnAmount(''); setCnReason(''); setCnNotes(''); setCnShipmentId('');
     setJournalLines([
       { account_id: '', debit: '', credit: '', description: '' },
       { account_id: '', debit: '', credit: '', description: '' },
@@ -621,7 +632,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
       setManualSaving(true);
       try {
-        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(cnAmountUsd)} — ${cnReason}`;
+        const refShipment = (cnShipmentId && cnShipmentId !== 'none') ? shipments.find((s: any) => s.id === cnShipmentId) : null;
+        const refLabel = refShipment ? ` — Ref: ${refShipment.po_number || refShipment.id.slice(0, 8)}` : '';
+        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(cnAmountUsd)} — ${cnReason}${refLabel}`;
 
         await createJournalFromPreview(desc, cnNotes || null);
 
@@ -1389,17 +1402,39 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proveedor *</Label>
                   {suppliers.length > 0 ? (
-                    <SearchableSelect
-                      options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
-                      value={cnSupplierId}
-                      onValueChange={handleCnSupplier}
-                      placeholder="Seleccionar proveedor"
-                      searchPlaceholder="Buscar proveedor..."
-                      emptyMessage="No se encontró proveedor"
-                    />
+                    <Select value={cnSupplierId} onValueChange={handleCnSupplier}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Seleccionar proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <Input value={cnSupplierName} onChange={e => setCnSupplierName(e.target.value)} placeholder="Nombre del proveedor" />
                   )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Referencia de Orden (opcional)</Label>
+                  <Select value={cnShipmentId} onValueChange={setCnShipmentId}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Vincular a orden existente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin referencia</SelectItem>
+                      {(cnSupplierId
+                        ? shipments.filter((s: any) => s.supplier_id === cnSupplierId || s.supplier_name === cnSupplierName)
+                        : shipments
+                      ).map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.po_number || s.id.slice(0, 8)} — {s.supplier_name} — {formatUSD(Number(s.total_cost_usd || 0))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <AmountInput
@@ -1575,7 +1610,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 description={
                   manualType === 'journal' ? journalDescription
                   : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
-                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
+                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}${cnShipmentId && cnShipmentId !== 'none' ? ` — Ref: ${shipments.find((s: any) => s.id === cnShipmentId)?.po_number || cnShipmentId.slice(0, 8)}` : ''}`
                   : description
                 }
               />
