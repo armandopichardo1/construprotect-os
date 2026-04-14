@@ -622,7 +622,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
       setManualSaving(true);
       try {
-        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(cnAmountUsd)} — ${cnReason}`;
+        const refShipment = cnShipmentId ? shipments.find((s: any) => s.id === cnShipmentId) : null;
+        const refLabel = refShipment ? ` — Ref: ${refShipment.po_number || refShipment.id.slice(0, 8)}` : '';
+        const desc = `Nota de crédito proveedor — ${cnSupplierName || 'Proveedor'} — ${formatUSD(cnAmountUsd)} — ${cnReason}${refLabel}`;
 
         await createJournalFromPreview(desc, cnNotes || null);
 
