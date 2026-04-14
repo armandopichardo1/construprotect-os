@@ -291,6 +291,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setCnSupplierId(id);
     const s = suppliers.find((s: any) => s.id === id);
     setCnSupplierName(s?.name || '');
+    // Reset shipment reference when supplier changes
+    setCnShipmentId('');
   };
 
   const getPriceForTier = (prod: any, tier: string) => {
