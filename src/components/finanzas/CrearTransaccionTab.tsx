@@ -1255,61 +1255,45 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <Label className="text-xs">Productos / Servicios *</Label>
                   {saleItems.map((item, i) => (
-                    <div key={i} className="space-y-1.5 rounded-lg border border-border/50 p-2">
-                      <div className="flex gap-2 items-end">
-                        <div className="w-24 shrink-0">
-                          <Label className="text-[10px] text-muted-foreground">SKU</Label>
-                          <SearchableSelect
-                            options={saleItemOptions.map(o => ({ value: o.value, label: o.sku }))}
-                            value={item.product_id}
-                            onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                            placeholder="SKU"
-                            searchPlaceholder="Buscar SKU..."
-                            emptyMessage="No encontrado"
-                            className="text-xs"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <Label className="text-[10px] text-muted-foreground">Producto / Servicio</Label>
-                          <SearchableSelect
-                            options={saleItemOptions.map(o => ({ value: o.value, label: o.label }))}
-                            value={item.product_id}
-                            onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                            placeholder="Producto o servicio"
-                            searchPlaceholder="Buscar nombre..."
-                            emptyMessage="No encontrado"
-                            className="text-xs"
-                          />
-                        </div>
-                        {saleItems.length > 1 && (
-                          <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive shrink-0 mb-1">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                    <div key={i} className="flex gap-1.5 items-end">
+                      <div className="flex-1 min-w-0">
+                        <SearchableSelect
+                          options={saleItemOptions.map(o => ({ value: o.value, label: `${o.sku} — ${o.label}` }))}
+                          value={item.product_id}
+                          onValueChange={v => updateSaleItem(i, 'product_id', v)}
+                          placeholder="Producto / Servicio"
+                          searchPlaceholder="Buscar..."
+                          emptyMessage="No encontrado"
+                          className="text-xs"
+                        />
                       </div>
-                      <div className="flex gap-2 items-end">
-                        <div className="w-20">
-                          <Label className="text-[10px] text-muted-foreground">Cant.</Label>
-                          <Input type="text" inputMode="decimal" value={item.quantity || ''}
-                            onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9.,]/g, ''), 0))}
-                            className="text-xs" placeholder="0" />
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-[10px] text-muted-foreground">Precio ({currencySymbol})</Label>
-                          <Input type="text" inputMode="decimal"
-                            value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
-                            onChange={e => {
-                              const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                      <Input type="text" inputMode="numeric" value={item.quantity || ''}
+                        onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9]/g, ''), 0))}
+                        className="w-14 text-xs text-center" placeholder="Qty" />
+                      <div className="w-24 shrink-0">
+                        <Input type="text" inputMode="decimal"
+                          value={item._priceDisplay ?? (item.unit_price_usd === 0 ? '' : String(currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100))}
+                          onChange={e => {
+                            const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                            // Update display immediately to allow typing dots
+                            setSaleItems(prev => prev.map((it, idx) => {
+                              if (idx !== i) return it;
                               const val = parseNum(raw);
-                              updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
-                            }}
-                            className="text-xs" placeholder="0.00" />
-                        </div>
-                        <div className="text-right shrink-0 min-w-[80px] pb-1">
-                          <Label className="text-[10px] text-muted-foreground">Total</Label>
-                          <p className="text-xs font-mono font-medium">{item.unit_price_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_price_usd * item.quantity : item.unit_price_usd * item.quantity * xr) : '—'}</p>
-                        </div>
+                              return { ...it, _priceDisplay: raw, unit_price_usd: currencyBase === 'USD' ? val : val / xr };
+                            }));
+                          }}
+                          onBlur={() => {
+                            // Clear display override on blur so computed value takes over
+                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _priceDisplay: undefined }));
+                          }}
+                          className="text-xs" placeholder={`${currencySymbol}0.00`} />
                       </div>
+                      <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{item.unit_price_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_price_usd * item.quantity : item.unit_price_usd * item.quantity * xr) : '—'}</span>
+                      {saleItems.length > 1 && (
+                        <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive pb-2">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={addSaleItem} className="gap-1 text-xs">
