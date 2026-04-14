@@ -105,6 +105,7 @@ interface SaleItem {
   product_id: string;
   quantity: number;
   unit_price_usd: number;
+  _priceDisplay?: string; // raw string for decimal input
 }
 
 interface PurchaseItem {
