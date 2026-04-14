@@ -1608,7 +1608,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 description={
                   manualType === 'journal' ? journalDescription
                   : manualType === 'purchase' ? `Compra inventario — ${purchaseSupplierName}`
-                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}`
+                  : manualType === 'credit_note' ? `NC — ${cnSupplierName} — ${cnReason}${cnShipmentId && cnShipmentId !== 'none' ? ` — Ref: ${shipments.find((s: any) => s.id === cnShipmentId)?.po_number || cnShipmentId.slice(0, 8)}` : ''}`
                   : description
                 }
               />
