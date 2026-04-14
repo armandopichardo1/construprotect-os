@@ -212,7 +212,7 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
                 'ml-auto shrink-0 font-medium',
                 imp.effect.includes('Aumenta') ? 'text-success' : 'text-destructive'
               )}>
-                {imp.effect} {formatUSD(imp.amount)}
+                {imp.effect} {xr > 0 ? formatDOP(imp.amount * xr) : formatRawUSD(imp.amount)}
               </span>
             </div>
           ))}
