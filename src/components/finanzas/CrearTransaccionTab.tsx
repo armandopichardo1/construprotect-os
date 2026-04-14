@@ -1299,7 +1299,6 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                             value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
                             onChange={e => {
                               const raw = e.target.value.replace(/[^0-9.,]/g, '');
-                              if (raw === '' || raw.endsWith('.') || raw.endsWith(',')) return;
                               const val = parseNum(raw);
                               updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
                             }}
