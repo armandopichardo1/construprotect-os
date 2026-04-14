@@ -1437,12 +1437,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   </Select>
                 </div>
 
-                <AmountInput
-                  value={cnAmount}
-                  onChange={setCnAmount}
-                  label={`Monto (${currencyBase})`}
-                  required
-                />
+                {renderAmountInput(cnAmount, setCnAmount, `Monto (${currencyBase})`, true)}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Razón / Concepto *</Label>
@@ -1509,12 +1504,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   />
                 </div>
 
-                <AmountInput
-                  value={amount}
-                  onChange={setAmount}
-                  label={`Monto (${currencyBase})`}
-                  required
-                />
+                {renderAmountInput(amount, setAmount, `Monto (${currencyBase})`, true)}
               </div>
             )}
 
