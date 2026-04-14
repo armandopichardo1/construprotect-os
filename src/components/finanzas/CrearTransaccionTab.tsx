@@ -469,7 +469,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
     setCnSupplierId(''); setCnSupplierName('');
-    setCnAmount(''); setCnReason(''); setCnNotes('');
+    setCnAmount(''); setCnReason(''); setCnNotes(''); setCnShipmentId('');
     setJournalLines([
       { account_id: '', debit: '', credit: '', description: '' },
       { account_id: '', debit: '', credit: '', description: '' },
