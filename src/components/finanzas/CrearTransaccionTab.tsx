@@ -437,7 +437,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (merchAcct) lines.push({ accountCode: merchAcct.code, accountName: merchAcct.description, accountType: merchAcct.account_type, accountId: merchAcct.id, debit: 0, credit: totalCogs });
         else lines.push({ accountName: 'Mercancía para la Venta', accountType: 'Activo', debit: 0, credit: totalCogs });
       }
-    } else if ((manualType === 'expense' || manualType === 'cost') && (parseFloat(amount) > 0)) {
+    } else if ((manualType === 'expense' || manualType === 'cost') && (parseNum(amount) > 0)) {
       const amtUsd = getAmountUsd(amount);
       const expAcct = accountId ? getAcct(accountId) : null;
       // Expenses → counter is Cash/Banco; Costs → counter is CxP Proveedores
@@ -705,7 +705,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     // Expense / Cost
     if (!description.trim()) { toast.error('Descripción requerida'); return; }
     if (!category) { toast.error('Selecciona una categoría'); return; }
-    const rawAmt = parseFloat(amount) || 0;
+    const rawAmt = parseNum(amount);
     if (rawAmt <= 0) { toast.error('Ingresa un monto'); return; }
 
     setManualSaving(true);
@@ -1003,7 +1003,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Amount input component with auto-conversion display
   const AmountInput = ({ value, onChange, label, required }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean }) => {
-    const numVal = parseFloat(value) || 0;
+    const numVal = parseNum(value);
     return (
       <div className="space-y-1">
         {label && <Label className="text-xs">{label}{required ? ' *' : ''}</Label>}
@@ -1259,7 +1259,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         <Input type="number" min={0} step={0.01}
                           value={item.unit_price_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100)}
                           onChange={e => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const val = parseNum(e.target.value);
                             updateSaleItem(i, 'unit_price_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
                           className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
@@ -1358,7 +1358,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                         <Input type="number" min={0} step={0.01}
                           value={item.unit_cost_usd === 0 ? '' : (currencyBase === 'USD' ? item.unit_cost_usd : Math.round(item.unit_cost_usd * xr * 100) / 100)}
                           onChange={e => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const val = parseNum(e.target.value);
                             updatePurchaseItem(i, 'unit_cost_usd', currencyBase === 'USD' ? val : val / xr);
                           }}
                           className={cn('text-xs', currencyBase === 'USD' ? 'pl-5' : 'pl-8')} placeholder="0.00" />
