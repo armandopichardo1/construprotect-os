@@ -1639,8 +1639,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         )}
       </div>
 
-      {/* Sidebar: session history */}
-      <div className="space-y-4">
+      {/* Session history + help below */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-2xl bg-card border border-border p-5 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Registradas esta sesión</h3>
           {history.length === 0 ? (
