@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { formatUSD, formatDOP } from '@/lib/format';
+import { formatDOP, formatRawUSD } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { ArrowRight, TrendingUp, TrendingDown, Scale, BookOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
