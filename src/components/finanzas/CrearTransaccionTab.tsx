@@ -1001,8 +1001,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     </div>
   );
 
-  // Amount input component with auto-conversion display
-  const AmountInput = ({ value, onChange, label, required }: { value: string; onChange: (v: string) => void; label?: string; required?: boolean }) => {
+  // Amount input - rendered inline to avoid remount on parent re-render
+  const renderAmountInput = (value: string, onChange: (v: string) => void, label?: string, required?: boolean) => {
     const numVal = parseNum(value);
     return (
       <div className="space-y-1">
