@@ -52,3 +52,17 @@ export function formatNumber(n: number): string {
 export function formatPct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
+
+/**
+ * Parse a user-input number string that may contain commas as thousands
+ * separators (e.g. "1,500" or "1,500.25"). Strips commas before parsing.
+ * Returns 0 for empty/invalid input (or the provided fallback).
+ */
+export function parseNum(value: string | number | undefined | null, fallback = 0): number {
+  if (value == null || value === '') return fallback;
+  if (typeof value === 'number') return isNaN(value) ? fallback : value;
+  // Strip commas used as thousands separators
+  const cleaned = String(value).replace(/,/g, '').trim();
+  const n = Number(cleaned);
+  return isNaN(n) ? fallback : n;
+}
