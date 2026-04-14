@@ -243,11 +243,11 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
   // Get USD value from amount field
   const getAmountUsd = (raw: string) => {
-    const n = parseFloat(raw) || 0;
+    const n = parseNum(raw);
     return currencyBase === 'USD' ? n : n / xr;
   };
   const getAmountDop = (raw: string) => {
-    const n = parseFloat(raw) || 0;
+    const n = parseNum(raw);
     return currencyBase === 'DOP' ? n : n * xr;
   };
 
@@ -257,7 +257,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setJournalLines(prev => prev.map((line, idx) => idx === i ? { ...line, [field]: value } : line));
   };
 
-  const parseNum = (v: string) => parseFloat(v) || 0;
+  const _parseNum = (v: string) => parseNum(v);
   const journalTotalDebitRaw = journalLines.reduce((s, l) => s + parseNum(l.debit), 0);
   const journalTotalCreditRaw = journalLines.reduce((s, l) => s + parseNum(l.credit), 0);
   const journalTotalDebit = currencyBase === 'DOP' ? journalTotalDebitRaw / xr : journalTotalDebitRaw;
