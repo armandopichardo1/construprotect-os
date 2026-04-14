@@ -159,6 +159,21 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
+  const { data: services = [] } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const { data } = await supabase.from('services').select('id, sku, description, family, business_line').eq('is_active', true).order('description');
+      return data || [];
+    },
+  });
+
+  // Combined product + service options for sale selectors
+  const saleItemOptions = useMemo(() => {
+    const prodOpts = products.map((p: any) => ({ value: p.id, label: p.name, sku: p.sku, isService: false }));
+    const svcOpts = services.map((s: any) => ({ value: `svc:${s.id}`, label: `[SVC] ${s.description}`, sku: `[SVC] ${s.sku}`, isService: true }));
+    return [...prodOpts, ...svcOpts];
+  }, [products, services]);
+
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers'],
     queryFn: async () => {
@@ -323,8 +338,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       if (idx !== i) return item;
       const updated = { ...item, [field]: value };
       if (field === 'product_id') {
-        const prod = products.find((p: any) => p.id === value);
-        updated.unit_price_usd = getPriceForTier(prod, priceTier);
+        // Check if it's a service (prefixed with svc:)
+        if (typeof value === 'string' && value.startsWith('svc:')) {
+          updated.unit_price_usd = 0; // user sets price manually for services
+        } else {
+          const prod = products.find((p: any) => p.id === value);
+          updated.unit_price_usd = getPriceForTier(prod, priceTier);
+        }
       }
       return updated;
     }));
@@ -419,6 +439,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
       // Calculate total cost of goods sold
       const totalCogs = saleItems.reduce((s, i) => {
+        if (i.product_id.startsWith('svc:')) return s; // no COGS for services
         const prod = products.find((p: any) => p.id === i.product_id);
         return s + (Number(prod?.unit_cost_usd || 0) * i.quantity);
       }, 0);
@@ -651,7 +672,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
     if (manualType === 'sale') {
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
-      if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
+      if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos o servicios para todos los ítems'); return; }
 
       setManualSaving(true);
       const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
@@ -673,10 +694,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error || !sale) throw error || new Error('Error creando venta');
 
         const itemsData = saleItems.map(i => {
-          const prod = products.find((p: any) => p.id === i.product_id);
+          const isService = i.product_id.startsWith('svc:');
+          const realProductId = isService ? null : i.product_id;
+          const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
           return {
-            sale_id: sale.id, product_id: i.product_id, quantity: i.quantity,
+            sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
             unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
             line_total_usd: i.unit_price_usd * i.quantity,
             margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
@@ -1229,12 +1252,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Productos *</Label>
+                  <Label className="text-xs">Productos / Servicios *</Label>
                   {saleItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
-                      <div className="w-28 shrink-0">
+                       <div className="w-28 shrink-0">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: p.sku }))}
+                          options={saleItemOptions.map(o => ({ value: o.value, label: o.sku }))}
                           value={item.product_id}
                           onValueChange={v => updateSaleItem(i, 'product_id', v)}
                           placeholder="SKU"
@@ -1245,10 +1268,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       </div>
                       <div className="flex-1 min-w-[120px]">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: p.name }))}
+                          options={saleItemOptions.map(o => ({ value: o.value, label: o.label }))}
                           value={item.product_id}
                           onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                          placeholder="Nombre producto"
+                          placeholder="Producto o servicio"
                           searchPlaceholder="Buscar nombre..."
                           emptyMessage="No encontrado"
                           className="text-xs"
@@ -1276,7 +1299,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={addSaleItem} className="gap-1 text-xs">
-                    <Plus className="w-3 h-3" /> Agregar Producto
+                    <Plus className="w-3 h-3" /> Agregar Producto / Servicio
                   </Button>
                 </div>
 

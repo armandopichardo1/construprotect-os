@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { formatUSD, formatDOP } from '@/lib/format';
+import { formatDOP, formatRawUSD } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { ArrowRight, TrendingUp, TrendingDown, Scale, BookOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -143,8 +143,8 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           <span className="text-xs truncate">{l.accountCode ? `${l.accountCode} ` : ''}{l.accountName}</span>
         )}
         <div className="flex flex-col items-end shrink-0">
-          <span className="text-xs font-mono font-medium">{formatUSD(amount)}</span>
-          {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(amount * xr)}</span>}
+          <span className="text-xs font-mono font-medium">{xr > 0 ? formatDOP(amount * xr) : formatRawUSD(amount)}</span>
+          {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatRawUSD(amount)}</span>}
         </div>
       </div>
     );
@@ -162,7 +162,7 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
         )}
         {!isBalanced && (
           <span className="ml-auto text-[10px] font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-            ⚠ Descuadre: {formatUSD(Math.abs(totalDebit - totalCredit))}
+            ⚠ Descuadre: {xr > 0 ? formatDOP(Math.abs(totalDebit - totalCredit) * xr) : formatRawUSD(Math.abs(totalDebit - totalCredit))}
           </span>
         )}
         {isBalanced && (
@@ -180,8 +180,8 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           <div className="border-t border-border pt-1 mt-1 flex justify-between">
             <span className="text-[10px] font-bold text-muted-foreground">Total</span>
             <div className="flex flex-col items-end">
-              <span className="text-xs font-mono font-bold">{formatUSD(totalDebit)}</span>
-              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(totalDebit * xr)}</span>}
+              <span className="text-xs font-mono font-bold">{xr > 0 ? formatDOP(totalDebit * xr) : formatRawUSD(totalDebit)}</span>
+              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatRawUSD(totalDebit)}</span>}
             </div>
           </div>
         </div>
@@ -191,8 +191,8 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
           <div className="border-t border-border pt-1 mt-1 flex justify-between">
             <span className="text-[10px] font-bold text-muted-foreground">Total</span>
             <div className="flex flex-col items-end">
-              <span className="text-xs font-mono font-bold">{formatUSD(totalCredit)}</span>
-              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatDOP(totalCredit * xr)}</span>}
+              <span className="text-xs font-mono font-bold">{xr > 0 ? formatDOP(totalCredit * xr) : formatRawUSD(totalCredit)}</span>
+              {xr > 0 && <span className="text-[9px] text-muted-foreground font-mono">{formatRawUSD(totalCredit)}</span>}
             </div>
           </div>
         </div>
@@ -212,7 +212,7 @@ export function AccountingPreview({ lines, description, accounts = [], onAccount
                 'ml-auto shrink-0 font-medium',
                 imp.effect.includes('Aumenta') ? 'text-success' : 'text-destructive'
               )}>
-                {imp.effect} {formatUSD(imp.amount)}
+                {imp.effect} {xr > 0 ? formatDOP(imp.amount * xr) : formatRawUSD(imp.amount)}
               </span>
             </div>
           ))}
