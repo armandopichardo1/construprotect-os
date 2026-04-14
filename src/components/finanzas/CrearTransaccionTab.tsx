@@ -1253,7 +1253,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Productos / Servicios *</Label>
+                  <div className="flex gap-1.5 items-end text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                    <span className="flex-1">Producto / Servicio</span>
+                    <span className="w-14 text-center">Cant</span>
+                    <span className="w-24">Precio</span>
+                    <span className="w-20 text-right">Total</span>
+                  </div>
                   {saleItems.map((item, i) => (
                     <div key={i} className="flex gap-1.5 items-end">
                       <div className="flex-1 min-w-0">
