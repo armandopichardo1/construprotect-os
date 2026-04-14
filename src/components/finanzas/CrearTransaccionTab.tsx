@@ -1252,9 +1252,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   <Label className="text-xs">Productos *</Label>
                   {saleItems.map((item, i) => (
                     <div key={i} className="flex gap-2 items-end flex-wrap sm:flex-nowrap">
-                      <div className="w-28 shrink-0">
+                       <div className="w-28 shrink-0">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: p.sku }))}
+                          options={saleItemOptions.map(o => ({ value: o.value, label: o.sku }))}
                           value={item.product_id}
                           onValueChange={v => updateSaleItem(i, 'product_id', v)}
                           placeholder="SKU"
@@ -1265,10 +1265,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       </div>
                       <div className="flex-1 min-w-[120px]">
                         <SearchableSelect
-                          options={products.map((p: any) => ({ value: p.id, label: p.name }))}
+                          options={saleItemOptions.map(o => ({ value: o.value, label: o.label }))}
                           value={item.product_id}
                           onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                          placeholder="Nombre producto"
+                          placeholder="Producto o servicio"
                           searchPlaceholder="Buscar nombre..."
                           emptyMessage="No encontrado"
                           className="text-xs"
