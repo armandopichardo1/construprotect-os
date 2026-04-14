@@ -439,6 +439,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
 
       // Calculate total cost of goods sold
       const totalCogs = saleItems.reduce((s, i) => {
+        if (i.product_id.startsWith('svc:')) return s; // no COGS for services
         const prod = products.find((p: any) => p.id === i.product_id);
         return s + (Number(prod?.unit_cost_usd || 0) * i.quantity);
       }, 0);
