@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck, Wallet, Landmark, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Props {
   open: boolean;
@@ -109,8 +110,15 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       setCustoms(currentCustoms ? String(currentCustoms) : '');
       setOther(currentOther ? String(currentOther) : '');
       setNotes(shipment.notes || '');
-      setPaymentMode('cxp');
-      setBankAccountId('');
+      // Precarga modo de pago desde el envío:
+      // si ya tiene payment_account_id definido → Banco con esa cuenta; si no → CxP
+      if (shipment.payment_account_id) {
+        setPaymentMode('bank');
+        setBankAccountId(shipment.payment_account_id);
+      } else {
+        setPaymentMode('cxp');
+        setBankAccountId('');
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
@@ -389,39 +397,91 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               )}
             </div>
 
-            {/* Asiento contable */}
-            {Math.abs(deltaAddons) > 0.001 && (
-              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+            {/* Selector de cuenta de pago — SIEMPRE visible */}
+            <div className={`rounded-lg border-2 p-3 space-y-3 transition-colors ${
+              paymentMode === 'bank' && bankAccountId
+                ? 'border-success/40 bg-success/5'
+                : paymentMode === 'cxp'
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-warning/40 bg-warning/5'
+            }`}>
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs font-medium">
                   <BookOpen className="w-3.5 h-3.5 text-primary" />
-                  Asiento contable a generar (delta {fmt(Math.abs(deltaAddons))})
+                  Cuenta de pago del envío
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Contrapartida</Label>
-                    <Select value={paymentMode} onValueChange={(v: any) => setPaymentMode(v)}>
-                      <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cxp">Cuentas por Pagar (no pagado aún)</SelectItem>
-                        <SelectItem value="bank">Pago desde Banco / Caja</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {shipment.payment_account_id ? (
+                  <Badge variant="outline" className="text-[10px] gap-1 border-success/40 text-success">
+                    <CheckCircle2 className="w-3 h-3" /> Cuenta de pago ya definida en el envío
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] gap-1 border-warning/40 text-warning">
+                    <AlertTriangle className="w-3 h-3" /> Sin cuenta de pago previa
+                  </Badge>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('cxp')}
+                  className={`rounded-lg border-2 p-2.5 text-left transition-all ${
+                    paymentMode === 'cxp'
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : 'border-border bg-background hover:border-primary/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet className={`w-4 h-4 ${paymentMode === 'cxp' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-xs font-semibold">CxP — A Crédito</span>
                   </div>
-                  {paymentMode === 'bank' && (
-                    <div>
-                      <Label className="text-[10px] text-muted-foreground">Cuenta bancaria</Label>
-                      <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                        <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Selecciona..." /></SelectTrigger>
-                        <SelectContent>
-                          {bankAccounts.map((a: any) => (
-                            <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    No se ha pagado aún. Genera deuda en {cxpAcct?.code || '20150'} Cuentas por Pagar.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('bank')}
+                  className={`rounded-lg border-2 p-2.5 text-left transition-all ${
+                    paymentMode === 'bank'
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : 'border-border bg-background hover:border-primary/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Landmark className={`w-4 h-4 ${paymentMode === 'bank' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-xs font-semibold">Banco / Caja</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Pagado de inmediato desde una cuenta de banco o caja.
+                  </p>
+                </button>
+              </div>
+
+              {paymentMode === 'bank' && (
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Cuenta bancaria</Label>
+                  <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                    <SelectTrigger className={`h-8 text-xs mt-1 ${!bankAccountId ? 'border-warning/60' : ''}`}>
+                      <SelectValue placeholder="Selecciona cuenta de banco / caja..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} — {a.description}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!bankAccountId && (
+                    <p className="text-[10px] text-warning mt-1">⚠️ Selecciona una cuenta para que el asiento se registre correctamente.</p>
                   )}
                 </div>
-                <div className="text-[10px] text-muted-foreground space-y-0.5 pt-1 border-t border-border/40">
+              )}
+
+              {/* Vista previa del asiento contable */}
+              {Math.abs(deltaAddons) > 0.001 ? (
+                <div className="text-[10px] text-muted-foreground space-y-0.5 pt-2 border-t border-border/40">
+                  <div className="font-medium text-foreground mb-1">Asiento a generar (delta {fmt(Math.abs(deltaAddons))}):</div>
                   {deltaAddons > 0 ? (
                     <>
                       <div>DR <span className="font-mono">{inventoryAcct?.code} {inventoryAcct?.description}</span> — {fmt(deltaAddons)}</div>
@@ -438,8 +498,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                     </>
                   )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-[10px] text-muted-foreground pt-2 border-t border-border/40 italic">
+                  Sin cambios en montos: no se generará asiento contable. La cuenta seleccionada se usará si editas los gastos.
+                </p>
+              )}
+            </div>
+
 
             {preview.length > 0 && (
               <div>
