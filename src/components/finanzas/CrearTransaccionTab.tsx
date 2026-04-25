@@ -201,7 +201,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     queryFn: async () => {
       const { data } = await supabase
         .from('discount_rules')
-        .select('id, contact_id, category, discount_pct, priority')
+        .select('id, contact_id, category, discount_pct, discount_type, discount_amount_usd, priority')
         .eq('is_active', true);
       return data || [];
     },
