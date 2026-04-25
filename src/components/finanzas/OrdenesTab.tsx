@@ -181,6 +181,75 @@ export function OrdenesTab() {
         }
       }
 
+      // Reclasificación de gastos capitalizables (flete/aduana/otros) que se cargaron
+      // a 13200 (Compras en Tránsito) mientras el envío estaba en customs/in_transit.
+      // Al recibir, esos addons deben moverse a 13000 (Inventarios) para reflejar que
+      // ya forman parte del inventario disponible. Buscamos asientos previos con
+      // reference_type='shipment_expense_edit' y reference_id=shipment.id, y sumamos
+      // el neto cargado a 13200 (débitos − créditos sobre esa cuenta).
+      try {
+        const accountsForRecl = await fetchAccounts();
+        const invAcct = findInventoryAccount(accountsForRecl);
+        const transitAcct = findTransitAccount(accountsForRecl);
+
+        if (invAcct && transitAcct && invAcct.id !== transitAcct.id) {
+          const { data: prevEntries } = await supabase
+            .from('journal_entries')
+            .select('id, journal_entry_lines(account_id, debit_usd, credit_usd)')
+            .eq('reference_type', 'shipment_expense_edit')
+            .eq('reference_id', shipment.id);
+
+          let transitNet = 0;
+          (prevEntries || []).forEach((je: any) => {
+            (je.journal_entry_lines || []).forEach((l: any) => {
+              if (l.account_id === transitAcct.id) {
+                transitNet += Number(l.debit_usd || 0) - Number(l.credit_usd || 0);
+              }
+            });
+          });
+
+          if (Math.abs(transitNet) > 0.01) {
+            const isPositive = transitNet > 0;
+            const amount = Math.abs(transitNet);
+            const desc = `Reclasificación gastos capitalizables a inventario — PO ${shipment.po_number || shipment.id.slice(0, 8)}`;
+            const { data: reclEntry, error: reclErr } = await supabase
+              .from('journal_entries')
+              .insert({
+                description: desc,
+                total_debit_usd: amount,
+                total_credit_usd: amount,
+                notes: `Cierre de Compras en Tránsito (13200) hacia Inventarios (13000) por addons (flete/aduana/otros) capitalizados durante el tránsito. Neto: ${isPositive ? '+' : '-'}$${amount.toFixed(2)}.`,
+                reference_type: 'shipment_status_received',
+                reference_id: shipment.id,
+              } as any)
+              .select()
+              .single();
+            if (reclErr) throw reclErr;
+            if (reclEntry) {
+              const lines = isPositive
+                ? [
+                    { journal_entry_id: reclEntry.id, account_id: invAcct.id, debit_usd: amount, credit_usd: 0, description: 'Inventario — addons capitalizados' },
+                    { journal_entry_id: reclEntry.id, account_id: transitAcct.id, debit_usd: 0, credit_usd: amount, description: 'Cierre Compras en Tránsito — addons' },
+                  ]
+                : [
+                    // Caso raro: si el neto en tránsito quedó negativo (más reversas que cargos),
+                    // invertimos para no dejar saldo colgado en 13200.
+                    { journal_entry_id: reclEntry.id, account_id: transitAcct.id, debit_usd: amount, credit_usd: 0, description: 'Ajuste Compras en Tránsito — addons negativos' },
+                    { journal_entry_id: reclEntry.id, account_id: invAcct.id, debit_usd: 0, credit_usd: amount, description: 'Ajuste Inventarios — addons negativos' },
+                  ];
+              await supabase.from('journal_entry_lines').insert(lines);
+              toast.message('Asiento de reclasificación 13200 → 13000 generado por addons del envío.', {
+                description: `${isPositive ? '+' : '-'}$${amount.toFixed(2)} reclasificado de Compras en Tránsito a Inventarios.`,
+              });
+            }
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      } catch (e) {
+        console.error('Error en reclasificación 13200→13000 de addons:', e);
+        toast.warning('Recepción OK, pero no se pudo reclasificar automáticamente los addons de 13200 a 13000. Revisa el Libro Diario.');
+      }
+
       toast.success('Envío recibido — inventario y contabilidad actualizados');
       queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
