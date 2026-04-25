@@ -323,19 +323,31 @@ export function OrdenesTab() {
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-center" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant={hasAddons ? 'outline' : 'default'}
-                          className="h-7 text-[10px] gap-1 px-2"
-                          disabled={!canEditExpenses}
-                          title={s.status === 'received'
-                            ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
-                            : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
-                          onClick={() => setEditExpenses(s)}
-                        >
-                          <Truck className="w-3 h-3" />
-                          {hasAddons ? 'Editar gastos' : 'Agregar gastos'}
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={hasAddons ? 'outline' : 'default'}
+                            className="h-7 text-[10px] gap-1 px-2"
+                            disabled={!canEditExpenses}
+                            title={s.status === 'received'
+                              ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
+                              : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
+                            onClick={() => setEditExpenses(s)}
+                          >
+                            <Truck className="w-3 h-3" />
+                            {hasAddons ? 'Editar gastos' : 'Agregar gastos'}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={!canEditExpenses}
+                            title="Ajuste de costo histórico (fecha efectiva pasada, sin reprorrateo)"
+                            onClick={() => setHistoricalAdj(s)}
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell><ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /></TableCell>
                     </TableRow>
