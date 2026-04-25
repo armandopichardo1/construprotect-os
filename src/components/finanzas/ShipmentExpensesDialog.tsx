@@ -882,9 +882,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             {/* Vista previa: cambio estimado de costo por producto y delta de inventario */}
             {items.length > 0 && (
               <div>
-                <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-                  <TrendingUp className="w-3 h-3" /> Vista previa de impacto por producto
-                </Label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3" /> Vista previa de impacto por producto
+                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Regla de prorrateo</Label>
+                    <Select value={prorationMethod} onValueChange={(v) => setProrationMethod(v as any)}>
+                      <SelectTrigger className="h-7 text-[11px] w-[170px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fob" className="text-[11px]">Por valor FOB (NIC 2)</SelectItem>
+                        <SelectItem value="units" className="text-[11px]">Por unidades</SelectItem>
+                        <SelectItem value="weight" className="text-[11px]">Por peso (kg)</SelectItem>
+                        <SelectItem value="volume" className="text-[11px]">Por volumen (CBM)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {prorationFallbackToFob && (
+                  <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-[10px] text-warning flex items-start gap-1.5 mb-1.5">
+                    <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                    <span>
+                      Los productos del envío no tienen {prorationMethod === 'weight' ? 'peso (kg)' : 'volumen (CBM)'} cargado. El prorrateo cae a <strong>FOB</strong> automáticamente. Carga estos datos en cada producto para usar este método.
+                    </span>
+                  </div>
+                )}
                 <div className="rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto">
                   <table className="w-full text-[11px]">
                     <thead className="bg-muted/40 sticky top-0">
