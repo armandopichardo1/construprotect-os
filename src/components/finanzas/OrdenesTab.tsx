@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDOP, getGlobalExchangeRate } from '@/lib/format';
@@ -52,7 +52,24 @@ export function OrdenesTab() {
         .order('created_at', { ascending: false });
       return data || [];
     },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
+
+  // Mantener el snapshot del detalle/edición sincronizado con la lista refrescada
+  // (cuando el diálogo de gastos invalida la query, debe verse al instante).
+  useEffect(() => {
+    if (!shipments.length) return;
+    if (detailOrder && detailType === 'compras') {
+      const fresh = shipments.find((s: any) => s.id === detailOrder.id);
+      if (fresh && fresh !== detailOrder) setDetailOrder(fresh);
+    }
+    if (editExpenses) {
+      const fresh = shipments.find((s: any) => s.id === editExpenses.id);
+      if (fresh && fresh !== editExpenses) setEditExpenses(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipments]);
 
   const { data: sales = [] } = useQuery({
     queryKey: ['sales-orders'],
@@ -680,9 +697,28 @@ export function OrdenesTab() {
         open={!!editExpenses}
         onOpenChange={v => { if (!v) setEditExpenses(null); }}
         shipment={editExpenses}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
-          queryClient.invalidateQueries({ queryKey: ['shipments'] });
+        onSaved={async () => {
+          // Refetch inmediato (no esperar a que la query se invalide perezosamente)
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['shipments'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['inventory-stock'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' }),
+          ]);
+          // Refrescar snapshot del detalle abierto, si aplica
+          const targetId = editExpenses?.id || detailOrder?.id;
+          if (targetId) {
+            const { data } = await supabase
+              .from('shipments')
+              .select('*, shipment_items(*, products(name, sku))')
+              .eq('id', targetId)
+              .maybeSingle();
+            if (data) {
+              if (detailOrder && detailOrder.id === targetId) setDetailOrder(data);
+              if (editExpenses && editExpenses.id === targetId) setEditExpenses(data);
+            }
+          }
         }}
       />
 
