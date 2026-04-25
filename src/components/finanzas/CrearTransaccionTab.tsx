@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen, ArrowLeftRight, Upload } from 'lucide-react';
+import { Bot, Send, Check, Pencil, X, Sparkles, Loader2, FileText, CalendarIcon, Plus, Trash2, BookOpen, ArrowLeftRight, Upload, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { AccountingPreview } from './AccountingPreview';
 
@@ -1534,6 +1534,33 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           </span>
                         </div>
                       )}
+                      {(() => {
+                        const errors: { field: 'product' | 'qty' | 'price' | 'discount' | 'net'; msg: string }[] = [];
+                        if (!item.product_id) errors.push({ field: 'product', msg: 'Selecciona un producto o servicio.' });
+                        if (item.product_id && (!item.quantity || item.quantity <= 0)) errors.push({ field: 'qty', msg: 'La cantidad debe ser mayor a 0.' });
+                        if (item.product_id && item.quantity > 0 && item.unit_price_usd <= 0) errors.push({ field: 'price', msg: 'El precio unitario debe ser mayor a 0.' });
+                        if (item.discount_type === 'pct' && item.discount_pct > 100) errors.push({ field: 'discount', msg: 'El descuento % no puede superar 100.' });
+                        if (item.discount_type === 'pct' && item.discount_pct < 0) errors.push({ field: 'discount', msg: 'El descuento % no puede ser negativo.' });
+                        if (item.discount_type === 'amount' && item.discount_amount_usd < 0) errors.push({ field: 'discount', msg: 'El descuento no puede ser negativo.' });
+                        if (item.discount_type === 'amount' && lineGrossBase > 0 && item.discount_amount_usd > lineGrossBase) {
+                          errors.push({ field: 'discount', msg: `El descuento (${formatBase(currencyBase === 'USD' ? item.discount_amount_usd : item.discount_amount_usd * xr)}) excede el bruto de la línea (${formatBase(currencyBase === 'USD' ? lineGrossBase : lineGrossBase * xr)}).` });
+                        }
+                        if (showInfoRow && lineGrossBase > 0 && lineTotalBase <= 0) {
+                          errors.push({ field: 'net', msg: 'El neto de la línea quedó en 0 o negativo. Revisa precio o descuento.' });
+                        }
+                        if (errors.length === 0) return null;
+                        const fieldLabel = (f: string) => f === 'product' ? 'Producto' : f === 'qty' ? 'Cantidad' : f === 'price' ? 'Precio' : f === 'discount' ? 'Descuento' : 'Neto';
+                        return (
+                          <div className="pl-1 space-y-0.5">
+                            {errors.map((e, k) => (
+                              <div key={k} className="flex items-start gap-1.5 text-[10px] text-destructive">
+                                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                                <span><strong className="font-semibold">{fieldLabel(e.field)}:</strong> {e.msg}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     );
                   })}
