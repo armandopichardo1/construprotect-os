@@ -109,6 +109,27 @@ export function DiscountRulesManager() {
           : `Aviso: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría. Se usará la de mayor prioridad. ¿Guardar?`;
         if (!window.confirm(msg)) return;
       }
+
+      // Cross-scope overlap detection: rule scopes that include or are included by this one
+      // (e.g. Cliente+Categoría vs Cliente solo, o Categoría sola).
+      const crossOverlaps = findCrossScopeOverlaps(form, rules);
+      if (crossOverlaps.length > 0) {
+        const formPrio = Number(form.priority || 0);
+        const lines = crossOverlaps.map((o: any) => {
+          const scope = o.contact_id && o.category ? 'Cliente+Categoría'
+            : o.contact_id ? 'Cliente' : 'Categoría';
+          const cName = contacts.find((c: any) => c.id === o.contact_id)?.contact_name || (o.contact_id ? '—' : 'Todos');
+          const winner = Number(o.priority || 0) > formPrio ? ' → GANA esta regla existente'
+            : Number(o.priority || 0) < formPrio ? ' → gana la nueva'
+            : ' → MISMA prioridad (impredecible)';
+          return `• ${scope} [${cName} / ${o.category || 'Todas'}] p${o.priority || 0}${winner}`;
+        }).join('\n');
+        const hasTie = crossOverlaps.some((o: any) => Number(o.priority || 0) === formPrio);
+        const header = hasTie
+          ? `Solape con MISMA prioridad detectado (${crossOverlaps.length} regla[s] de alcance distinto). El resultado al aplicar será impredecible.`
+          : `Solape de alcances distintos detectado (${crossOverlaps.length} regla[s]). Solo ganará la de mayor prioridad.`;
+        if (!window.confirm(`${header}\n\n${lines}\n\n¿Guardar de todos modos?`)) return;
+      }
     }
 
     const payload: any = {
