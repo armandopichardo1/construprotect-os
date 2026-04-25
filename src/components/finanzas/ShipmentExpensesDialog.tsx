@@ -30,6 +30,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const [saving, setSaving] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [capitalize, setCapitalize] = useState<boolean>(true);
 
   // Load chart of accounts to pick bank / CxP / inventory
   const { data: accounts = [] } = useQuery({
