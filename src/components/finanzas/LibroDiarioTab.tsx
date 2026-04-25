@@ -253,7 +253,43 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
-  }, [entries, typeFilter, monthFilter, yearFilter, searchQuery, filterByDate, sortField, sortDir]);
+  }, [preFiltered, searchQuery, sortField, sortDir]);
+
+  // Build autocomplete suggestions from preFiltered (so they respect mes/año/tipo/período)
+  const [searchOpen, setSearchOpen] = useState(false);
+  const suggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const matches = (s: string) => !q || s.toLowerCase().includes(q);
+
+    const entriesGroup: { value: string; label: string; sub: string }[] = [];
+    const documentsMap = new Map<string, string>();
+    const clientsMap = new Map<string, number>();
+
+    preFiltered.forEach(e => {
+      if (matches(e.entry_number) || matches(e.description)) {
+        entriesGroup.push({
+          value: e.entry_number,
+          label: e.entry_number,
+          sub: `${e.date} · ${TYPE_LABELS[e.type]?.label || e.type} · ${e.vendor_client}`,
+        });
+      }
+      if (e.document && (matches(e.document) || matches(e.vendor_client))) {
+        if (!documentsMap.has(e.document)) {
+          documentsMap.set(e.document, `${TYPE_LABELS[e.type]?.label || e.type} · ${e.vendor_client}`);
+        }
+      }
+      if (e.vendor_client && e.vendor_client !== '—' && matches(e.vendor_client)) {
+        clientsMap.set(e.vendor_client, (clientsMap.get(e.vendor_client) || 0) + 1);
+      }
+    });
+
+    return {
+      entries: entriesGroup.slice(0, 8),
+      documents: Array.from(documentsMap.entries()).slice(0, 8).map(([value, sub]) => ({ value, sub })),
+      clients: Array.from(clientsMap.entries()).slice(0, 8).map(([value, count]) => ({ value, count })),
+    };
+  }, [preFiltered, searchQuery]);
+
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
