@@ -119,12 +119,17 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const [txPaymentStatus, setTxPaymentStatus] = useState('pending');
   const [txNotes, setTxNotes] = useState('');
   const [txCurrency, setTxCurrency] = useState<'USD' | 'DOP'>('USD');
+  // Landed cost fields for purchase imports (capitalized to inventory per IAS 2)
+  const [txFreightUsd, setTxFreightUsd] = useState<string>('');
+  const [txCustomsUsd, setTxCustomsUsd] = useState<string>('');
+  const [txOtherUsd, setTxOtherUsd] = useState<string>('');
 
   const reset = () => {
     setStep('config'); setRows([]); setStats({ inserted: 0, failed: 0 });
     setTxDate(new Date().toISOString().split('T')[0]);
     setTxVendor(''); setTxClient(''); setTxInvoiceRef('');
     setTxPaymentStatus('pending'); setTxNotes(''); setTxCurrency('USD');
+    setTxFreightUsd(''); setTxCustomsUsd(''); setTxOtherUsd('');
   };
 
   const downloadTemplate = () => {
