@@ -14,7 +14,8 @@ import { Pencil, Search, Download, Save, Trash2, ArrowUp, ArrowDown, ArrowUpDown
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
-import { exportToExcel } from '@/lib/export-utils';
+import { exportToExcel, exportToCSV } from '@/lib/export-utils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { JournalEntryDuplicateDialog } from './JournalEntryDuplicateDialog';
 import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
@@ -259,28 +260,48 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     setDeleting(false);
   };
 
-  const handleExport = () => {
-    exportToExcel(filtered.map(e => {
-      const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
-      return {
-        Fecha: e.date,
-        Tipo: TYPE_LABELS[e.type]?.label || e.type,
-        Descripción: e.description,
-        'Proveedor/Cliente': e.vendor_client,
-        'Cuenta Débito': e.account_name,
-        'Código Débito': e.account_code,
-        'Cuenta Crédito': e.credit_account_name,
-        'Código Crédito': e.credit_account_code,
-        'Débito USD': e.debit_usd || '',
-        'Crédito USD': e.credit_usd || '',
-        'Débito DOP': e.debit_dop || '',
-        'Crédito DOP': e.credit_dop || '',
-        'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
-        'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
-        'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
-        'Tasa Cambio': e.exchange_rate,
-      };
-    }), 'libro-diario', 'Libro Diario');
+  const buildExportRows = () => filtered.map(e => {
+    const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
+    return {
+      Fecha: e.date,
+      Tipo: TYPE_LABELS[e.type]?.label || e.type,
+      Descripción: e.description,
+      'Proveedor/Cliente': e.vendor_client,
+      'Cuenta Débito': e.account_name,
+      'Código Débito': e.account_code,
+      'Cuenta Crédito': e.credit_account_name,
+      'Código Crédito': e.credit_account_code,
+      'Débito USD': e.debit_usd || '',
+      'Crédito USD': e.credit_usd || '',
+      'Débito DOP': e.debit_dop || '',
+      'Crédito DOP': e.credit_dop || '',
+      'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
+      'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
+      'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
+      'Tasa Cambio': e.exchange_rate,
+    };
+  });
+
+  const exportFilename = () => {
+    const parts = ['libro-diario'];
+    if (yearFilter !== 'all') parts.push(yearFilter);
+    if (monthFilter !== 'all') parts.push(monthFilter);
+    if (typeFilter !== 'all') parts.push(typeFilter);
+    return parts.join('-');
+  };
+
+  const handleExportExcel = () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) { toast.error('Sin asientos para exportar'); return; }
+    exportToExcel(rows, exportFilename(), 'Libro Diario');
+    toast.success(`${rows.length} asientos exportados a Excel`);
+  };
+
+  const handleExportCSV = () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) { toast.error('Sin asientos para exportar'); return; }
+    exportToCSV(rows, exportFilename());
+    toast.success(`${rows.length} asientos exportados a CSV`);
   };
 
 
@@ -333,9 +354,21 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </SelectContent>
         </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
-        <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto">
-          <Download className="w-3.5 h-3.5 mr-1" /> Excel
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="ml-auto">
+              <Download className="w-3.5 h-3.5 mr-1" /> Exportar ({filtered.length})
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportExcel} className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-2" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportCSV} className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-2" /> CSV (.csv)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Summary KPIs */}
