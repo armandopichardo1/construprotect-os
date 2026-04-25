@@ -34,6 +34,8 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [capitalize, setCapitalize] = useState<boolean>(true);
+  type ProrationMethod = 'fob' | 'units' | 'weight' | 'volume';
+  const [prorationMethod, setProrationMethod] = useState<ProrationMethod>('fob');
 
   // Load chart of accounts to pick bank / CxP / inventory
   const { data: accounts = [] } = useQuery({
@@ -88,17 +90,21 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     queryFn: async () => {
       const [{ data: inv }, { data: prods }] = await Promise.all([
         supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', productIds),
-        supabase.from('products').select('id, unit_cost_usd').in('id', productIds),
+        supabase.from('products').select('id, unit_cost_usd, weight_kg_per_unit, cbm_per_unit').in('id', productIds),
       ]);
-      const map: Record<string, { onHand: number; currentWac: number }> = {};
+      const map: Record<string, { onHand: number; currentWac: number; weightKg: number; cbm: number }> = {};
       productIds.forEach((pid: string) => {
-        map[pid] = { onHand: 0, currentWac: 0 };
+        map[pid] = { onHand: 0, currentWac: 0, weightKg: 0, cbm: 0 };
       });
       (inv || []).forEach((row: any) => {
         if (map[row.product_id]) map[row.product_id].onHand = Number(row.quantity_on_hand || 0);
       });
       (prods || []).forEach((row: any) => {
-        if (map[row.id]) map[row.id].currentWac = Number(row.unit_cost_usd || 0);
+        if (map[row.id]) {
+          map[row.id].currentWac = Number(row.unit_cost_usd || 0);
+          map[row.id].weightKg = Number(row.weight_kg_per_unit || 0);
+          map[row.id].cbm = Number(row.cbm_per_unit || 0);
+        }
       });
       return map;
     },
@@ -161,6 +167,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       setPaymentMode(autoPaymentMode);
       setBankAccountId(autoBankAccountId);
       setCapitalize(true);
+      setProrationMethod('fob');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
@@ -172,12 +179,62 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const deltaAddons = newAddons - currentAddons; // positive = more expense, negative = reversal
   const newLanded = totalFob + newAddons;
 
-  const preview = useMemo(() => baselineFob.map(it => {
-    const lineFobTotal = it.fobUnit * it.qty;
-    const lineAddon = totalFob > 0 ? (lineFobTotal / totalFob) * newAddons : 0;
-    const newUnitCost = it.qty > 0 ? it.fobUnit + lineAddon / it.qty : it.fobUnit;
-    return { ...it, lineFobTotal, lineAddon, newUnitCost, newLineLanded: newUnitCost * it.qty };
-  }), [baselineFob, totalFob, newAddons]);
+  // Cálculo de la base de prorrateo según el método elegido.
+  // Cada línea aporta una "weight" (peso de prorrateo) y la fracción de los addons
+  // se asigna proporcionalmente a esa weight. Si para una línea no hay dato (peso/cbm
+  // = 0) o la suma total de la base es 0, se hace fallback a FOB para no perder dinero.
+  const preview = useMemo(() => {
+    const items_ = items as any[];
+    const findItem = (id: string) => items_.find((i: any) => i.id === id);
+    const lineWeight = (it: any): number => {
+      const item = findItem(it.id);
+      const pid = item?.product_id;
+      const info = pid ? (productStock as any)[pid] : null;
+      const qty = it.qty;
+      switch (prorationMethod) {
+        case 'units':
+          return qty;
+        case 'weight':
+          return qty * Number(info?.weightKg || 0);
+        case 'volume':
+          return qty * Number(info?.cbm || 0);
+        case 'fob':
+        default:
+          return it.fobUnit * qty;
+      }
+    };
+    const weights = baselineFob.map(it => ({ id: it.id, w: lineWeight(it) }));
+    const sumW = weights.reduce((s, x) => s + x.w, 0);
+    // Fallback a FOB si la base seleccionada da 0 (datos incompletos)
+    const useFobFallback = sumW <= 0 && totalFob > 0;
+    return baselineFob.map(it => {
+      const lineFobTotal = it.fobUnit * it.qty;
+      let lineAddon = 0;
+      if (useFobFallback) {
+        lineAddon = totalFob > 0 ? (lineFobTotal / totalFob) * newAddons : 0;
+      } else if (sumW > 0) {
+        const w = weights.find(x => x.id === it.id)?.w || 0;
+        lineAddon = (w / sumW) * newAddons;
+      }
+      const newUnitCost = it.qty > 0 ? it.fobUnit + lineAddon / it.qty : it.fobUnit;
+      return { ...it, lineFobTotal, lineAddon, newUnitCost, newLineLanded: newUnitCost * it.qty };
+    });
+  }, [baselineFob, totalFob, newAddons, prorationMethod, productStock, items]);
+
+  // Indicador para advertir al usuario si el método elegido no tiene datos suficientes
+  const prorationFallbackToFob = useMemo(() => {
+    if (prorationMethod === 'fob' || prorationMethod === 'units') return false;
+    const items_ = items as any[];
+    const findItem = (id: string) => items_.find((i: any) => i.id === id);
+    const sum = baselineFob.reduce((s, it) => {
+      const item = findItem(it.id);
+      const pid = item?.product_id;
+      const info = pid ? (productStock as any)[pid] : null;
+      const v = prorationMethod === 'weight' ? Number(info?.weightKg || 0) : Number(info?.cbm || 0);
+      return s + it.qty * v;
+    }, 0);
+    return sum <= 0;
+  }, [prorationMethod, baselineFob, productStock, items]);
 
   // Pre-flight: cuentas requeridas en el catálogo. Bloquea guardado si faltan.
   // Se evalúa siempre que se vaya a generar asiento (delta != 0).
@@ -276,11 +333,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     setSaving(true);
     try {
       const userNotes = String(notes || '')
-        .replace(/Costo aterrizado prorrateado por valor FOB[^·\n]*?(\.|·|$)/g, '')
+        .replace(/Costo aterrizado prorrateado por (valor FOB|unidades|peso|volumen)[^·\n]*?(\.|·|$)/g, '')
         .replace(/[·\s]+$/g, '')
         .trim();
+      const methodLabel = prorationMethod === 'units' ? 'unidades' : prorationMethod === 'weight' ? 'peso' : prorationMethod === 'volume' ? 'volumen' : 'valor FOB';
+      const effectiveMethodLabel = prorationFallbackToFob ? 'valor FOB (fallback)' : methodLabel;
       const landedAnnotation = newAddons > 0
-        ? `Costo aterrizado prorrateado por valor FOB — Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (Total addons $${newAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
+        ? `Costo aterrizado prorrateado por ${effectiveMethodLabel} — Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (Total addons $${newAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
         : null;
       const finalNotes = [userNotes || null, landedAnnotation].filter(Boolean).join(' · ') || null;
 
@@ -825,9 +884,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             {/* Vista previa: cambio estimado de costo por producto y delta de inventario */}
             {items.length > 0 && (
               <div>
-                <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-                  <TrendingUp className="w-3 h-3" /> Vista previa de impacto por producto
-                </Label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3" /> Vista previa de impacto por producto
+                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[10px] text-muted-foreground">Regla de prorrateo</Label>
+                    <Select value={prorationMethod} onValueChange={(v) => setProrationMethod(v as any)}>
+                      <SelectTrigger className="h-7 text-[11px] w-[170px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fob" className="text-[11px]">Por valor FOB (NIC 2)</SelectItem>
+                        <SelectItem value="units" className="text-[11px]">Por unidades</SelectItem>
+                        <SelectItem value="weight" className="text-[11px]">Por peso (kg)</SelectItem>
+                        <SelectItem value="volume" className="text-[11px]">Por volumen (CBM)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {prorationFallbackToFob && (
+                  <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-[10px] text-warning flex items-start gap-1.5 mb-1.5">
+                    <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                    <span>
+                      Los productos del envío no tienen {prorationMethod === 'weight' ? 'peso (kg)' : 'volumen (CBM)'} cargado. El prorrateo cae a <strong>FOB</strong> automáticamente. Carga estos datos en cada producto para usar este método.
+                    </span>
+                  </div>
+                )}
                 <div className="rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto">
                   <table className="w-full text-[11px]">
                     <thead className="bg-muted/40 sticky top-0">
