@@ -175,6 +175,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
 
   const [reversalConfirmOpen, setReversalConfirmOpen] = useState(false);
   const [previewConfirmOpen, setPreviewConfirmOpen] = useState(false);
+  const [reprocessConfirmOpen, setReprocessConfirmOpen] = useState(false);
 
   // Cuentas DR/CR que se asentarán (para preview de confirmación)
   const credAcctPreview = useMemo(() => {
