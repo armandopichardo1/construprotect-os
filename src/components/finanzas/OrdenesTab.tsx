@@ -340,6 +340,7 @@ export function OrdenesTab() {
               </TableBody>
             </Table>
           </div>
+          </div>
         </div>
       )}
 
