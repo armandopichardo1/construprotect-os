@@ -520,10 +520,29 @@ date: txDate,
               </div>
 
               {txType === 'purchase' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted-foreground">Notas</label>
-                  <Textarea value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="Notas de la orden..." className="text-xs min-h-[40px]" rows={2} />
-                </div>
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Flete USD</label>
+                      <Input type="number" step="0.01" min="0" value={txFreightUsd} onChange={e => setTxFreightUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Aduana USD</label>
+                      <Input type="number" step="0.01" min="0" value={txCustomsUsd} onChange={e => setTxCustomsUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Otros USD</label>
+                      <Input type="number" step="0.01" min="0" value={txOtherUsd} onChange={e => setTxOtherUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground -mt-1">
+                    💡 Estos costos se <strong>prorratean por valor FOB</strong> entre los productos y se capitalizan al inventario (NIC 2). Ajustan el WAC y los márgenes automáticamente.
+                  </p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Notas</label>
+                    <Textarea value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="Notas de la orden..." className="text-xs min-h-[40px]" rows={2} />
+                  </div>
+                </>
               )}
             </div>
 
