@@ -631,6 +631,53 @@ export type Database = {
           },
         ]
       }
+      discount_rules: {
+        Row: {
+          category: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          discount_pct: number
+          id: string
+          is_active: boolean
+          notes: string | null
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount_pct?: number
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount_pct?: number
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_rules_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rates: {
         Row: {
           created_at: string

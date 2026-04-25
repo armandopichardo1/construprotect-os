@@ -110,6 +110,7 @@ interface SaleItem {
   discount_type: 'pct' | 'amount';
   _priceDisplay?: string; // raw string for decimal input
   _discountDisplay?: string;
+  _discountTouched?: boolean; // true once the user manually edited the discount
 }
 
 interface PurchaseItem {
@@ -195,7 +196,36 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
-  // AI state
+  const { data: discountRules = [] } = useQuery({
+    queryKey: ['discount-rules'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('discount_rules')
+        .select('id, contact_id, category, discount_pct, priority')
+        .eq('is_active', true);
+      return data || [];
+    },
+  });
+
+  // Find best matching rule. Priority: contact+category > contact-only > category-only.
+  // Within the same specificity, higher `priority` wins.
+  const findDiscountRule = (contactIdArg: string, category: string | null) => {
+    if (!discountRules.length) return null;
+    const buckets = [
+      // contact + category
+      discountRules.filter(r => r.contact_id === contactIdArg && r.category && category && r.category === category),
+      // contact only
+      discountRules.filter(r => r.contact_id === contactIdArg && !r.category),
+      // category only
+      discountRules.filter(r => !r.contact_id && r.category && category && r.category === category),
+    ];
+    for (const bucket of buckets) {
+      if (bucket.length) {
+        return [...bucket].sort((a, b) => (b.priority || 0) - (a.priority || 0))[0];
+      }
+    }
+    return null;
+  };
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
@@ -331,8 +361,22 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPriceTier(tier);
     setSaleItems(prev => prev.map(item => {
       if (!item.product_id) return item;
-      const prod = products.find((p: any) => p.id === item.product_id);
-      return { ...item, unit_price_usd: getPriceForTier(prod, tier) };
+      const isService = item.product_id.startsWith('svc:');
+      const prod = isService ? null : products.find((p: any) => p.id === item.product_id);
+      const newPrice = isService ? item.unit_price_usd : getPriceForTier(prod, tier);
+      // Re-apply discount rule unless user already edited it manually
+      if (item._discountTouched) {
+        return { ...item, unit_price_usd: newPrice };
+      }
+      const rule = findDiscountRule(id, prod?.category || null);
+      return {
+        ...item,
+        unit_price_usd: newPrice,
+        discount_type: 'pct',
+        discount_pct: rule ? Number(rule.discount_pct) : 0,
+        discount_amount_usd: 0,
+        _discountDisplay: undefined,
+      };
     }));
   };
 
@@ -341,14 +385,27 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
       if (idx !== i) return item;
-      const updated = { ...item, [field]: value, _priceDisplay: undefined };
+      const updated: SaleItem = { ...item, [field]: value, _priceDisplay: undefined };
       if (field === 'product_id') {
         // Check if it's a service (prefixed with svc:)
         if (typeof value === 'string' && value.startsWith('svc:')) {
           updated.unit_price_usd = 0; // user sets price manually for services
+          if (!updated._discountTouched) {
+            updated.discount_pct = 0;
+            updated.discount_amount_usd = 0;
+            updated.discount_type = 'pct';
+          }
         } else {
           const prod = products.find((p: any) => p.id === value);
           updated.unit_price_usd = getPriceForTier(prod, priceTier);
+          // Auto-apply discount rule unless manually overridden
+          if (!updated._discountTouched) {
+            const rule = findDiscountRule(contactId, prod?.category || null);
+            updated.discount_type = 'pct';
+            updated.discount_pct = rule ? Number(rule.discount_pct) : 0;
+            updated.discount_amount_usd = 0;
+            updated._discountDisplay = undefined;
+          }
         }
       }
       return updated;
@@ -1328,10 +1385,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                               const val = parseNum(raw);
                               if (it.discount_type === 'pct') {
                                 const pct = Math.min(100, Math.max(0, val));
-                                return { ...it, _discountDisplay: raw, discount_pct: pct };
+                                return { ...it, _discountDisplay: raw, discount_pct: pct, _discountTouched: true };
                               }
                               const usd = currencyBase === 'USD' ? val : val / xr;
-                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd };
+                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd, _discountTouched: true };
                             }));
                           }}
                           onBlur={() => {
@@ -1345,6 +1402,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                               ...it,
                               discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
                               _discountDisplay: undefined,
+                              _discountTouched: true,
                             }))
                           }
                           className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
