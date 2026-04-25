@@ -152,6 +152,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const filtered = useMemo(() => {
     let items = filterByDate(entries);
     if (typeFilter !== 'all') items = items.filter(e => e.type === typeFilter);
+    if (yearFilter !== 'all') items = items.filter(e => e.date?.slice(0, 4) === yearFilter);
+    if (monthFilter !== 'all') items = items.filter(e => e.date?.slice(5, 7) === monthFilter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       items = items.filter(e =>
