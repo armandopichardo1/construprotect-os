@@ -167,6 +167,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       setPaymentMode(autoPaymentMode);
       setBankAccountId(autoBankAccountId);
       setCapitalize(true);
+      setProrationMethod('fob');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
