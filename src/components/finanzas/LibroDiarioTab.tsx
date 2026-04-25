@@ -80,6 +80,14 @@ function extractVendorClient(desc: string): string {
   return '—';
 }
 
+/** Extract document/reference (factura, PO, NC, etc.) from description first segment */
+function extractDocument(desc: string): string {
+  // Patterns like "Venta INV-001 — ...", "Compra PO-123 — ...", "Nota de crédito NC-7 — ..."
+  const m = desc.match(/^(?:Venta|Compra|Nota de cr[eé]dito|NC|Gasto|Costo|Asiento)\s+([^\s—]+)/i);
+  if (m && m[1]) return m[1];
+  return '';
+}
+
 interface Props {
   journalEntries?: any[];
   rate: number;
