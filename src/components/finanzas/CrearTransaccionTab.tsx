@@ -1395,90 +1395,119 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <span className="w-20 text-right">Total</span>
                   </div>
                   {saleItems.map((item, i) => {
+                    const lineGrossBase = lineGrossUsd(item);
+                    const lineDiscBase = lineDiscountUsd(item);
                     const lineTotalBase = lineNetUsd(item);
                     const lineTotalDisplay = currencyBase === 'USD' ? lineTotalBase : lineTotalBase * xr;
+                    const netUnitUsd = item.quantity > 0 ? lineTotalBase / item.quantity : 0;
+                    const netUnitDisplay = currencyBase === 'USD' ? netUnitUsd : netUnitUsd * xr;
+                    const origin = getDiscountOrigin(item);
+                    const showInfoRow = !!item.product_id && item.quantity > 0;
                     return (
-                    <div key={i} className="flex gap-1.5 items-end">
-                      <div className="flex-1 min-w-0">
-                        <SearchableSelect
-                          options={saleItemOptions.map(o => ({ value: o.value, label: `${o.sku} — ${o.label}` }))}
-                          value={item.product_id}
-                          onValueChange={v => updateSaleItem(i, 'product_id', v)}
-                          placeholder="Producto / Servicio"
-                          searchPlaceholder="Buscar..."
-                          emptyMessage="No encontrado"
-                          className="text-xs"
-                        />
+                    <div key={i} className="space-y-1">
+                      <div className="flex gap-1.5 items-end">
+                        <div className="flex-1 min-w-0">
+                          <SearchableSelect
+                            options={saleItemOptions.map(o => ({ value: o.value, label: `${o.sku} — ${o.label}` }))}
+                            value={item.product_id}
+                            onValueChange={v => updateSaleItem(i, 'product_id', v)}
+                            placeholder="Producto / Servicio"
+                            searchPlaceholder="Buscar..."
+                            emptyMessage="No encontrado"
+                            className="text-xs"
+                          />
+                        </div>
+                        <Input type="text" inputMode="numeric" value={item.quantity || ''}
+                          onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9]/g, ''), 0))}
+                          className="w-12 text-xs text-center" placeholder="Qty" />
+                        <div className="w-24 shrink-0">
+                          <Input type="text" inputMode="decimal"
+                            value={item._priceDisplay ?? (item.unit_price_usd === 0 ? '' : String(currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100))}
+                            onChange={e => {
+                              const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                              setSaleItems(prev => prev.map((it, idx) => {
+                                if (idx !== i) return it;
+                                const val = parseNum(raw);
+                                return { ...it, _priceDisplay: raw, unit_price_usd: currencyBase === 'USD' ? val : val / xr };
+                              }));
+                            }}
+                            onBlur={() => {
+                              setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _priceDisplay: undefined }));
+                            }}
+                            className="text-xs" placeholder={`${currencySymbol}0.00`} />
+                        </div>
+                        <div className="w-[104px] shrink-0 flex gap-0.5">
+                          <Input type="text" inputMode="decimal"
+                            value={
+                              item._discountDisplay ??
+                              (item.discount_type === 'pct'
+                                ? (item.discount_pct ? String(item.discount_pct) : '')
+                                : (item.discount_amount_usd
+                                    ? String(currencyBase === 'USD'
+                                        ? Math.round(item.discount_amount_usd * 100) / 100
+                                        : Math.round(item.discount_amount_usd * xr * 100) / 100)
+                                    : ''))
+                            }
+                            onChange={e => {
+                              const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                              setSaleItems(prev => prev.map((it, idx) => {
+                                if (idx !== i) return it;
+                                const val = parseNum(raw);
+                                if (it.discount_type === 'pct') {
+                                  const pct = Math.min(100, Math.max(0, val));
+                                  return { ...it, _discountDisplay: raw, discount_pct: pct, _discountTouched: true };
+                                }
+                                const usd = currencyBase === 'USD' ? val : val / xr;
+                                return { ...it, _discountDisplay: raw, discount_amount_usd: usd, _discountTouched: true };
+                              }));
+                            }}
+                            onBlur={() => {
+                              setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _discountDisplay: undefined }));
+                            }}
+                            className="text-xs text-center px-1" placeholder="0" />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : {
+                                ...it,
+                                discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
+                                _discountDisplay: undefined,
+                                _discountTouched: true,
+                              }))
+                            }
+                            className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
+                            title={item.discount_type === 'pct' ? 'Cambiar a monto' : 'Cambiar a porcentaje'}
+                          >
+                            {item.discount_type === 'pct' ? '%' : currencySymbol}
+                          </button>
+                        </div>
+                        <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{lineTotalBase > 0 ? formatBase(lineTotalDisplay) : '—'}</span>
+                        {saleItems.length > 1 && (
+                          <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive pb-2">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
-                      <Input type="text" inputMode="numeric" value={item.quantity || ''}
-                        onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9]/g, ''), 0))}
-                        className="w-12 text-xs text-center" placeholder="Qty" />
-                      <div className="w-24 shrink-0">
-                        <Input type="text" inputMode="decimal"
-                          value={item._priceDisplay ?? (item.unit_price_usd === 0 ? '' : String(currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100))}
-                          onChange={e => {
-                            const raw = e.target.value.replace(/[^0-9.,]/g, '');
-                            setSaleItems(prev => prev.map((it, idx) => {
-                              if (idx !== i) return it;
-                              const val = parseNum(raw);
-                              return { ...it, _priceDisplay: raw, unit_price_usd: currencyBase === 'USD' ? val : val / xr };
-                            }));
-                          }}
-                          onBlur={() => {
-                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _priceDisplay: undefined }));
-                          }}
-                          className="text-xs" placeholder={`${currencySymbol}0.00`} />
-                      </div>
-                      <div className="w-[104px] shrink-0 flex gap-0.5">
-                        <Input type="text" inputMode="decimal"
-                          value={
-                            item._discountDisplay ??
-                            (item.discount_type === 'pct'
-                              ? (item.discount_pct ? String(item.discount_pct) : '')
-                              : (item.discount_amount_usd
-                                  ? String(currencyBase === 'USD'
-                                      ? Math.round(item.discount_amount_usd * 100) / 100
-                                      : Math.round(item.discount_amount_usd * xr * 100) / 100)
-                                  : ''))
-                          }
-                          onChange={e => {
-                            const raw = e.target.value.replace(/[^0-9.,]/g, '');
-                            setSaleItems(prev => prev.map((it, idx) => {
-                              if (idx !== i) return it;
-                              const val = parseNum(raw);
-                              if (it.discount_type === 'pct') {
-                                const pct = Math.min(100, Math.max(0, val));
-                                return { ...it, _discountDisplay: raw, discount_pct: pct, _discountTouched: true };
-                              }
-                              const usd = currencyBase === 'USD' ? val : val / xr;
-                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd, _discountTouched: true };
-                            }));
-                          }}
-                          onBlur={() => {
-                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _discountDisplay: undefined }));
-                          }}
-                          className="text-xs text-center px-1" placeholder="0" />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : {
-                              ...it,
-                              discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
-                              _discountDisplay: undefined,
-                              _discountTouched: true,
-                            }))
-                          }
-                          className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
-                          title={item.discount_type === 'pct' ? 'Cambiar a monto' : 'Cambiar a porcentaje'}
-                        >
-                          {item.discount_type === 'pct' ? '%' : currencySymbol}
-                        </button>
-                      </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{lineTotalBase > 0 ? formatBase(lineTotalDisplay) : '—'}</span>
-                      {saleItems.length > 1 && (
-                        <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive pb-2">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      {showInfoRow && (
+                        <div className="flex items-center gap-2 pl-1 text-[10px] text-muted-foreground">
+                          <span className={cn(
+                            'px-1.5 py-0.5 rounded-md font-medium',
+                            origin.tone === 'rule' && 'bg-primary/10 text-primary',
+                            origin.tone === 'manual' && 'bg-warning/10 text-warning',
+                            origin.tone === 'none' && 'bg-muted text-muted-foreground',
+                          )}>
+                            {origin.label}
+                          </span>
+                          {lineDiscBase > 0 && (
+                            <span className="font-mono">
+                              -{formatBase(currencyBase === 'USD' ? lineDiscBase : lineDiscBase * xr)}
+                              <span className="text-muted-foreground/70"> ({((lineDiscBase / Math.max(lineGrossBase, 0.0001)) * 100).toFixed(1)}%)</span>
+                            </span>
+                          )}
+                          <span className="ml-auto">
+                            Neto unitario: <span className="font-mono text-foreground">{formatBase(netUnitDisplay)}</span>
+                          </span>
+                        </div>
                       )}
                     </div>
                     );
