@@ -105,7 +105,9 @@ interface SaleItem {
   product_id: string;
   quantity: number;
   unit_price_usd: number;
+  discount_pct: number;
   _priceDisplay?: string; // raw string for decimal input
+  _discountDisplay?: string;
 }
 
 interface PurchaseItem {
@@ -226,7 +228,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [invoiceRef, setInvoiceRef] = useState('');
   const [priceTier, setPriceTier] = useState('list');
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0 }]);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
 
   // Purchase-specific state
   const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
@@ -332,7 +334,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0 }]);
+  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
   const removeSaleItem = (i: number) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
@@ -351,7 +353,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const subtotal = saleItems.reduce((s, i) => s + i.unit_price_usd * i.quantity, 0);
+  const lineNetUsd = (it: SaleItem) => it.unit_price_usd * it.quantity * (1 - (it.discount_pct || 0) / 100);
+  const subtotal = saleItems.reduce((s, i) => s + lineNetUsd(i), 0);
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
@@ -496,7 +499,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setAmount(''); setManualDate(undefined); setCustomRate(''); setEditingRate(false);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
-    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0 }]);
+    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
     setPurchaseSupplierId(''); setPurchaseSupplierName('');
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
@@ -699,11 +702,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           const realProductId = isService ? null : i.product_id;
           const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
+          const netUnit = i.unit_price_usd * (1 - (i.discount_pct || 0) / 100);
           return {
             sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
-            unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
-            line_total_usd: i.unit_price_usd * i.quantity,
-            margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
+            unit_price_usd: netUnit, unit_cost_usd: costUsd,
+            line_total_usd: netUnit * i.quantity,
+            margin_pct: netUnit > 0 ? Math.round((netUnit - costUsd) / netUnit * 100) : 0,
           };
         });
         await supabase.from('sale_items').insert(itemsData);
@@ -1255,11 +1259,15 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 <div className="space-y-2">
                   <div className="flex gap-1.5 items-end text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                     <span className="flex-1">Producto / Servicio</span>
-                    <span className="w-14 text-center">Cant</span>
+                    <span className="w-12 text-center">Cant</span>
                     <span className="w-24">Precio</span>
+                    <span className="w-14 text-center">Desc %</span>
                     <span className="w-20 text-right">Total</span>
                   </div>
-                  {saleItems.map((item, i) => (
+                  {saleItems.map((item, i) => {
+                    const lineTotalBase = lineNetUsd(item);
+                    const lineTotalDisplay = currencyBase === 'USD' ? lineTotalBase : lineTotalBase * xr;
+                    return (
                     <div key={i} className="flex gap-1.5 items-end">
                       <div className="flex-1 min-w-0">
                         <SearchableSelect
@@ -1274,13 +1282,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       </div>
                       <Input type="text" inputMode="numeric" value={item.quantity || ''}
                         onChange={e => updateSaleItem(i, 'quantity', parseNum(e.target.value.replace(/[^0-9]/g, ''), 0))}
-                        className="w-14 text-xs text-center" placeholder="Qty" />
+                        className="w-12 text-xs text-center" placeholder="Qty" />
                       <div className="w-24 shrink-0">
                         <Input type="text" inputMode="decimal"
                           value={item._priceDisplay ?? (item.unit_price_usd === 0 ? '' : String(currencyBase === 'USD' ? item.unit_price_usd : Math.round(item.unit_price_usd * xr * 100) / 100))}
                           onChange={e => {
                             const raw = e.target.value.replace(/[^0-9.,]/g, '');
-                            // Update display immediately to allow typing dots
                             setSaleItems(prev => prev.map((it, idx) => {
                               if (idx !== i) return it;
                               const val = parseNum(raw);
@@ -1288,19 +1295,35 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                             }));
                           }}
                           onBlur={() => {
-                            // Clear display override on blur so computed value takes over
                             setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _priceDisplay: undefined }));
                           }}
                           className="text-xs" placeholder={`${currencySymbol}0.00`} />
                       </div>
-                      <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{item.unit_price_usd * item.quantity > 0 ? formatBase(currencyBase === 'USD' ? item.unit_price_usd * item.quantity : item.unit_price_usd * item.quantity * xr) : '—'}</span>
+                      <div className="w-14 shrink-0">
+                        <Input type="text" inputMode="decimal"
+                          value={item._discountDisplay ?? (item.discount_pct ? String(item.discount_pct) : '')}
+                          onChange={e => {
+                            const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                            setSaleItems(prev => prev.map((it, idx) => {
+                              if (idx !== i) return it;
+                              const val = Math.min(100, Math.max(0, parseNum(raw)));
+                              return { ...it, _discountDisplay: raw, discount_pct: val };
+                            }));
+                          }}
+                          onBlur={() => {
+                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _discountDisplay: undefined }));
+                          }}
+                          className="text-xs text-center" placeholder="0" />
+                      </div>
+                      <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{lineTotalBase > 0 ? formatBase(lineTotalDisplay) : '—'}</span>
                       {saleItems.length > 1 && (
                         <button onClick={() => removeSaleItem(i)} className="p-1 text-muted-foreground hover:text-destructive pb-2">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                   <Button variant="outline" size="sm" onClick={addSaleItem} className="gap-1 text-xs">
                     <Plus className="w-3 h-3" /> Agregar Producto / Servicio
                   </Button>
