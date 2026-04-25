@@ -381,7 +381,9 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             total_debit_usd: Math.abs(deltaAddons),
             total_credit_usd: Math.abs(deltaAddons),
             notes: `Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (delta ${deltaAddons >= 0 ? '+' : ''}${deltaAddons.toFixed(2)})`,
-          })
+            reference_type: 'shipment_expense_edit',
+            reference_id: shipment.id,
+          } as any)
           .select('id')
           .single();
         if (jeErr) throw jeErr;
