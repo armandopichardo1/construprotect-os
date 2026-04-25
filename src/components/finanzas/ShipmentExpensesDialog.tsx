@@ -25,6 +25,7 @@ const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits
 
 export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [freight, setFreight] = useState<string>('');
   const [customs, setCustoms] = useState<string>('');
   const [other, setOther] = useState<string>('');
