@@ -710,11 +710,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           const realProductId = isService ? null : i.product_id;
           const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
-          const netUnit = i.unit_price_usd * (1 - (i.discount_pct || 0) / 100);
+          const qty = i.quantity || 0;
+          const netLine = lineNetUsd(i);
+          const netUnit = qty > 0 ? netLine / qty : 0;
           return {
-            sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
+            sale_id: sale.id, product_id: realProductId, quantity: qty,
             unit_price_usd: netUnit, unit_cost_usd: costUsd,
-            line_total_usd: netUnit * i.quantity,
+            line_total_usd: netLine,
             margin_pct: netUnit > 0 ? Math.round((netUnit - costUsd) / netUnit * 100) : 0,
           };
         });
