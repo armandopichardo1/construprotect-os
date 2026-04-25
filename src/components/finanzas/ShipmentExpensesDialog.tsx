@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck, Wallet, Landmark, CheckCircle2 } from 'lucide-react';
+import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck, Wallet, Landmark, CheckCircle2, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 interface Props {
   open: boolean;
@@ -29,6 +30,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const [saving, setSaving] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [capitalize, setCapitalize] = useState<boolean>(true);
 
   // Load chart of accounts to pick bank / CxP / inventory
   const { data: accounts = [] } = useQuery({
@@ -124,6 +126,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       // Precarga AUTOMÁTICA según estado de pago del envío
       setPaymentMode(autoPaymentMode);
       setBankAccountId(autoBankAccountId);
+      setCapitalize(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
@@ -144,8 +147,8 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
 
   const handleSave = async () => {
     if (!shipment) return;
-    if (shipment.status === 'received') {
-      toast.error('No se puede editar gastos de un envío ya recibido — afectaría WAC e inventario.');
+    if (shipment.status === 'received' && !capitalize) {
+      toast.error('Envío ya recibido — activa "Capitalizar como costo aterrizado" para recalcular WAC y márgenes, o cierra sin guardar.');
       return;
     }
     if (paymentMode === 'bank' && !bankAccountId && Math.abs(deltaAddons) > 0.001) {
@@ -191,6 +194,78 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           .update({ unit_cost_usd: Number(p.newUnitCost.toFixed(4)) })
           .eq('id', p.id);
         if (itErr) throw itErr;
+      }
+
+      // 2.5) CAPITALIZACIÓN: si está activo, actualiza products.unit_cost_usd vía WAC
+      // y recalcula márgenes. Aplica especialmente cuando el envío YA fue recibido.
+      const capitalizedProducts: { sku: string; oldCost: number; newCost: number; newWAC: number }[] = [];
+      if (capitalize) {
+        for (const p of preview) {
+          const item = items.find((i: any) => i.id === p.id);
+          if (!item?.product_id) continue;
+          const newItemCost = Number(p.newUnitCost.toFixed(4));
+
+          // Cargar inventario y producto actuales
+          const { data: prod } = await supabase
+            .from('products')
+            .select('unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd, sku')
+            .eq('id', item.product_id)
+            .single();
+          if (!prod) continue;
+
+          const currentCost = Number(prod.unit_cost_usd || 0);
+          let newCost = newItemCost;
+
+          if (shipment.status === 'received') {
+            // El envío ya fue recibido → aplicar WAC con stock actual
+            const { data: inv } = await supabase
+              .from('inventory')
+              .select('quantity_on_hand')
+              .eq('product_id', item.product_id)
+              .maybeSingle();
+            const stockQty = Number(inv?.quantity_on_hand || 0);
+            const incomingQty = Number(item.quantity_received || item.quantity_ordered || 0);
+            // WAC tradicional: el stock actual ya incluye la entrada anterior con el costo viejo,
+            // así que reasignamos el delta del addon distribuido sobre el stock actual.
+            const previousLanded = Number(item.unit_cost_usd || 0); // ya updated arriba? No: leemos baseline
+            // Para el delta usamos: nuevo costo aterrizado de esta línea vs. costo previamente
+            // contabilizado en stock. Si stockQty <= 0, simplemente fijamos newItemCost.
+            if (stockQty > 0 && incomingQty > 0) {
+              const deltaPerUnit = newItemCost - currentCost;
+              const onHandValue = stockQty * currentCost;
+              const adjustment = deltaPerUnit * Math.min(stockQty, incomingQty);
+              newCost = stockQty > 0 ? (onHandValue + adjustment) / stockQty : newItemCost;
+            } else {
+              newCost = newItemCost;
+            }
+          } else {
+            // Envío aún no recibido → fija unit_cost_usd al nuevo aterrizado para que al
+            // momento de recibir, el WAC use el costo correcto.
+            newCost = newItemCost;
+          }
+
+          const updates: Record<string, number> = {
+            unit_cost_usd: Number(newCost.toFixed(4)),
+            total_unit_cost_usd: Number(newCost.toFixed(4)),
+          };
+          // Recalcular márgenes
+          [
+            { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+            { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+            { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+            { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+          ].forEach(({ price, field }) => {
+            if (price > 0) updates[field] = Number((((price - newCost) / price) * 100).toFixed(1));
+          });
+
+          const { error: prodErr } = await supabase
+            .from('products')
+            .update(updates as any)
+            .eq('id', item.product_id);
+          if (prodErr) throw prodErr;
+
+          capitalizedProducts.push({ sku: prod.sku, oldCost: currentCost, newCost, newWAC: newCost });
+        }
       }
 
       // 3) Create journal entry for the DELTA (if any)
@@ -258,11 +333,15 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         });
       if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
 
-      toast.success('Gastos del envío actualizados — costos aterrizados reprorrateados y asiento contable registrado');
+      const capMsg = capitalize && capitalizedProducts.length > 0
+        ? ` · ${capitalizedProducts.length} producto(s) capitalizados (WAC + márgenes actualizados)`
+        : '';
+      toast.success(`Gastos del envío actualizados${capMsg}`);
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
       queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
@@ -292,14 +371,17 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           </DialogDescription>
         </DialogHeader>
 
-        {isReceived ? (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground">
-            ⚠️ Este envío ya fue recibido. No se pueden editar los gastos porque afectaría el inventario, el WAC y los asientos contables ya registrados. Si necesitas corregir, registra una nota de crédito o un ajuste contable.
+        {isReceived && (
+          <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <div>
+              <strong>Envío ya recibido.</strong> Para que el ajuste se aplique al catálogo de productos, mantén activado <strong>"Capitalizar como costo aterrizado"</strong>. Esto recalculará WAC y márgenes futuros usando el stock disponible actual. Las ventas pasadas NO se ajustan retroactivamente.
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted/30 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal FOB ({items.length} ítems)</span><span className="font-mono">{fmt(totalFob)}</span></div>
+        )}
+        <div className="space-y-4">
+          <div className="rounded-lg bg-muted/30 p-3 text-xs">
+            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal FOB ({items.length} ítems)</span><span className="font-mono">{fmt(totalFob)}</span></div>
               {currentAddons > 0 && (
                 <div className="flex justify-between text-muted-foreground/80 mt-1">
                   <span>Addons actuales</span><span className="font-mono">{fmt(currentAddons)}</span>
@@ -402,7 +484,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               )}
             </div>
 
-            {/* Tratamiento contable AUTOMÁTICO */}
+            {/* Toggle: Capitalizar como costo aterrizado (NIC 2) */}
+            <div className={`rounded-lg border-2 p-3 transition-colors ${
+              capitalize ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    Capitalizar como costo aterrizado
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                    {capitalize
+                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo). {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
+                      : <>Solo se reprorratearán los <code>shipment_items</code>. <strong className="text-warning">No se actualizará</strong> el costo unitario en el catálogo de productos ni se recalcularán los márgenes — afecta reportería futura.</>
+                    }
+                  </p>
+                </div>
+                <Switch checked={capitalize} onCheckedChange={setCapitalize} />
+              </div>
+              {capitalize && shipment.status === 'received' && (
+                <div className="mt-2 pt-2 border-t border-border/40 flex items-start gap-1.5 text-[10px] text-warning">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>Este envío ya está recibido. Los productos vendidos previamente NO se ajustarán retroactivamente; el WAC se actualiza con el stock disponible actual.</span>
+                </div>
+              )}
+            </div>
+
             <div className={`rounded-lg border-2 p-3 space-y-3 transition-colors ${
               paymentMode === 'bank' && bankAccountId
                 ? 'border-success/40 bg-success/5'
@@ -622,16 +730,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                 </div>
               )}
             </div>
-          </div>
-        )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          {!isReceived && (
-            <Button onClick={handleSave} disabled={saving || items.length === 0}>
-              {saving ? 'Guardando...' : 'Guardar y Reprorratear'}
-            </Button>
-          )}
+          <Button onClick={handleSave} disabled={saving || items.length === 0}>
+            {saving ? 'Guardando...' : (isReceived && capitalize ? 'Guardar y Capitalizar' : 'Guardar y Reprorratear')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

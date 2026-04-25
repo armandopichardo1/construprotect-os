@@ -231,7 +231,7 @@ export function OrdenesTab() {
               <TableBody>
                 {shipments.map((s: any) => {
                   const payStatus = s.payment_status || 'pending';
-                  const canEditExpenses = s.status !== 'received';
+                  const canEditExpenses = true; // siempre permitido — recibidos usan capitalización (WAC)
                   const otherMatch = String(s.notes || '').match(/Otros \$([0-9.]+)/);
                   const hasAddons = Number(s.shipping_cost_usd || 0) + Number(s.customs_cost_usd || 0) + (otherMatch ? Number(otherMatch[1]) : 0) > 0;
                   return (
@@ -257,9 +257,9 @@ export function OrdenesTab() {
                           variant={hasAddons ? 'outline' : 'default'}
                           className="h-7 text-[10px] gap-1 px-2"
                           disabled={!canEditExpenses}
-                          title={canEditExpenses
-                            ? (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')
-                            : 'Envío ya recibido — no se puede editar gastos'}
+                          title={s.status === 'received'
+                            ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
+                            : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
                           onClick={() => setEditExpenses(s)}
                         >
                           <Truck className="w-3 h-3" />
@@ -406,12 +406,10 @@ export function OrdenesTab() {
                       onClick={() => { setEditShipment(detailOrder); setDetailOrder(null); }}>
                       <Pencil className="w-3.5 h-3.5" /> Editar Orden
                     </Button>
-                    {detailOrder.status !== 'received' && (
-                      <Button size="sm" variant="outline" className="gap-1.5 text-xs"
-                        onClick={() => { setEditExpenses(detailOrder); setDetailOrder(null); }}>
-                        <Truck className="w-3.5 h-3.5" /> Editar Gastos (Flete/Aduana)
-                      </Button>
-                    )}
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                      onClick={() => { setEditExpenses(detailOrder); setDetailOrder(null); }}>
+                      <Truck className="w-3.5 h-3.5" /> {detailOrder.status === 'received' ? 'Capitalizar Gastos (WAC)' : 'Editar Gastos (Flete/Aduana)'}
+                    </Button>
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) > 0 && (
                       <Button size="sm" variant="default" className="gap-1.5 text-xs" disabled={receiving}
                         onClick={() => receiveShipment(detailOrder)}>
