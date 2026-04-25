@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Truck, Sparkles, BookOpen } from 'lucide-react';
+import { Truck, Sparkles, BookOpen, History } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -38,6 +38,20 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         .select('id, code, description, account_type, classification')
         .eq('is_active', true)
         .order('code');
+      return data || [];
+    },
+  });
+
+  // Load expense edit history for this shipment
+  const { data: history = [] } = useQuery({
+    queryKey: ['shipment-expense-history', shipment?.id],
+    enabled: !!shipment?.id && open,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('shipment_expense_history')
+        .select('*')
+        .eq('shipment_id', shipment.id)
+        .order('created_at', { ascending: false });
       return data || [];
     },
   });
@@ -152,13 +166,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       }
 
       // 3) Create journal entry for the DELTA (if any)
+      let journalEntryId: string | null = null;
       if (Math.abs(deltaAddons) > 0.001) {
         const today = new Date().toISOString().slice(0, 10);
         const credAcct = paymentMode === 'cxp' ? cxpAcct : bankAccounts.find((a: any) => a.id === bankAccountId);
         const description = `Capitalización de flete/aduana — Envío ${shipment.po_number || shipment.id?.slice(0, 8)}`;
         const debitAmt = deltaAddons > 0 ? deltaAddons : 0;
         const creditAmt = deltaAddons > 0 ? deltaAddons : 0;
-        // For reversal (deltaAddons < 0): swap sides
         const isReversal = deltaAddons < 0;
 
         const { data: je, error: jeErr } = await supabase
@@ -173,6 +187,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           .select('id')
           .single();
         if (jeErr) throw jeErr;
+        journalEntryId = je.id;
 
         const lines = isReversal
           ? [
@@ -188,6 +203,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         if (linesErr) throw linesErr;
       }
 
+      // 4) Insert history record (always, even if delta is 0 — captures who touched it and when)
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes?.user?.id || null;
+      let userName: string | null = null;
+      if (uid) {
+        const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', uid).maybeSingle();
+        userName = prof?.full_name || userRes?.user?.email || null;
+      }
+      const { error: histErr } = await (supabase as any)
+        .from('shipment_expense_history')
+        .insert({
+          shipment_id: shipment.id,
+          changed_by: uid,
+          changed_by_name: userName,
+          previous_freight_usd: currentFreight,
+          previous_customs_usd: currentCustoms,
+          previous_other_usd: currentOther,
+          new_freight_usd: newFreight,
+          new_customs_usd: newCustoms,
+          new_other_usd: newOther,
+          delta_total_usd: deltaAddons,
+          payment_mode: Math.abs(deltaAddons) > 0.001 ? paymentMode : null,
+          journal_entry_id: journalEntryId,
+          notes: notes || null,
+        });
+      if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
+
       toast.success('Gastos del envío actualizados — costos aterrizados reprorrateados y asiento contable registrado');
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
@@ -196,6 +238,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
@@ -356,6 +399,57 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               <Label className="text-xs">Notas (opcional)</Label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)}
                 placeholder="Notas adicionales sobre el envío..." className="min-h-[60px] text-xs mt-1" />
+            </div>
+
+            {/* Edit history */}
+            <div>
+              <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+                <History className="w-3 h-3" /> Historial de cambios ({history.length})
+              </Label>
+              {history.length === 0 ? (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 text-[11px] text-muted-foreground text-center">
+                  Sin ediciones previas. El primer cambio quedará registrado aquí.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border overflow-hidden max-h-56 overflow-y-auto">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-muted/40 sticky top-0">
+                      <tr>
+                        <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Fecha</th>
+                        <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Usuario</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Flete</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Aduana</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Otros</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-primary">Δ</th>
+                        <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Pago</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((h: any) => {
+                        const d = new Date(h.created_at);
+                        const dateStr = `${d.toLocaleDateString('es-DO')} ${d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`;
+                        const arrow = (prev: number, next: number) =>
+                          Math.abs(next - prev) < 0.001 ? '—' : `${fmt(prev)} → ${fmt(next)}`;
+                        return (
+                          <tr key={h.id} className="border-t border-border/40 align-top">
+                            <td className="px-2 py-1.5 font-mono text-muted-foreground whitespace-nowrap">{dateStr}</td>
+                            <td className="px-2 py-1.5">{h.changed_by_name || <span className="italic text-muted-foreground">—</span>}</td>
+                            <td className="text-right px-2 py-1.5 font-mono">{arrow(Number(h.previous_freight_usd), Number(h.new_freight_usd))}</td>
+                            <td className="text-right px-2 py-1.5 font-mono">{arrow(Number(h.previous_customs_usd), Number(h.new_customs_usd))}</td>
+                            <td className="text-right px-2 py-1.5 font-mono">{arrow(Number(h.previous_other_usd), Number(h.new_other_usd))}</td>
+                            <td className={`text-right px-2 py-1.5 font-mono font-semibold ${Number(h.delta_total_usd) > 0 ? 'text-warning' : Number(h.delta_total_usd) < 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                              {Number(h.delta_total_usd) === 0 ? '—' : `${Number(h.delta_total_usd) > 0 ? '+' : ''}${fmt(Number(h.delta_total_usd))}`}
+                            </td>
+                            <td className="px-2 py-1.5 text-muted-foreground">
+                              {h.payment_mode === 'cxp' ? 'CxP' : h.payment_mode === 'bank' ? 'Banco' : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
