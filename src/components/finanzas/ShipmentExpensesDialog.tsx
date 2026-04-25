@@ -42,6 +42,20 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     },
   });
 
+  // Load expense edit history for this shipment
+  const { data: history = [] } = useQuery({
+    queryKey: ['shipment-expense-history', shipment?.id],
+    enabled: !!shipment?.id && open,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('shipment_expense_history')
+        .select('*')
+        .eq('shipment_id', shipment.id)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+  });
+
   const bankAccounts = useMemo(() =>
     accounts.filter((a: any) => a.account_type === 'Activo' && (a.classification === 'Banco' || a.classification === 'Caja')),
     [accounts]
