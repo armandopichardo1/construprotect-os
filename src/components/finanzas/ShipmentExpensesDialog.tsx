@@ -77,6 +77,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     },
   });
 
+  // Stock e información de producto para la vista previa de impacto en inventario
+  const productIds = useMemo(
+    () => (shipment?.shipment_items || []).map((i: any) => i.product_id).filter(Boolean),
+    [shipment?.shipment_items]
+  );
+  const { data: productStock = {} } = useQuery({
+    queryKey: ['shipment-expense-preview-stock', shipment?.id, productIds.join(',')],
+    enabled: !!shipment?.id && open && productIds.length > 0,
+    queryFn: async () => {
+      const [{ data: inv }, { data: prods }] = await Promise.all([
+        supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', productIds),
+        supabase.from('products').select('id, unit_cost_usd').in('id', productIds),
+      ]);
+      const map: Record<string, { onHand: number; currentWac: number }> = {};
+      productIds.forEach((pid: string) => {
+        map[pid] = { onHand: 0, currentWac: 0 };
+      });
+      (inv || []).forEach((row: any) => {
+        if (map[row.product_id]) map[row.product_id].onHand = Number(row.quantity_on_hand || 0);
+      });
+      (prods || []).forEach((row: any) => {
+        if (map[row.id]) map[row.id].currentWac = Number(row.unit_cost_usd || 0);
+      });
+      return map;
+    },
+  });
+
   const bankAccounts = useMemo(() =>
     accounts.filter((a: any) => a.account_type === 'Activo' && (a.classification === 'Banco' || a.classification === 'Caja')),
     [accounts]
