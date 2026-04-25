@@ -45,6 +45,19 @@ export function DiscountRulesManager() {
     contact_name: contacts.find((c: any) => c.id === r.contact_id)?.contact_name || (r.contact_id ? '—' : 'Todos'),
   })), [rules, contacts]);
 
+  // Build conflict map: same (contact_id|category) scope among ACTIVE rules
+  const scopeKey = (r: any) => `${r.contact_id || 'ALL'}::${r.category || 'ALL'}`;
+  const conflictGroups = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    rules.filter((r: any) => r.is_active).forEach((r: any) => {
+      const k = scopeKey(r);
+      (groups[k] = groups[k] || []).push(r);
+    });
+    return Object.fromEntries(Object.entries(groups).filter(([, v]) => v.length > 1));
+  }, [rules]);
+  const conflictIds = useMemo(() => new Set(Object.values(conflictGroups).flat().map((r: any) => r.id)), [conflictGroups]);
+  const conflictCount = Object.keys(conflictGroups).length;
+
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     if (!search.trim()) return enriched;
