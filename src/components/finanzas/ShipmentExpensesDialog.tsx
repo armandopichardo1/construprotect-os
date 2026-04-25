@@ -178,12 +178,62 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const deltaAddons = newAddons - currentAddons; // positive = more expense, negative = reversal
   const newLanded = totalFob + newAddons;
 
-  const preview = useMemo(() => baselineFob.map(it => {
-    const lineFobTotal = it.fobUnit * it.qty;
-    const lineAddon = totalFob > 0 ? (lineFobTotal / totalFob) * newAddons : 0;
-    const newUnitCost = it.qty > 0 ? it.fobUnit + lineAddon / it.qty : it.fobUnit;
-    return { ...it, lineFobTotal, lineAddon, newUnitCost, newLineLanded: newUnitCost * it.qty };
-  }), [baselineFob, totalFob, newAddons]);
+  // Cálculo de la base de prorrateo según el método elegido.
+  // Cada línea aporta una "weight" (peso de prorrateo) y la fracción de los addons
+  // se asigna proporcionalmente a esa weight. Si para una línea no hay dato (peso/cbm
+  // = 0) o la suma total de la base es 0, se hace fallback a FOB para no perder dinero.
+  const preview = useMemo(() => {
+    const items_ = items as any[];
+    const findItem = (id: string) => items_.find((i: any) => i.id === id);
+    const lineWeight = (it: any): number => {
+      const item = findItem(it.id);
+      const pid = item?.product_id;
+      const info = pid ? (productStock as any)[pid] : null;
+      const qty = it.qty;
+      switch (prorationMethod) {
+        case 'units':
+          return qty;
+        case 'weight':
+          return qty * Number(info?.weightKg || 0);
+        case 'volume':
+          return qty * Number(info?.cbm || 0);
+        case 'fob':
+        default:
+          return it.fobUnit * qty;
+      }
+    };
+    const weights = baselineFob.map(it => ({ id: it.id, w: lineWeight(it) }));
+    const sumW = weights.reduce((s, x) => s + x.w, 0);
+    // Fallback a FOB si la base seleccionada da 0 (datos incompletos)
+    const useFobFallback = sumW <= 0 && totalFob > 0;
+    return baselineFob.map(it => {
+      const lineFobTotal = it.fobUnit * it.qty;
+      let lineAddon = 0;
+      if (useFobFallback) {
+        lineAddon = totalFob > 0 ? (lineFobTotal / totalFob) * newAddons : 0;
+      } else if (sumW > 0) {
+        const w = weights.find(x => x.id === it.id)?.w || 0;
+        lineAddon = (w / sumW) * newAddons;
+      }
+      const newUnitCost = it.qty > 0 ? it.fobUnit + lineAddon / it.qty : it.fobUnit;
+      return { ...it, lineFobTotal, lineAddon, newUnitCost, newLineLanded: newUnitCost * it.qty };
+    });
+  }, [baselineFob, totalFob, newAddons, prorationMethod, productStock, items]);
+
+  // Indicador para advertir al usuario si el método elegido no tiene datos suficientes
+  const prorationFallbackToFob = useMemo(() => {
+    if (prorationMethod === 'fob' || prorationMethod === 'units') return false;
+    const items_ = items as any[];
+    const findItem = (id: string) => items_.find((i: any) => i.id === id);
+    const sum = baselineFob.reduce((s, it) => {
+      const item = findItem(it.id);
+      const pid = item?.product_id;
+      const info = pid ? (productStock as any)[pid] : null;
+      const v = prorationMethod === 'weight' ? Number(info?.weightKg || 0) : Number(info?.cbm || 0);
+      return s + it.qty * v;
+    }, 0);
+    return sum <= 0;
+  }, [prorationMethod, baselineFob, productStock, items]);
 
   // Pre-flight: cuentas requeridas en el catálogo. Bloquea guardado si faltan.
   // Se evalúa siempre que se vaya a generar asiento (delta != 0).
