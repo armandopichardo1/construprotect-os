@@ -703,26 +703,44 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       setManualSaving(true);
       try {
         const desc = `Compra inventario — ${purchaseSupplierName || 'Proveedor'} — ${formatUSD(purchaseTotal)}`;
-        
         const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
+
+        const freight = Math.max(0, purchaseFreightUsd);
+        const customs = Math.max(0, purchaseCustomsUsd);
+        const other = Math.max(0, purchaseOtherUsd);
+        const addons = freight + customs + other;
+        const fobBase = purchaseFob;
+
+        const landedNotes = addons > 0
+          ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)} · Aduana $${customs.toFixed(2)} · Otros $${other.toFixed(2)} (Total addons $${addons.toFixed(2)} sobre FOB $${fobBase.toFixed(2)})`
+          : null;
+        const finalNotes = [purchaseNotes || null, landedNotes].filter(Boolean).join(' · ') || null;
+
         const { data: shipment, error: shipErr } = await supabase.from('shipments').insert({
           supplier_id: purchaseSupplierId || null,
           supplier_name: purchaseSupplierName || 'Proveedor',
           po_number: `PO-${Date.now().toString(36).toUpperCase()}`,
           order_date: dateStr,
-          total_cost_usd: purchaseTotal,
+          total_cost_usd: purchaseTotal, // landed cost (FOB + addons)
+          shipping_cost_usd: freight,
+          customs_cost_usd: customs,
           status: 'ordered' as any,
-          notes: purchaseNotes || null,
+          notes: finalNotes,
         }).select().single();
         if (shipErr || !shipment) throw shipErr || new Error('Error creando envío');
 
-        const itemsData = purchaseItems.map(i => ({
-          shipment_id: shipment.id,
-          product_id: i.product_id,
-          quantity_ordered: i.quantity,
-          quantity_received: 0,
-          unit_cost_usd: i.unit_cost_usd,
-        }));
+        const itemsData = purchaseItems.map(i => {
+          const lineFob = i.unit_cost_usd * i.quantity;
+          const lineAddon = fobBase > 0 ? (lineFob / fobBase) * addons : 0;
+          const landedUnitCost = i.quantity > 0 ? i.unit_cost_usd + (lineAddon / i.quantity) : i.unit_cost_usd;
+          return {
+            shipment_id: shipment.id,
+            product_id: i.product_id,
+            quantity_ordered: i.quantity,
+            quantity_received: 0,
+            unit_cost_usd: Number(landedUnitCost.toFixed(4)),
+          };
+        });
         await supabase.from('shipment_items').insert(itemsData);
 
         await createJournalFromPreview(desc, purchaseNotes || null);
