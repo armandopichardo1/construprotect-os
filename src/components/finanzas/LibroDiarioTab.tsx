@@ -97,7 +97,13 @@ interface Props {
 export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const queryClient = useQueryClient();
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [urlParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(urlParams.get('q') || '');
+  // Sincronizar con cambios en el query param (deep-link desde otras pantallas)
+  useEffect(() => {
+    const q = urlParams.get('q');
+    if (q) setSearchQuery(q);
+  }, [urlParams]);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [yearFilter, setYearFilter] = useState<string>('all');
