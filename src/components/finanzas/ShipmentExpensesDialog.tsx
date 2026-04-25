@@ -56,6 +56,21 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     },
   });
 
+  // Load journal entries previously linked to this shipment (via history)
+  const { data: linkedJournals = [] } = useQuery({
+    queryKey: ['shipment-linked-journals', shipment?.id],
+    enabled: !!shipment?.id && open,
+    queryFn: async () => {
+      const ids = (history || []).map((h: any) => h.journal_entry_id).filter(Boolean);
+      if (ids.length === 0) return [];
+      const { data } = await supabase
+        .from('journal_entries')
+        .select('id, date, description, total_debit_usd')
+        .in('id', ids);
+      return data || [];
+    },
+  });
+
   const bankAccounts = useMemo(() =>
     accounts.filter((a: any) => a.account_type === 'Activo' && (a.classification === 'Banco' || a.classification === 'Caja')),
     [accounts]
