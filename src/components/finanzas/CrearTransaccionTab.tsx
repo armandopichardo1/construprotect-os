@@ -622,6 +622,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPreviewAccountOverrides({});
   };
 
+  // Invalida la grilla del Libro Diario y, si se conoce, el detalle del asiento recién creado
+  // para que aparezca sin recargar la página.
+  const invalidateJournalCaches = (entryId?: string | null) => {
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' });
+    queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' });
+    if (entryId) {
+      queryClient.invalidateQueries({ queryKey: ['journal-entry', entryId], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['journal-entry-lines', entryId], refetchType: 'active' });
+    }
+  };
+
   // Helper to create journal entry from computed preview lines
   const createJournalFromPreview = async (desc: string, notes?: string) => {
     if (previewLines.length < 2) return;
@@ -658,7 +669,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       await supabase.from('journal_entry_lines').insert(linesData);
     }
 
-    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+    invalidateJournalCaches(entry.id);
+    return entry.id as string;
   };
 
   // ===== MANUAL SAVE =====
@@ -701,7 +713,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         await supabase.from('journal_entry_lines').insert(linesData);
 
         toast.success('Asiento contable registrado');
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(entry.id);
 
         setHistory(prev => [{ type: 'journal', description: journalDescription, amount: formatUSD(journalTotalDebit), timestamp: new Date() }, ...prev].slice(0, 5));
         resetManualForm();
@@ -1006,10 +1018,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error) throw error;
         // Auto journal entry
         const lines = buildExpenseJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
-        await createAutoJournal(`Gasto: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, lines, { exchangeRate: xr });
+        const expEntry = await createAutoJournal(`Gasto: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, lines, { exchangeRate: xr });
         toast.success('Gasto registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(expEntry?.id);
       } else if (preview.type === 'cost') {
         const { error } = await supabase.from('costs').insert({
           description: preview.data.description,
@@ -1023,10 +1035,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error) throw error;
         // Auto journal entry
         const costLines = buildCostJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
-        await createAutoJournal(`Costo: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, costLines, { exchangeRate: xr });
+        const costEntry = await createAutoJournal(`Costo: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, costLines, { exchangeRate: xr });
         toast.success('Costo registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['costs'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(costEntry?.id);
       } else if (preview.type === 'sale') {
         const salePayload: any = {
           contact_id: preview.data.contact_id || null,
@@ -1062,12 +1074,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         }
 
         const contactName = preview.data.contact_name || '';
-        await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
+        const saleEntry = await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
         toast.success('Venta registrada con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(saleEntry?.id);
       }
 
       setHistory(prev => [{
