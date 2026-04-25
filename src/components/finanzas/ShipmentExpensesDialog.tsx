@@ -207,15 +207,16 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         : null;
       const finalNotes = [userNotes || null, landedAnnotation].filter(Boolean).join(' · ') || null;
 
-      // 1) Update shipment header
+      // 1) Update shipment header (incluye other_cost_usd estructurado)
       const { error: shipErr } = await supabase
         .from('shipments')
         .update({
           shipping_cost_usd: newFreight,
           customs_cost_usd: newCustoms,
+          other_cost_usd: newOther,
           total_cost_usd: totalFob,
           notes: finalNotes,
-        })
+        } as any)
         .eq('id', shipment.id);
       if (shipErr) throw shipErr;
 
