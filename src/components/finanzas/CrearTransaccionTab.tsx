@@ -110,6 +110,7 @@ interface SaleItem {
   discount_type: 'pct' | 'amount';
   _priceDisplay?: string; // raw string for decimal input
   _discountDisplay?: string;
+  _discountTouched?: boolean; // true once the user manually edited the discount
 }
 
 interface PurchaseItem {
