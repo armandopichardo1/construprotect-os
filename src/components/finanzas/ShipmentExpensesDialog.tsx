@@ -167,6 +167,8 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     return errs;
   }, [willPostJournal, acct13000, acct20150, paymentMode, bankAccountId, selectedBankAcct]);
 
+  const [reversalConfirmOpen, setReversalConfirmOpen] = useState(false);
+
   const handleSave = async () => {
     if (!shipment) return;
     if (shipment.status === 'received' && !capitalize) {
@@ -179,6 +181,16 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       });
       return;
     }
+    // Paso de confirmación extra cuando el delta es negativo (se generará una reversa contable)
+    if (deltaAddons < -0.001) {
+      setReversalConfirmOpen(true);
+      return;
+    }
+    await performSave();
+  };
+
+  const performSave = async () => {
+    if (!shipment) return;
 
     setSaving(true);
     try {
