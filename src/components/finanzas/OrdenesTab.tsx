@@ -370,6 +370,12 @@ export function OrdenesTab() {
                       onClick={() => { setEditShipment(detailOrder); setDetailOrder(null); }}>
                       <Pencil className="w-3.5 h-3.5" /> Editar Orden
                     </Button>
+                    {detailOrder.status !== 'received' && (
+                      <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                        onClick={() => { setEditExpenses(detailOrder); setDetailOrder(null); }}>
+                        <Truck className="w-3.5 h-3.5" /> Editar Gastos (Flete/Aduana)
+                      </Button>
+                    )}
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) > 0 && (
                       <Button size="sm" variant="default" className="gap-1.5 text-xs" disabled={receiving}
                         onClick={() => receiveShipment(detailOrder)}>
