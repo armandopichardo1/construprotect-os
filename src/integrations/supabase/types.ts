@@ -1549,6 +1549,60 @@ export type Database = {
         }
         Relationships: []
       }
+      shipment_expense_history: {
+        Row: {
+          changed_by: string | null
+          changed_by_name: string | null
+          created_at: string
+          delta_total_usd: number
+          id: string
+          journal_entry_id: string | null
+          new_customs_usd: number
+          new_freight_usd: number
+          new_other_usd: number
+          notes: string | null
+          payment_mode: string | null
+          previous_customs_usd: number
+          previous_freight_usd: number
+          previous_other_usd: number
+          shipment_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          changed_by_name?: string | null
+          created_at?: string
+          delta_total_usd?: number
+          id?: string
+          journal_entry_id?: string | null
+          new_customs_usd?: number
+          new_freight_usd?: number
+          new_other_usd?: number
+          notes?: string | null
+          payment_mode?: string | null
+          previous_customs_usd?: number
+          previous_freight_usd?: number
+          previous_other_usd?: number
+          shipment_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          changed_by_name?: string | null
+          created_at?: string
+          delta_total_usd?: number
+          id?: string
+          journal_entry_id?: string | null
+          new_customs_usd?: number
+          new_freight_usd?: number
+          new_other_usd?: number
+          notes?: string | null
+          payment_mode?: string | null
+          previous_customs_usd?: number
+          previous_freight_usd?: number
+          previous_other_usd?: number
+          shipment_id?: string
+        }
+        Relationships: []
+      }
       shipment_items: {
         Row: {
           created_at: string
