@@ -1402,6 +1402,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                               ...it,
                               discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
                               _discountDisplay: undefined,
+                              _discountTouched: true,
                             }))
                           }
                           className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
