@@ -336,8 +336,13 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
         });
       if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
 
-      toast.success(`Ajuste histórico registrado (${fmt(amountUsd)}) con fecha ${format(effectiveDate, "d MMM yyyy", { locale: es })}`, {
-        description: 'No se modificó el costo unitario ni el WAC. Para reprorratear usa "Editar gastos".',
+      const wacMsg = updateWac && wacUpdates.length > 0
+        ? ` · WAC versionado en ${wacUpdates.length} producto(s)`
+        : (updateWac ? ' · sin productos con stock para versionar WAC' : '');
+      toast.success(`Ajuste histórico registrado (${fmt(amountUsd)}) con fecha ${format(effectiveDate, "d MMM yyyy", { locale: es })}${wacMsg}`, {
+        description: updateWac
+          ? 'WAC actualizado hacia adelante. Movimientos previos quedan intactos.'
+          : 'Solo asiento contable. WAC y costo unitario no modificados.',
       });
 
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
@@ -345,6 +350,9 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
