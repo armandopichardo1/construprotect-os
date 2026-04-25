@@ -1701,37 +1701,45 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Gastos adicionales (capitalizables al inventario) <span className="text-[10px] text-muted-foreground font-normal">— USD</span></Label>
+                  <Label className="text-xs">Gastos adicionales (capitalizables al inventario) <span className="text-[10px] text-muted-foreground font-normal">— elige moneda por campo</span></Label>
                   <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground">Flete</label>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
-                        <Input type="number" min={0} step={0.01} value={purchaseFreightUsd || ''}
-                          onChange={e => setPurchaseFreightUsd(parseNum(e.target.value, 0))}
-                          className="pl-5 text-xs h-8" placeholder="0.00" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground">Aduana</label>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
-                        <Input type="number" min={0} step={0.01} value={purchaseCustomsUsd || ''}
-                          onChange={e => setPurchaseCustomsUsd(parseNum(e.target.value, 0))}
-                          className="pl-5 text-xs h-8" placeholder="0.00" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground">Otros</label>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
-                        <Input type="number" min={0} step={0.01} value={purchaseOtherUsd || ''}
-                          onChange={e => setPurchaseOtherUsd(parseNum(e.target.value, 0))}
-                          className="pl-5 text-xs h-8" placeholder="0.00" />
-                      </div>
-                    </div>
+                    {([
+                      { label: 'Flete', val: purchaseFreightUsd, setVal: setPurchaseFreightUsd, ccy: freightCurrency, setCcy: setFreightCurrency },
+                      { label: 'Aduana', val: purchaseCustomsUsd, setVal: setPurchaseCustomsUsd, ccy: customsCurrency, setCcy: setCustomsCurrency },
+                      { label: 'Otros', val: purchaseOtherUsd, setVal: setPurchaseOtherUsd, ccy: otherCurrency, setCcy: setOtherCurrency },
+                    ] as const).map((f) => {
+                      const usdEquiv = f.ccy === 'USD' ? f.val : (xr > 0 ? f.val / xr : 0);
+                      return (
+                        <div key={f.label}>
+                          <label className="text-[10px] text-muted-foreground">{f.label}</label>
+                          <div className="flex gap-1">
+                            <div className="relative flex-1">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{f.ccy === 'USD' ? '$' : 'RD$'}</span>
+                              <Input type="number" min={0} step={0.01} value={f.val || ''}
+                                onChange={e => f.setVal(parseNum(e.target.value, 0))}
+                                className={f.ccy === 'USD' ? 'pl-5 text-xs h-8' : 'pl-9 text-xs h-8'} placeholder="0.00" />
+                            </div>
+                            <select
+                              value={f.ccy}
+                              onChange={e => f.setCcy(e.target.value as 'USD' | 'DOP')}
+                              className="h-8 text-[10px] rounded-md border bg-background px-1"
+                              aria-label={`Moneda ${f.label}`}
+                            >
+                              <option value="USD">USD</option>
+                              <option value="DOP">DOP</option>
+                            </select>
+                          </div>
+                          {f.ccy === 'DOP' && f.val > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">≈ {formatUSD(usdEquiv)} @ {xr || '—'}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Estos costos se prorratean por valor FOB y se capitalizan en el costo unitario de cada producto (NIC 2).</p>
+                  <p className="text-[10px] text-muted-foreground">Internamente todo se prorratea en USD; los montos en DOP se convierten con la tasa actual ({xr || '—'}). Se capitaliza al costo unitario por NIC 2.</p>
+                  {dopAddonNeedsRate && (
+                    <p className="text-[10px] text-destructive">⚠ Hay gastos en DOP pero no hay tasa de cambio cargada. Define la tasa o cambia los campos a USD.</p>
+                  )}
                 </div>
 
                 <div className="rounded-xl bg-muted/50 p-4 space-y-1">
@@ -1739,14 +1747,14 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <span className="text-muted-foreground">Subtotal FOB</span>
                     <span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseFob : purchaseFob * xr)}</span>
                   </div>
-                  {purchaseFreightUsd > 0 && (
-                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Flete</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseFreightUsd : purchaseFreightUsd * xr)}</span></div>
+                  {freightUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Flete</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? freightUsd : freightUsd * xr)}</span></div>
                   )}
-                  {purchaseCustomsUsd > 0 && (
-                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Aduana</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseCustomsUsd : purchaseCustomsUsd * xr)}</span></div>
+                  {customsUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Aduana</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? customsUsd : customsUsd * xr)}</span></div>
                   )}
-                  {purchaseOtherUsd > 0 && (
-                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Otros</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseOtherUsd : purchaseOtherUsd * xr)}</span></div>
+                  {otherUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Otros</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? otherUsd : otherUsd * xr)}</span></div>
                   )}
                   <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/50">
                     <span>Costo Aterrizado Total</span>
@@ -1755,6 +1763,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                       <span className="text-xs text-muted-foreground font-normal ml-2">≈ {currencyBase === 'USD' ? formatDOP(purchaseTotal * xr) : formatUSD(purchaseTotal)}</span>
                     </div>
                   </div>
+                  {purchaseAddons > 0 && purchaseFob > 0 && (
+                    <div className={`flex justify-between text-[10px] pt-1 ${purchaseReconciles ? 'text-muted-foreground' : 'text-destructive'}`}>
+                      <span>{purchaseReconciles ? '✓ Prorrateo cuadra con el total' : '⚠ Prorrateo no cuadra con el total'}</span>
+                      <span className="font-mono">Σ líneas: {formatUSD(purchaseLandedSum)} · Δ {formatUSD(purchaseReconcileDelta)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
