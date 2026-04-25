@@ -768,9 +768,22 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             </div>
         </div>
 
+        {missingAccountErrors.length > 0 && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <strong className="block">No se puede guardar: faltan cuentas en el catálogo.</strong>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {missingAccountErrors.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+              <span className="block text-muted-foreground">Crea o reactiva las cuentas requeridas en Maestras → Catálogo de Cuentas e inténtalo de nuevo.</span>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || items.length === 0}>
+          <Button onClick={handleSave} disabled={saving || items.length === 0 || missingAccountErrors.length > 0}>
             {saving ? 'Guardando...' : (isReceived && capitalize ? 'Guardar y Capitalizar' : 'Guardar y Reprorratear')}
           </Button>
         </DialogFooter>
