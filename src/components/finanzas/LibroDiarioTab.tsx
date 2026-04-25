@@ -23,6 +23,8 @@ import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
 interface JournalEntry {
   id: string;
+  entry_number: string;
+  document: string;
   date: string;
   type: 'sale' | 'expense' | 'cost' | 'journal' | 'purchase' | 'credit_note';
   description: string;
