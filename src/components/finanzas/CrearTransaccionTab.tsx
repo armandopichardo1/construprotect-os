@@ -1309,21 +1309,49 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           }}
                           className="text-xs" placeholder={`${currencySymbol}0.00`} />
                       </div>
-                      <div className="w-14 shrink-0">
+                      <div className="w-[104px] shrink-0 flex gap-0.5">
                         <Input type="text" inputMode="decimal"
-                          value={item._discountDisplay ?? (item.discount_pct ? String(item.discount_pct) : '')}
+                          value={
+                            item._discountDisplay ??
+                            (item.discount_type === 'pct'
+                              ? (item.discount_pct ? String(item.discount_pct) : '')
+                              : (item.discount_amount_usd
+                                  ? String(currencyBase === 'USD'
+                                      ? Math.round(item.discount_amount_usd * 100) / 100
+                                      : Math.round(item.discount_amount_usd * xr * 100) / 100)
+                                  : ''))
+                          }
                           onChange={e => {
                             const raw = e.target.value.replace(/[^0-9.,]/g, '');
                             setSaleItems(prev => prev.map((it, idx) => {
                               if (idx !== i) return it;
-                              const val = Math.min(100, Math.max(0, parseNum(raw)));
-                              return { ...it, _discountDisplay: raw, discount_pct: val };
+                              const val = parseNum(raw);
+                              if (it.discount_type === 'pct') {
+                                const pct = Math.min(100, Math.max(0, val));
+                                return { ...it, _discountDisplay: raw, discount_pct: pct };
+                              }
+                              const usd = currencyBase === 'USD' ? val : val / xr;
+                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd };
                             }));
                           }}
                           onBlur={() => {
                             setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _discountDisplay: undefined }));
                           }}
-                          className="text-xs text-center" placeholder="0" />
+                          className="text-xs text-center px-1" placeholder="0" />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : {
+                              ...it,
+                              discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
+                              _discountDisplay: undefined,
+                            }))
+                          }
+                          className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
+                          title={item.discount_type === 'pct' ? 'Cambiar a monto' : 'Cambiar a porcentaje'}
+                        >
+                          {item.discount_type === 'pct' ? '%' : currencySymbol}
+                        </button>
                       </div>
                       <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{lineTotalBase > 0 ? formatBase(lineTotalDisplay) : '—'}</span>
                       {saleItems.length > 1 && (
