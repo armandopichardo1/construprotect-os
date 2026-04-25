@@ -365,6 +365,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
       queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
       onSaved?.();
       onOpenChange(false);
