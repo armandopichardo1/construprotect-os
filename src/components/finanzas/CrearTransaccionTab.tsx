@@ -321,10 +321,29 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const journalTotalCredit = currencyBase === 'DOP' ? journalTotalCreditRaw / xr : journalTotalCreditRaw;
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
 
-  // Purchase computed
+  // Purchase computed — addons normalized to USD (convert from DOP using xr when applicable)
+  const addonToUsd = (val: number, ccy: 'USD' | 'DOP') => ccy === 'USD' ? val : (xr > 0 ? val / xr : 0);
+  const freightUsd = Math.max(0, addonToUsd(purchaseFreightUsd, freightCurrency));
+  const customsUsd = Math.max(0, addonToUsd(purchaseCustomsUsd, customsCurrency));
+  const otherUsd = Math.max(0, addonToUsd(purchaseOtherUsd, otherCurrency));
   const purchaseFob = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
-  const purchaseAddons = Math.max(0, purchaseFreightUsd) + Math.max(0, purchaseCustomsUsd) + Math.max(0, purchaseOtherUsd);
+  const purchaseAddons = freightUsd + customsUsd + otherUsd;
   const purchaseTotal = purchaseFob + purchaseAddons; // landed cost — debited to Inventario / credited to CxP
+
+  // Reconciliation: sum of per-line landed cost should equal purchaseTotal (within rounding tolerance)
+  const purchaseLandedSum = purchaseItems.reduce((s, i) => {
+    const lineFob = i.unit_cost_usd * i.quantity;
+    const lineAddon = purchaseFob > 0 ? (lineFob / purchaseFob) * purchaseAddons : 0;
+    const landedUnit = i.quantity > 0 ? i.unit_cost_usd + (lineAddon / i.quantity) : i.unit_cost_usd;
+    return s + Number(landedUnit.toFixed(4)) * i.quantity;
+  }, 0);
+  const purchaseReconcileDelta = purchaseLandedSum - purchaseTotal;
+  const purchaseReconcileTolerance = Math.max(0.01, purchaseItems.length * 0.01);
+  const purchaseReconciles = Math.abs(purchaseReconcileDelta) <= purchaseReconcileTolerance;
+  const hasDopAddon = (freightCurrency === 'DOP' && purchaseFreightUsd > 0)
+    || (customsCurrency === 'DOP' && purchaseCustomsUsd > 0)
+    || (otherCurrency === 'DOP' && purchaseOtherUsd > 0);
+  const dopAddonNeedsRate = hasDopAddon && !(xr > 0);
 
   const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const removePurchaseItem = (i: number) => setPurchaseItems(prev => prev.filter((_, idx) => idx !== i));
