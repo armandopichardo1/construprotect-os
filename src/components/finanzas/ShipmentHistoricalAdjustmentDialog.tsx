@@ -332,6 +332,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
           delta_total_usd: amountUsd,
           payment_mode: paymentMode,
           journal_entry_id: je.id,
+          adjustment_type: 'historical_adjustment',
           notes: histNote,
         });
       if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
