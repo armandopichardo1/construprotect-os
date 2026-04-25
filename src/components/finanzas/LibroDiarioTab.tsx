@@ -354,9 +354,21 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
           </SelectContent>
         </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
-        <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto">
-          <Download className="w-3.5 h-3.5 mr-1" /> Excel
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="ml-auto">
+              <Download className="w-3.5 h-3.5 mr-1" /> Exportar ({filtered.length})
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportExcel} className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-2" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportCSV} className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-2" /> CSV (.csv)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Summary KPIs */}
