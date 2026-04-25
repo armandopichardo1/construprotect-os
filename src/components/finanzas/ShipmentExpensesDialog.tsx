@@ -166,13 +166,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       }
 
       // 3) Create journal entry for the DELTA (if any)
+      let journalEntryId: string | null = null;
       if (Math.abs(deltaAddons) > 0.001) {
         const today = new Date().toISOString().slice(0, 10);
         const credAcct = paymentMode === 'cxp' ? cxpAcct : bankAccounts.find((a: any) => a.id === bankAccountId);
         const description = `Capitalización de flete/aduana — Envío ${shipment.po_number || shipment.id?.slice(0, 8)}`;
         const debitAmt = deltaAddons > 0 ? deltaAddons : 0;
         const creditAmt = deltaAddons > 0 ? deltaAddons : 0;
-        // For reversal (deltaAddons < 0): swap sides
         const isReversal = deltaAddons < 0;
 
         const { data: je, error: jeErr } = await supabase
@@ -187,6 +187,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           .select('id')
           .single();
         if (jeErr) throw jeErr;
+        journalEntryId = je.id;
 
         const lines = isReversal
           ? [
@@ -202,6 +203,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         if (linesErr) throw linesErr;
       }
 
+      // 4) Insert history record (always, even if delta is 0 — captures who touched it and when)
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes?.user?.id || null;
+      let userName: string | null = null;
+      if (uid) {
+        const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', uid).maybeSingle();
+        userName = prof?.full_name || userRes?.user?.email || null;
+      }
+      const { error: histErr } = await (supabase as any)
+        .from('shipment_expense_history')
+        .insert({
+          shipment_id: shipment.id,
+          changed_by: uid,
+          changed_by_name: userName,
+          previous_freight_usd: currentFreight,
+          previous_customs_usd: currentCustoms,
+          previous_other_usd: currentOther,
+          new_freight_usd: newFreight,
+          new_customs_usd: newCustoms,
+          new_other_usd: newOther,
+          delta_total_usd: deltaAddons,
+          payment_mode: Math.abs(deltaAddons) > 0.001 ? paymentMode : null,
+          journal_entry_id: journalEntryId,
+          notes: notes || null,
+        });
+      if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
+
       toast.success('Gastos del envío actualizados — costos aterrizados reprorrateados y asiento contable registrado');
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
@@ -210,6 +238,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
