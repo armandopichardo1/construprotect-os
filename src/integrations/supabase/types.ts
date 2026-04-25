@@ -874,6 +874,8 @@ export type Database = {
           exchange_rate: number | null
           id: string
           notes: string | null
+          reference_id: string | null
+          reference_type: string | null
           total_credit_usd: number
           total_debit_usd: number
         }
@@ -885,6 +887,8 @@ export type Database = {
           exchange_rate?: number | null
           id?: string
           notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
           total_credit_usd?: number
           total_debit_usd?: number
         }
@@ -896,6 +900,8 @@ export type Database = {
           exchange_rate?: number | null
           id?: string
           notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
           total_credit_usd?: number
           total_debit_usd?: number
         }

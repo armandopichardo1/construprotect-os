@@ -381,7 +381,9 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             total_debit_usd: Math.abs(deltaAddons),
             total_credit_usd: Math.abs(deltaAddons),
             notes: `Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (delta ${deltaAddons >= 0 ? '+' : ''}${deltaAddons.toFixed(2)})`,
-          })
+            reference_type: 'shipment_expense_edit',
+            reference_id: shipment.id,
+          } as any)
           .select('id')
           .single();
         if (jeErr) throw jeErr;
@@ -462,8 +464,23 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             <Truck className="w-4 h-4 text-primary" />
             Editar gastos del envío — {shipment.po_number || shipment.id?.slice(0, 8)}
           </DialogTitle>
-          <DialogDescription>
-            Agrega o modifica flete, aduana y otros gastos capitalizables. El sistema los prorratea por valor FOB y actualiza el costo unitario aterrizado de cada producto (NIC 2). El delta se registra en el libro diario.
+          <DialogDescription className="space-y-1.5">
+            <span className="block">
+              Agrega o modifica flete, aduana y otros gastos capitalizables. El sistema los prorratea por valor FOB y actualiza el costo unitario aterrizado de cada producto (NIC 2). El delta se registra en el libro diario.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false);
+                navigate(`/finanzas?tab=${encodeURIComponent('Libro Diario')}&q=${encodeURIComponent(shipment.id)}`);
+              }}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              title="Filtrar el Libro Diario por todos los asientos generados desde esta orden"
+            >
+              <BookOpen className="w-3 h-3" />
+              Ver asientos contables de esta orden en el Libro Diario
+              <ExternalLink className="w-3 h-3" />
+            </button>
           </DialogDescription>
         </DialogHeader>
 
