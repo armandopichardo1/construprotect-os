@@ -267,10 +267,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [purchaseSupplierName, setPurchaseSupplierName] = useState('');
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const [purchaseNotes, setPurchaseNotes] = useState('');
-  // Landed cost addons (always in USD internally; UI may render in currencyBase)
+  // Landed cost addons — stored as raw value in the chosen currency; converted to USD at calc time
   const [purchaseFreightUsd, setPurchaseFreightUsd] = useState<number>(0);
   const [purchaseCustomsUsd, setPurchaseCustomsUsd] = useState<number>(0);
   const [purchaseOtherUsd, setPurchaseOtherUsd] = useState<number>(0);
+  const [freightCurrency, setFreightCurrency] = useState<'USD' | 'DOP'>('USD');
+  const [customsCurrency, setCustomsCurrency] = useState<'USD' | 'DOP'>('USD');
+  const [otherCurrency, setOtherCurrency] = useState<'USD' | 'DOP'>('USD');
 
   // Credit note state
   const [cnSupplierId, setCnSupplierId] = useState('');
