@@ -1385,10 +1385,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                               const val = parseNum(raw);
                               if (it.discount_type === 'pct') {
                                 const pct = Math.min(100, Math.max(0, val));
-                                return { ...it, _discountDisplay: raw, discount_pct: pct };
+                                return { ...it, _discountDisplay: raw, discount_pct: pct, _discountTouched: true };
                               }
                               const usd = currencyBase === 'USD' ? val : val / xr;
-                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd };
+                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd, _discountTouched: true };
                             }));
                           }}
                           onBlur={() => {
