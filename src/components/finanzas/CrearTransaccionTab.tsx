@@ -713,7 +713,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         await supabase.from('journal_entry_lines').insert(linesData);
 
         toast.success('Asiento contable registrado');
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(entry.id);
 
         setHistory(prev => [{ type: 'journal', description: journalDescription, amount: formatUSD(journalTotalDebit), timestamp: new Date() }, ...prev].slice(0, 5));
         resetManualForm();
