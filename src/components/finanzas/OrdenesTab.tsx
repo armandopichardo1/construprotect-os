@@ -224,12 +224,16 @@ export function OrdenesTab() {
                   <TableHead className="text-xs text-right">Total</TableHead>
                   <TableHead className="text-xs text-center">Estado</TableHead>
                   <TableHead className="text-xs text-center">Pago</TableHead>
+                  <TableHead className="text-xs text-center">Acciones</TableHead>
                   <TableHead className="text-xs w-8"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {shipments.map((s: any) => {
                   const payStatus = s.payment_status || 'pending';
+                  const canEditExpenses = s.status !== 'received';
+                  const otherMatch = String(s.notes || '').match(/Otros \$([0-9.]+)/);
+                  const hasAddons = Number(s.shipping_cost_usd || 0) + Number(s.customs_cost_usd || 0) + (otherMatch ? Number(otherMatch[1]) : 0) > 0;
                   return (
                     <TableRow key={s.id} className="cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => openDetail(s, 'compras')}>
                       <TableCell className="text-xs font-mono font-medium">{s.po_number || s.id.slice(0, 8)}</TableCell>
@@ -247,12 +251,27 @@ export function OrdenesTab() {
                           {PAYMENT_LABELS[payStatus] || payStatus}
                         </span>
                       </TableCell>
+                      <TableCell className="text-xs text-center" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant={hasAddons ? 'outline' : 'default'}
+                          className="h-7 text-[10px] gap-1 px-2"
+                          disabled={!canEditExpenses}
+                          title={canEditExpenses
+                            ? (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')
+                            : 'Envío ya recibido — no se puede editar gastos'}
+                          onClick={() => setEditExpenses(s)}
+                        >
+                          <Truck className="w-3 h-3" />
+                          {hasAddons ? 'Editar gastos' : 'Agregar gastos'}
+                        </Button>
+                      </TableCell>
                       <TableCell><ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /></TableCell>
                     </TableRow>
                   );
                 })}
                 {shipments.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Sin órdenes de compra</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Sin órdenes de compra</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
