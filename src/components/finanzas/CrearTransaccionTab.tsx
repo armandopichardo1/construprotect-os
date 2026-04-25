@@ -1074,12 +1074,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         }
 
         const contactName = preview.data.contact_name || '';
-        await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
+        const saleEntry = await createAutoJournal(`Venta ${sale.id.slice(0, 8)} — ${contactName}`, saleLines, { exchangeRate: xr });
         toast.success('Venta registrada con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['sale-items'] });
         queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(saleEntry?.id);
       }
 
       setHistory(prev => [{
