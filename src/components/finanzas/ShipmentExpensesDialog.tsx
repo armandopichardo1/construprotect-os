@@ -333,11 +333,15 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         });
       if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
 
-      toast.success('Gastos del envío actualizados — costos aterrizados reprorrateados y asiento contable registrado');
+      const capMsg = capitalize && capitalizedProducts.length > 0
+        ? ` · ${capitalizedProducts.length} producto(s) capitalizados (WAC + márgenes actualizados)`
+        : '';
+      toast.success(`Gastos del envío actualizados${capMsg}`);
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
       queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
