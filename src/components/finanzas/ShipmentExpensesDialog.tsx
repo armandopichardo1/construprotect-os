@@ -121,15 +121,9 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       setCustoms(currentCustoms ? String(currentCustoms) : '');
       setOther(currentOther ? String(currentOther) : '');
       setNotes(shipment.notes || '');
-      // Precarga modo de pago desde el envío:
-      // si ya tiene payment_account_id definido → Banco con esa cuenta; si no → CxP
-      if (shipment.payment_account_id) {
-        setPaymentMode('bank');
-        setBankAccountId(shipment.payment_account_id);
-      } else {
-        setPaymentMode('cxp');
-        setBankAccountId('');
-      }
+      // Precarga AUTOMÁTICA según estado de pago del envío
+      setPaymentMode(autoPaymentMode);
+      setBankAccountId(autoBankAccountId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
