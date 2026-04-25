@@ -204,6 +204,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       });
       return;
     }
+    // Confirmación general de reproceso (siempre que cambie algún addon)
+    setReprocessConfirmOpen(true);
+  };
+
+  // Continúa el flujo después de la confirmación general de reproceso
+  const continueAfterReprocess = async () => {
+    setReprocessConfirmOpen(false);
     // Paso de confirmación extra cuando el delta es negativo (se generará una reversa contable)
     if (deltaAddons < -0.001) {
       setReversalConfirmOpen(true);
