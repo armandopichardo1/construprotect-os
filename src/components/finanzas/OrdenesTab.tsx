@@ -42,6 +42,7 @@ export function OrdenesTab() {
   const [editShipment, setEditShipment] = useState<any>(null);
   const [editSale, setEditSale] = useState<any>(null);
   const [editExpenses, setEditExpenses] = useState<any>(null);
+  const [historicalAdj, setHistoricalAdj] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
