@@ -231,7 +231,7 @@ export function OrdenesTab() {
               <TableBody>
                 {shipments.map((s: any) => {
                   const payStatus = s.payment_status || 'pending';
-                  const canEditExpenses = s.status !== 'received';
+                  const canEditExpenses = true; // siempre permitido — recibidos usan capitalización (WAC)
                   const otherMatch = String(s.notes || '').match(/Otros \$([0-9.]+)/);
                   const hasAddons = Number(s.shipping_cost_usd || 0) + Number(s.customs_cost_usd || 0) + (otherMatch ? Number(otherMatch[1]) : 0) > 0;
                   return (
