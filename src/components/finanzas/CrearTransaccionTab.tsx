@@ -196,7 +196,36 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
-  // AI state
+  const { data: discountRules = [] } = useQuery({
+    queryKey: ['discount-rules'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('discount_rules')
+        .select('id, contact_id, category, discount_pct, priority')
+        .eq('is_active', true);
+      return data || [];
+    },
+  });
+
+  // Find best matching rule. Priority: contact+category > contact-only > category-only.
+  // Within the same specificity, higher `priority` wins.
+  const findDiscountRule = (contactIdArg: string, category: string | null) => {
+    if (!discountRules.length) return null;
+    const buckets = [
+      // contact + category
+      discountRules.filter(r => r.contact_id === contactIdArg && r.category && category && r.category === category),
+      // contact only
+      discountRules.filter(r => r.contact_id === contactIdArg && !r.category),
+      // category only
+      discountRules.filter(r => !r.contact_id && r.category && category && r.category === category),
+    ];
+    for (const bucket of buckets) {
+      if (bucket.length) {
+        return [...bucket].sort((a, b) => (b.priority || 0) - (a.priority || 0))[0];
+      }
+    }
+    return null;
+  };
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
