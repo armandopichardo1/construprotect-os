@@ -481,7 +481,33 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               )}
             </div>
 
-            {/* Tratamiento contable AUTOMÁTICO */}
+            {/* Toggle: Capitalizar como costo aterrizado (NIC 2) */}
+            <div className={`rounded-lg border-2 p-3 transition-colors ${
+              capitalize ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    Capitalizar como costo aterrizado
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                    {capitalize
+                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo). {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
+                      : <>Solo se reprorratearán los <code>shipment_items</code>. <strong className="text-warning">No se actualizará</strong> el costo unitario en el catálogo de productos ni se recalcularán los márgenes — afecta reportería futura.</>
+                    }
+                  </p>
+                </div>
+                <Switch checked={capitalize} onCheckedChange={setCapitalize} />
+              </div>
+              {capitalize && shipment.status === 'received' && (
+                <div className="mt-2 pt-2 border-t border-border/40 flex items-start gap-1.5 text-[10px] text-warning">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>Este envío ya está recibido. Los productos vendidos previamente NO se ajustarán retroactivamente; el WAC se actualiza con el stock disponible actual.</span>
+                </div>
+              )}
+            </div>
+
             <div className={`rounded-lg border-2 p-3 space-y-3 transition-colors ${
               paymentMode === 'bank' && bankAccountId
                 ? 'border-success/40 bg-success/5'
