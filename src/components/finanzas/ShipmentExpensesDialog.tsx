@@ -265,6 +265,26 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           if (prodErr) throw prodErr;
 
           capitalizedProducts.push({ sku: prod.sku, oldCost: currentCost, newCost, newWAC: newCost });
+
+          // 2.6) AUDITORÍA: registrar un movimiento de inventario tipo 'adjustment'
+          // con quantity=0 para dejar rastro de la corrección de costo histórico.
+          // No altera stock (qty=0) pero queda visible en el historial de movimientos
+          // del producto y referenciado al envío que originó la corrección.
+          const deltaPerUnit = Number((newCost - currentCost).toFixed(4));
+          if (Math.abs(deltaPerUnit) > 0.0001) {
+            const { error: movErr } = await supabase
+              .from('inventory_movements')
+              .insert({
+                product_id: item.product_id,
+                quantity: 0,
+                movement_type: 'adjustment',
+                unit_cost_usd: Number(newCost.toFixed(4)),
+                reference_id: shipment.id,
+                reference_type: 'shipment_expense_correction',
+                notes: `Corrección de costo aterrizado — Envío ${shipment.po_number || shipment.id?.slice(0, 8)}: costo ${currentCost.toFixed(4)} → ${newCost.toFixed(4)} (Δ ${deltaPerUnit >= 0 ? '+' : ''}${deltaPerUnit.toFixed(4)} USD/u). ${shipment.status === 'received' ? 'WAC ajustado sobre stock disponible.' : 'Costo fijado para futura recepción.'}`,
+              });
+            if (movErr) console.warn('No se pudo registrar movimiento de ajuste:', movErr.message);
+          }
         }
       }
 
@@ -345,6 +365,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
       queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
       onSaved?.();
       onOpenChange(false);
@@ -496,7 +517,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
                     {capitalize
-                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo). {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
+                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo), y se dejará un <strong>movimiento de inventario tipo "ajuste"</strong> (qty=0) por SKU para preservar el historial sin alterar el stock. {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
                       : <>Solo se reprorratearán los <code>shipment_items</code>. <strong className="text-warning">No se actualizará</strong> el costo unitario en el catálogo de productos ni se recalcularán los márgenes — afecta reportería futura.</>
                     }
                   </p>
