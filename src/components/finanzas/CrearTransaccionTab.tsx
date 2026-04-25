@@ -319,7 +319,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
 
   // Purchase computed
-  const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
+  const purchaseFob = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
+  const purchaseAddons = Math.max(0, purchaseFreightUsd) + Math.max(0, purchaseCustomsUsd) + Math.max(0, purchaseOtherUsd);
+  const purchaseTotal = purchaseFob + purchaseAddons; // landed cost — debited to Inventario / credited to CxP
 
   const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const removePurchaseItem = (i: number) => setPurchaseItems(prev => prev.filter((_, idx) => idx !== i));
