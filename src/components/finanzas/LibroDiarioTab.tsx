@@ -265,6 +265,32 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
             <SelectItem value="credit_note" className="text-xs">📝 NC</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+          <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos los meses</SelectItem>
+            {[
+              ['01', 'Enero'], ['02', 'Febrero'], ['03', 'Marzo'], ['04', 'Abril'],
+              ['05', 'Mayo'], ['06', 'Junio'], ['07', 'Julio'], ['08', 'Agosto'],
+              ['09', 'Septiembre'], ['10', 'Octubre'], ['11', 'Noviembre'], ['12', 'Diciembre'],
+            ].map(([v, l]) => (
+              <SelectItem key={v} value={v} className="text-xs">{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+          <SelectTrigger className="h-8 text-xs w-auto min-w-[90px]">
+            <SelectValue placeholder="Año" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos los años</SelectItem>
+            {availableYears.map(y => (
+              <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
         <Button size="sm" variant="outline" onClick={handleExport} className="ml-auto">
           <Download className="w-3.5 h-3.5 mr-1" /> Excel
