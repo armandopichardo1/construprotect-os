@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download, Truck, Layers, Anchor } from 'lucide-react';
+import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download, Truck, Layers, Anchor, History } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
 import { ShipmentExpensesDialog } from '@/components/finanzas/ShipmentExpensesDialog';
+import { ShipmentHistoricalAdjustmentDialog } from '@/components/finanzas/ShipmentHistoricalAdjustmentDialog';
 import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { exportToExcel } from '@/lib/export-utils';
 import { toast } from 'sonner';
@@ -41,6 +42,7 @@ export function OrdenesTab() {
   const [editShipment, setEditShipment] = useState<any>(null);
   const [editSale, setEditSale] = useState<any>(null);
   const [editExpenses, setEditExpenses] = useState<any>(null);
+  const [historicalAdj, setHistoricalAdj] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
@@ -321,19 +323,31 @@ export function OrdenesTab() {
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-center" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant={hasAddons ? 'outline' : 'default'}
-                          className="h-7 text-[10px] gap-1 px-2"
-                          disabled={!canEditExpenses}
-                          title={s.status === 'received'
-                            ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
-                            : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
-                          onClick={() => setEditExpenses(s)}
-                        >
-                          <Truck className="w-3 h-3" />
-                          {hasAddons ? 'Editar gastos' : 'Agregar gastos'}
-                        </Button>
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={hasAddons ? 'outline' : 'default'}
+                            className="h-7 text-[10px] gap-1 px-2"
+                            disabled={!canEditExpenses}
+                            title={s.status === 'received'
+                              ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
+                              : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
+                            onClick={() => setEditExpenses(s)}
+                          >
+                            <Truck className="w-3 h-3" />
+                            {hasAddons ? 'Editar gastos' : 'Agregar gastos'}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={!canEditExpenses}
+                            title="Ajuste de costo histórico (fecha efectiva pasada, sin reprorrateo)"
+                            onClick={() => setHistoricalAdj(s)}
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell><ChevronRight className="w-3.5 h-3.5 text-muted-foreground" /></TableCell>
                     </TableRow>
@@ -903,6 +917,21 @@ export function OrdenesTab() {
               if (editExpenses && editExpenses.id === targetId) setEditExpenses(data);
             }
           }
+        }}
+      />
+
+      {/* Historical cost adjustment (effective date in the past) */}
+      <ShipmentHistoricalAdjustmentDialog
+        open={!!historicalAdj}
+        onOpenChange={v => { if (!v) setHistoricalAdj(null); }}
+        shipment={historicalAdj}
+        onSaved={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['shipments'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' }),
+          ]);
         }}
       />
 
