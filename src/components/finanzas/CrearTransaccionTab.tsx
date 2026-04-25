@@ -106,6 +106,8 @@ interface SaleItem {
   quantity: number;
   unit_price_usd: number;
   discount_pct: number;
+  discount_amount_usd: number; // absolute discount per line in USD
+  discount_type: 'pct' | 'amount';
   _priceDisplay?: string; // raw string for decimal input
   _discountDisplay?: string;
 }
