@@ -78,8 +78,19 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   );
 
   // Helpers to find canonical accounts by code-prefix
-  const inventoryAcct = useMemo(() => accounts.find((a: any) => a.code === '13000') || accounts.find((a: any) => a.classification === 'Inventarios'), [accounts]);
+  // Inventario en Tránsito (13200) si el envío NO ha sido recibido — NIC 2
+  // Inventarios (13000) si ya fue recibido (corrección post-recepción)
+  const isReceived_ = shipment?.status === 'received';
+  const inventoryInTransitAcct = useMemo(() => accounts.find((a: any) => a.code === '13200') || accounts.find((a: any) => a.classification === 'Compras en Tránsito'), [accounts]);
+  const inventoryFinalAcct = useMemo(() => accounts.find((a: any) => a.code === '13000') || accounts.find((a: any) => a.classification === 'Inventarios'), [accounts]);
+  const inventoryAcct = isReceived_ ? inventoryFinalAcct : (inventoryInTransitAcct || inventoryFinalAcct);
   const cxpAcct = useMemo(() => accounts.find((a: any) => a.code === '20150') || accounts.find((a: any) => a.code === '20100') || accounts.find((a: any) => a.classification?.includes('Cuentas por Pagar')), [accounts]);
+
+  // Modo de pago AUTOMÁTICO según estado de pago del envío:
+  // - paid + payment_account_id → Banco (con esa cuenta)
+  // - pending / partial → CxP
+  const autoPaymentMode: 'bank' | 'cxp' = (shipment?.payment_status === 'paid' && shipment?.payment_account_id) ? 'bank' : 'cxp';
+  const autoBankAccountId: string = shipment?.payment_account_id || '';
 
   const items: any[] = shipment?.shipment_items || [];
 
@@ -110,15 +121,9 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       setCustoms(currentCustoms ? String(currentCustoms) : '');
       setOther(currentOther ? String(currentOther) : '');
       setNotes(shipment.notes || '');
-      // Precarga modo de pago desde el envío:
-      // si ya tiene payment_account_id definido → Banco con esa cuenta; si no → CxP
-      if (shipment.payment_account_id) {
-        setPaymentMode('bank');
-        setBankAccountId(shipment.payment_account_id);
-      } else {
-        setPaymentMode('cxp');
-        setBankAccountId('');
-      }
+      // Precarga AUTOMÁTICA según estado de pago del envío
+      setPaymentMode(autoPaymentMode);
+      setBankAccountId(autoBankAccountId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
@@ -397,7 +402,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               )}
             </div>
 
-            {/* Selector de cuenta de pago — SIEMPRE visible */}
+            {/* Tratamiento contable AUTOMÁTICO */}
             <div className={`rounded-lg border-2 p-3 space-y-3 transition-colors ${
               paymentMode === 'bank' && bankAccountId
                 ? 'border-success/40 bg-success/5'
@@ -405,21 +410,39 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                 ? 'border-primary/30 bg-primary/5'
                 : 'border-warning/40 bg-warning/5'
             }`}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 text-xs font-medium">
                   <BookOpen className="w-3.5 h-3.5 text-primary" />
-                  Cuenta de pago del envío
+                  Tratamiento contable (automático)
                 </div>
-                {shipment.payment_account_id ? (
-                  <Badge variant="outline" className="text-[10px] gap-1 border-success/40 text-success">
-                    <CheckCircle2 className="w-3 h-3" /> Cuenta de pago ya definida en el envío
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    Estado envío: <strong>{shipment.status}</strong>
                   </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-[10px] gap-1 border-warning/40 text-warning">
-                    <AlertTriangle className="w-3 h-3" /> Sin cuenta de pago previa
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    Pago: <strong>{shipment.payment_status || 'pending'}</strong>
                   </Badge>
-                )}
+                  {paymentMode === autoPaymentMode && bankAccountId === autoBankAccountId ? (
+                    <Badge variant="outline" className="text-[10px] gap-1 border-success/40 text-success">
+                      <CheckCircle2 className="w-3 h-3" /> Auto
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] gap-1 border-warning/40 text-warning">
+                      Manual
+                    </Badge>
+                  )}
+                </div>
               </div>
+
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Cuenta de inventario: <strong className="text-foreground">{inventoryAcct?.code} {inventoryAcct?.description}</strong> — se usa{' '}
+                {isReceived_
+                  ? <><strong>13000 Inventarios</strong> porque el envío ya fue recibido.</>
+                  : <><strong>13200 Compras en Tránsito</strong> porque el envío aún no se ha recibido (NIC 2).</>
+                }
+                <br />
+                Contrapartida: <strong className="text-foreground">{paymentMode === 'cxp' ? 'CxP Proveedores' : 'Banco / Caja'}</strong> — determinada por el estado de pago del envío.
+              </p>
 
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -436,7 +459,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                     <span className="text-xs font-semibold">CxP — A Crédito</span>
                   </div>
                   <p className="text-[10px] text-muted-foreground leading-tight">
-                    No se ha pagado aún. Genera deuda en {cxpAcct?.code || '20150'} Cuentas por Pagar.
+                    Genera deuda en {cxpAcct?.code || '20150'} Cuentas por Pagar.
                   </p>
                 </button>
 
@@ -478,29 +501,36 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                 </div>
               )}
 
-              {/* Vista previa del asiento contable */}
+              {/* Vista previa del asiento contable con LINKS al Libro Diario */}
               {Math.abs(deltaAddons) > 0.001 ? (
-                <div className="text-[10px] text-muted-foreground space-y-0.5 pt-2 border-t border-border/40">
+                <div className="text-[10px] space-y-0.5 pt-2 border-t border-border/40">
                   <div className="font-medium text-foreground mb-1">Asiento a generar (delta {fmt(Math.abs(deltaAddons))}):</div>
-                  {deltaAddons > 0 ? (
-                    <>
-                      <div>DR <span className="font-mono">{inventoryAcct?.code} {inventoryAcct?.description}</span> — {fmt(deltaAddons)}</div>
-                      <div>CR <span className="font-mono">
-                        {paymentMode === 'cxp'
-                          ? `${cxpAcct?.code} ${cxpAcct?.description}`
-                          : (bankAccounts.find((a: any) => a.id === bankAccountId)?.description || 'Selecciona cuenta...')}
-                      </span> — {fmt(deltaAddons)}</div>
-                    </>
-                  ) : (
-                    <>
-                      <div>DR <span className="font-mono">{paymentMode === 'cxp' ? `${cxpAcct?.code} ${cxpAcct?.description}` : (bankAccounts.find((a: any) => a.id === bankAccountId)?.description || '...')}</span> — {fmt(Math.abs(deltaAddons))} <span className="italic">(reversa)</span></div>
-                      <div>CR <span className="font-mono">{inventoryAcct?.code} {inventoryAcct?.description}</span> — {fmt(Math.abs(deltaAddons))}</div>
-                    </>
-                  )}
+                  {(() => {
+                    const credCode = paymentMode === 'cxp' ? cxpAcct?.code : bankAccounts.find((a: any) => a.id === bankAccountId)?.code;
+                    const credDesc = paymentMode === 'cxp' ? cxpAcct?.description : bankAccounts.find((a: any) => a.id === bankAccountId)?.description;
+                    const debitAcct = deltaAddons > 0 ? inventoryAcct : { code: credCode, description: credDesc };
+                    const creditAcct = deltaAddons > 0 ? { code: credCode, description: credDesc } : inventoryAcct;
+                    const linkClass = "font-mono underline decoration-dotted underline-offset-2 hover:text-primary cursor-pointer";
+                    const openLD = (code?: string) => {
+                      if (!code) return;
+                      window.open(`/finanzas?tab=Libro%20Diario&q=${encodeURIComponent(code)}`, '_blank');
+                    };
+                    return (
+                      <>
+                        <div className="text-muted-foreground">
+                          DR <a className={linkClass} onClick={() => openLD(debitAcct.code)} title="Ver en Libro Diario">{debitAcct.code} {debitAcct.description}</a> — {fmt(Math.abs(deltaAddons))}
+                          {deltaAddons < 0 && <span className="italic ml-1">(reversa)</span>}
+                        </div>
+                        <div className="text-muted-foreground">
+                          CR <a className={linkClass} onClick={() => openLD(creditAcct.code)} title="Ver en Libro Diario">{creditAcct.code || '—'} {creditAcct.description || 'Selecciona cuenta...'}</a> — {fmt(Math.abs(deltaAddons))}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ) : (
                 <p className="text-[10px] text-muted-foreground pt-2 border-t border-border/40 italic">
-                  Sin cambios en montos: no se generará asiento contable. La cuenta seleccionada se usará si editas los gastos.
+                  Sin cambios en montos: no se generará asiento contable.
                 </p>
               )}
             </div>
