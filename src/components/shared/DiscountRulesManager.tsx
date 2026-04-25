@@ -436,6 +436,31 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
         </div>
       )}
 
+      {liveCrossOverlaps.length > 0 && (
+        <div className={cn(
+          'rounded-lg border p-2.5 text-[11px] flex items-start gap-2',
+          crossSamePriority ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-warning/40 bg-warning/10 text-warning'
+        )}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="block">
+              {crossSamePriority
+                ? `Solape cruzado con MISMA prioridad: ${liveCrossOverlaps.length} regla(s) de alcance distinto.`
+                : `Solape cruzado: ${liveCrossOverlaps.length} regla(s) activa(s) cubren un alcance que se solapa con éste.`}
+            </strong>
+            <ul className="text-muted-foreground space-y-0.5 pl-3 list-disc">
+              {liveCrossOverlaps.slice(0, 4).map((o: any) => {
+                const scope = o.contact_id && o.category ? 'Cliente+Categoría' : o.contact_id ? 'Cliente' : 'Categoría';
+                const cmp = Number(o.priority || 0) > formPriority ? 'gana esta existente' : Number(o.priority || 0) < formPriority ? 'gana la nueva' : 'empate (impredecible)';
+                return <li key={o.id}>{scope} · prioridad {o.priority || 0} · {cmp}</li>;
+              })}
+              {liveCrossOverlaps.length > 4 && <li>… y {liveCrossOverlaps.length - 4} más</li>}
+            </ul>
+            <span className="block text-muted-foreground">Ajusta prioridad o restringe el alcance para evitar resultados ambiguos.</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-2">
         <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
