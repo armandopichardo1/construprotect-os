@@ -822,6 +822,111 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               </div>
             )}
 
+            {/* Vista previa: cambio estimado de costo por producto y delta de inventario */}
+            {items.length > 0 && (
+              <div>
+                <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+                  <TrendingUp className="w-3 h-3" /> Vista previa de impacto por producto
+                </Label>
+                <div className="rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto">
+                  <table className="w-full text-[11px]">
+                    <thead className="bg-muted/40 sticky top-0">
+                      <tr>
+                        <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Producto</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Qty</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Costo actual</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Nuevo costo</th>
+                        <th className="text-right px-2 py-1.5 font-medium text-primary">Δ U/u</th>
+                        {capitalize && isReceived && (
+                          <>
+                            <th className="text-right px-2 py-1.5 font-medium text-muted-foreground" title="Stock actual del producto">Stock</th>
+                            <th className="text-right px-2 py-1.5 font-medium text-warning" title="Cambio estimado en valor de inventario por la corrección WAC sobre stock disponible">Δ Inv. USD</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.map((p: any) => {
+                        const item = items.find((i: any) => i.id === p.id);
+                        const pid = item?.product_id;
+                        const stockInfo = pid ? (productStock as any)[pid] : null;
+                        const onHand = Number(stockInfo?.onHand || 0);
+                        const currentLineCost = Number(item?.unit_cost_usd || 0);
+                        const deltaPerUnit = p.newUnitCost - currentLineCost;
+                        const incomingQty = Number(item?.quantity_received || item?.quantity_ordered || 0);
+                        // Estimación del impacto en valor de inventario al capitalizar:
+                        // mismo modelo que performSave (WAC sobre stock con ajuste por la
+                        // qty del envío que ya está dentro del stock).
+                        const invDeltaValue = onHand > 0 && incomingQty > 0
+                          ? deltaPerUnit * Math.min(onHand, incomingQty)
+                          : 0;
+                        return (
+                          <tr key={p.id} className="border-t border-border/40">
+                            <td className="px-2 py-1.5">
+                              <div className="font-medium text-foreground">{p.productName}</div>
+                              {p.sku && <div className="text-[10px] text-muted-foreground font-mono">{p.sku}</div>}
+                            </td>
+                            <td className="text-right px-2 py-1.5 font-mono">{p.qty}</td>
+                            <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">{fmt(currentLineCost)}</td>
+                            <td className="text-right px-2 py-1.5 font-mono">{fmt(p.newUnitCost)}</td>
+                            <td className={`text-right px-2 py-1.5 font-mono font-semibold ${Math.abs(deltaPerUnit) < 0.0001 ? 'text-muted-foreground' : deltaPerUnit > 0 ? 'text-warning' : 'text-success'}`}>
+                              {Math.abs(deltaPerUnit) < 0.0001 ? '—' : `${deltaPerUnit > 0 ? '+' : ''}${fmt(deltaPerUnit)}`}
+                            </td>
+                            {capitalize && isReceived && (
+                              <>
+                                <td className="text-right px-2 py-1.5 font-mono">{onHand}</td>
+                                <td className={`text-right px-2 py-1.5 font-mono font-semibold ${Math.abs(invDeltaValue) < 0.01 ? 'text-muted-foreground' : invDeltaValue > 0 ? 'text-warning' : 'text-success'}`}>
+                                  {Math.abs(invDeltaValue) < 0.01 ? '—' : `${invDeltaValue > 0 ? '+' : ''}${fmt(invDeltaValue)}`}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-muted/30 sticky bottom-0">
+                      <tr className="border-t border-border">
+                        <td className="px-2 py-1.5 text-[10px] text-muted-foreground" colSpan={3}>
+                          FOB total: {fmt(totalFob)} · Addons: {fmt(currentAddons)} → {fmt(newAddons)}
+                        </td>
+                        <td className="text-right px-2 py-1.5 font-mono text-foreground">{fmt(newLanded)}</td>
+                        <td className={`text-right px-2 py-1.5 font-mono font-semibold ${Math.abs(deltaAddons) < 0.001 ? 'text-muted-foreground' : deltaAddons > 0 ? 'text-warning' : 'text-success'}`}>
+                          {Math.abs(deltaAddons) < 0.001 ? '—' : `${deltaAddons > 0 ? '+' : ''}${fmt(deltaAddons)}`}
+                        </td>
+                        {capitalize && isReceived && (
+                          <>
+                            <td></td>
+                            <td className="text-right px-2 py-1.5 font-mono font-semibold text-foreground">
+                              {(() => {
+                                const totalInv = preview.reduce((s: number, p: any) => {
+                                  const item = items.find((i: any) => i.id === p.id);
+                                  const pid = item?.product_id;
+                                  const stockInfo = pid ? (productStock as any)[pid] : null;
+                                  const onHand = Number(stockInfo?.onHand || 0);
+                                  const currentLineCost = Number(item?.unit_cost_usd || 0);
+                                  const deltaPerUnit = p.newUnitCost - currentLineCost;
+                                  const incomingQty = Number(item?.quantity_received || item?.quantity_ordered || 0);
+                                  return s + (onHand > 0 && incomingQty > 0 ? deltaPerUnit * Math.min(onHand, incomingQty) : 0);
+                                }, 0);
+                                return Math.abs(totalInv) < 0.01 ? '—' : `${totalInv > 0 ? '+' : ''}${fmt(totalInv)}`;
+                              })()}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {capitalize
+                    ? (isReceived
+                      ? 'Δ Inv. USD estima el ajuste de valor sobre stock disponible al recalcular WAC. Si stock=0 o el envío no se ha recibido en cantidad, no hay impacto en inventario.'
+                      : 'El nuevo costo se fijará en cada línea del envío para que al recibir el WAC use el valor correcto. Sin impacto en inventario actual.')
+                    : 'Capitalización desactivada: solo se actualizan los costos de las líneas del envío. WAC y márgenes no se tocarán.'}
+                </p>
+              </div>
+            )}
+
             <div>
               <Label className="text-xs">Notas (opcional)</Label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)}
