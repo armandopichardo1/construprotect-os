@@ -920,6 +920,21 @@ export function OrdenesTab() {
         }}
       />
 
+      {/* Historical cost adjustment (effective date in the past) */}
+      <ShipmentHistoricalAdjustmentDialog
+        open={!!historicalAdj}
+        onOpenChange={v => { if (!v) setHistoricalAdj(null); }}
+        shipment={historicalAdj}
+        onSaved={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['shipments'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' }),
+          ]);
+        }}
+      />
+
       {/* Edit Sale Dialog */}
       <SaleEditDialog
         open={!!editSale}
