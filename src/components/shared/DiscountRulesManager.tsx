@@ -216,8 +216,17 @@ export function DiscountRulesManager() {
           </TableHeader>
           <TableBody>
             {filtered.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs font-medium">{r.name || <span className="text-muted-foreground italic">Sin nombre</span>}</TableCell>
+              <TableRow key={r.id} className={cn(conflictIds.has(r.id) && 'bg-warning/5')}>
+                <TableCell className="text-xs font-medium">
+                  <div className="flex items-center gap-1.5">
+                    {r.name || <span className="text-muted-foreground italic">Sin nombre</span>}
+                    {conflictIds.has(r.id) && (
+                      <span title="Conflicto: hay otra regla activa con el mismo cliente/categoría" className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30">
+                        <AlertTriangle className="w-2.5 h-2.5" />Conflicto
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.contact_name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.category || 'Todas'}</TableCell>
                 <TableCell className="text-xs"><span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{ruleScope(r)}</span></TableCell>
