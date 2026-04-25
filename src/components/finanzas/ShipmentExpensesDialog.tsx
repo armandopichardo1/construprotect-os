@@ -333,11 +333,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     setSaving(true);
     try {
       const userNotes = String(notes || '')
-        .replace(/Costo aterrizado prorrateado por valor FOB[^·\n]*?(\.|·|$)/g, '')
+        .replace(/Costo aterrizado prorrateado por (valor FOB|unidades|peso|volumen)[^·\n]*?(\.|·|$)/g, '')
         .replace(/[·\s]+$/g, '')
         .trim();
+      const methodLabel = prorationMethod === 'units' ? 'unidades' : prorationMethod === 'weight' ? 'peso' : prorationMethod === 'volume' ? 'volumen' : 'valor FOB';
+      const effectiveMethodLabel = prorationFallbackToFob ? 'valor FOB (fallback)' : methodLabel;
       const landedAnnotation = newAddons > 0
-        ? `Costo aterrizado prorrateado por valor FOB — Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (Total addons $${newAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
+        ? `Costo aterrizado prorrateado por ${effectiveMethodLabel} — Flete $${newFreight.toFixed(2)} · Aduana $${newCustoms.toFixed(2)} · Otros $${newOther.toFixed(2)} (Total addons $${newAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
         : null;
       const finalNotes = [userNotes || null, landedAnnotation].filter(Boolean).join(' · ') || null;
 
