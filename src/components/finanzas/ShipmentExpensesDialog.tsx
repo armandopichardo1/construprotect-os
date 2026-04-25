@@ -196,6 +196,24 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const performSave = async () => {
     if (!shipment) return;
 
+    // Verificación de consistencia: el total prorrateado en shipment_items debe cuadrar
+    // con los addons (Flete + Aduana + Otros) y el delta contable que se asentará.
+    // Si hay discrepancia (>$0.05) abortamos antes de escribir para no dejar inventario
+    // y diario desalineados.
+    const sumAddonLines = preview.reduce((s, p) => s + p.lineAddon, 0);
+    const sumLandedLines = preview.reduce((s, p) => s + p.newLineLanded, 0);
+    const expectedLanded = totalFob + newAddons;
+    const addonDiff = Math.abs(sumAddonLines - newAddons);
+    const landedDiff = Math.abs(sumLandedLines - expectedLanded);
+    const deltaProratedDiff = Math.abs((sumAddonLines - currentAddons) - deltaAddons);
+    const TOL = 0.05;
+    if (addonDiff > TOL || landedDiff > TOL || deltaProratedDiff > TOL) {
+      toast.error('Discrepancia en el prorrateo del costo aterrizado', {
+        description: `Addons líneas: ${fmt(sumAddonLines)} vs total ${fmt(newAddons)} (Δ ${fmt(addonDiff)}). Aterrizado líneas: ${fmt(sumLandedLines)} vs esperado ${fmt(expectedLanded)} (Δ ${fmt(landedDiff)}). Delta contable vs prorrateado: ${fmt(deltaProratedDiff)}. No se guardó nada.`,
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const userNotes = String(notes || '')
