@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
+import { ShipmentExpensesDialog } from '@/components/finanzas/ShipmentExpensesDialog';
 import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { exportToExcel } from '@/lib/export-utils';
 import { toast } from 'sonner';
