@@ -637,9 +637,12 @@ export type Database = {
           contact_id: string | null
           created_at: string
           created_by: string | null
+          discount_amount_usd: number
           discount_pct: number
+          discount_type: string
           id: string
           is_active: boolean
+          name: string | null
           notes: string | null
           priority: number
           updated_at: string
@@ -649,9 +652,12 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount_usd?: number
           discount_pct?: number
+          discount_type?: string
           id?: string
           is_active?: boolean
+          name?: string | null
           notes?: string | null
           priority?: number
           updated_at?: string
@@ -661,9 +667,12 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount_amount_usd?: number
           discount_pct?: number
+          discount_type?: string
           id?: string
           is_active?: boolean
+          name?: string | null
           notes?: string | null
           priority?: number
           updated_at?: string

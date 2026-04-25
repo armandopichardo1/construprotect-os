@@ -201,7 +201,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     queryFn: async () => {
       const { data } = await supabase
         .from('discount_rules')
-        .select('id, contact_id, category, discount_pct, priority')
+        .select('id, contact_id, category, discount_pct, discount_type, discount_amount_usd, priority')
         .eq('is_active', true);
       return data || [];
     },
@@ -369,12 +369,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         return { ...item, unit_price_usd: newPrice };
       }
       const rule = findDiscountRule(id, prod?.category || null);
+      const ruleType = (rule as any)?.discount_type === 'amount' ? 'amount' : 'pct';
       return {
         ...item,
         unit_price_usd: newPrice,
-        discount_type: 'pct',
-        discount_pct: rule ? Number(rule.discount_pct) : 0,
-        discount_amount_usd: 0,
+        discount_type: ruleType,
+        discount_pct: rule && ruleType === 'pct' ? Number(rule.discount_pct) : 0,
+        discount_amount_usd: rule && ruleType === 'amount' ? Number((rule as any).discount_amount_usd) : 0,
         _discountDisplay: undefined,
       };
     }));
@@ -401,9 +402,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           // Auto-apply discount rule unless manually overridden
           if (!updated._discountTouched) {
             const rule = findDiscountRule(contactId, prod?.category || null);
-            updated.discount_type = 'pct';
-            updated.discount_pct = rule ? Number(rule.discount_pct) : 0;
-            updated.discount_amount_usd = 0;
+            const ruleType = (rule as any)?.discount_type === 'amount' ? 'amount' : 'pct';
+            updated.discount_type = ruleType;
+            updated.discount_pct = rule && ruleType === 'pct' ? Number(rule.discount_pct) : 0;
+            updated.discount_amount_usd = rule && ruleType === 'amount' ? Number((rule as any).discount_amount_usd) : 0;
             updated._discountDisplay = undefined;
           }
         }
