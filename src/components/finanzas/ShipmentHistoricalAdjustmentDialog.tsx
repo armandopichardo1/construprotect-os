@@ -295,7 +295,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
               unit_cost_usd: Number(newCost.toFixed(4)),
               reference_id: je.id,
               reference_type: 'shipment_expense_historical_adjustment',
-              notes: `Versión WAC por ajuste histórico — Envío ${poRef} · ${categoryLabel} +${fmt(amountUsd)} (fecha efectiva ${dateStr}) · WAC ${currentCost.toFixed(4)} → ${newCost.toFixed(4)} (Δ ${deltaPerUnit >= 0 ? '+' : ''}${deltaPerUnit.toFixed(4)} USD/u). Movimientos previos no alterados.`,
+              notes: `Ajuste histórico de costo · Asiento ${String(je.id).slice(0, 8)} · Envío ${poRef} · ${categoryLabel} +${fmt(amountUsd)} (fecha efectiva ${dateStr}) · WAC ${currentCost.toFixed(4)} → ${newCost.toFixed(4)} (Δ ${deltaPerUnit >= 0 ? '+' : ''}${deltaPerUnit.toFixed(4)} USD/u). Movimientos previos no alterados.`,
             });
           }
 
