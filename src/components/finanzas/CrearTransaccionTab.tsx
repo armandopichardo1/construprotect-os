@@ -369,12 +369,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         return { ...item, unit_price_usd: newPrice };
       }
       const rule = findDiscountRule(id, prod?.category || null);
+      const ruleType = (rule as any)?.discount_type === 'amount' ? 'amount' : 'pct';
       return {
         ...item,
         unit_price_usd: newPrice,
-        discount_type: 'pct',
-        discount_pct: rule ? Number(rule.discount_pct) : 0,
-        discount_amount_usd: 0,
+        discount_type: ruleType,
+        discount_pct: rule && ruleType === 'pct' ? Number(rule.discount_pct) : 0,
+        discount_amount_usd: rule && ruleType === 'amount' ? Number((rule as any).discount_amount_usd) : 0,
         _discountDisplay: undefined,
       };
     }));
