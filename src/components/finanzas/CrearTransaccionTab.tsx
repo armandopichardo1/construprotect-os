@@ -267,6 +267,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [purchaseSupplierName, setPurchaseSupplierName] = useState('');
   const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const [purchaseNotes, setPurchaseNotes] = useState('');
+  // Landed cost addons (always in USD internally; UI may render in currencyBase)
+  const [purchaseFreightUsd, setPurchaseFreightUsd] = useState<number>(0);
+  const [purchaseCustomsUsd, setPurchaseCustomsUsd] = useState<number>(0);
+  const [purchaseOtherUsd, setPurchaseOtherUsd] = useState<number>(0);
 
   // Credit note state
   const [cnSupplierId, setCnSupplierId] = useState('');
@@ -315,7 +319,9 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const journalIsBalanced = Math.abs(journalTotalDebitRaw - journalTotalCreditRaw) < 0.01;
 
   // Purchase computed
-  const purchaseTotal = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
+  const purchaseFob = purchaseItems.reduce((s, i) => s + i.unit_cost_usd * i.quantity, 0);
+  const purchaseAddons = Math.max(0, purchaseFreightUsd) + Math.max(0, purchaseCustomsUsd) + Math.max(0, purchaseOtherUsd);
+  const purchaseTotal = purchaseFob + purchaseAddons; // landed cost — debited to Inventario / credited to CxP
 
   const addPurchaseItem = () => setPurchaseItems(prev => [...prev, { product_id: '', quantity: 0, unit_cost_usd: 0 }]);
   const removePurchaseItem = (i: number) => setPurchaseItems(prev => prev.filter((_, idx) => idx !== i));
@@ -586,6 +592,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPurchaseSupplierId(''); setPurchaseSupplierName('');
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
+    setPurchaseFreightUsd(0); setPurchaseCustomsUsd(0); setPurchaseOtherUsd(0);
     setCnSupplierId(''); setCnSupplierName('');
     setCnAmount(''); setCnReason(''); setCnNotes(''); setCnShipmentId('');
     setJournalLines([
@@ -696,26 +703,44 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       setManualSaving(true);
       try {
         const desc = `Compra inventario — ${purchaseSupplierName || 'Proveedor'} — ${formatUSD(purchaseTotal)}`;
-        
         const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
+
+        const freight = Math.max(0, purchaseFreightUsd);
+        const customs = Math.max(0, purchaseCustomsUsd);
+        const other = Math.max(0, purchaseOtherUsd);
+        const addons = freight + customs + other;
+        const fobBase = purchaseFob;
+
+        const landedNotes = addons > 0
+          ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)} · Aduana $${customs.toFixed(2)} · Otros $${other.toFixed(2)} (Total addons $${addons.toFixed(2)} sobre FOB $${fobBase.toFixed(2)})`
+          : null;
+        const finalNotes = [purchaseNotes || null, landedNotes].filter(Boolean).join(' · ') || null;
+
         const { data: shipment, error: shipErr } = await supabase.from('shipments').insert({
           supplier_id: purchaseSupplierId || null,
           supplier_name: purchaseSupplierName || 'Proveedor',
           po_number: `PO-${Date.now().toString(36).toUpperCase()}`,
           order_date: dateStr,
-          total_cost_usd: purchaseTotal,
+          total_cost_usd: fobBase, // FOB cost — shipping/customs stored separately for breakdown
+          shipping_cost_usd: freight,
+          customs_cost_usd: customs,
           status: 'ordered' as any,
-          notes: purchaseNotes || null,
+          notes: finalNotes,
         }).select().single();
         if (shipErr || !shipment) throw shipErr || new Error('Error creando envío');
 
-        const itemsData = purchaseItems.map(i => ({
-          shipment_id: shipment.id,
-          product_id: i.product_id,
-          quantity_ordered: i.quantity,
-          quantity_received: 0,
-          unit_cost_usd: i.unit_cost_usd,
-        }));
+        const itemsData = purchaseItems.map(i => {
+          const lineFob = i.unit_cost_usd * i.quantity;
+          const lineAddon = fobBase > 0 ? (lineFob / fobBase) * addons : 0;
+          const landedUnitCost = i.quantity > 0 ? i.unit_cost_usd + (lineAddon / i.quantity) : i.unit_cost_usd;
+          return {
+            shipment_id: shipment.id,
+            product_id: i.product_id,
+            quantity_ordered: i.quantity,
+            quantity_received: 0,
+            unit_cost_usd: Number(landedUnitCost.toFixed(4)),
+          };
+        });
         await supabase.from('shipment_items').insert(itemsData);
 
         await createJournalFromPreview(desc, purchaseNotes || null);
@@ -1616,9 +1641,56 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                   </Button>
                 </div>
 
-                <div className="rounded-xl bg-muted/50 p-4">
-                  <div className="flex justify-between text-sm font-bold">
-                    <span>Total Compra</span>
+                <div className="space-y-2">
+                  <Label className="text-xs">Gastos adicionales (capitalizables al inventario) <span className="text-[10px] text-muted-foreground font-normal">— USD</span></Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Flete</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
+                        <Input type="number" min={0} step={0.01} value={purchaseFreightUsd || ''}
+                          onChange={e => setPurchaseFreightUsd(parseNum(e.target.value, 0))}
+                          className="pl-5 text-xs h-8" placeholder="0.00" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Aduana</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
+                        <Input type="number" min={0} step={0.01} value={purchaseCustomsUsd || ''}
+                          onChange={e => setPurchaseCustomsUsd(parseNum(e.target.value, 0))}
+                          className="pl-5 text-xs h-8" placeholder="0.00" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Otros</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">$</span>
+                        <Input type="number" min={0} step={0.01} value={purchaseOtherUsd || ''}
+                          onChange={e => setPurchaseOtherUsd(parseNum(e.target.value, 0))}
+                          className="pl-5 text-xs h-8" placeholder="0.00" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Estos costos se prorratean por valor FOB y se capitalizan en el costo unitario de cada producto (NIC 2).</p>
+                </div>
+
+                <div className="rounded-xl bg-muted/50 p-4 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Subtotal FOB</span>
+                    <span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseFob : purchaseFob * xr)}</span>
+                  </div>
+                  {purchaseFreightUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Flete</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseFreightUsd : purchaseFreightUsd * xr)}</span></div>
+                  )}
+                  {purchaseCustomsUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Aduana</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseCustomsUsd : purchaseCustomsUsd * xr)}</span></div>
+                  )}
+                  {purchaseOtherUsd > 0 && (
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Otros</span><span className="font-mono">{formatBase(currencyBase === 'USD' ? purchaseOtherUsd : purchaseOtherUsd * xr)}</span></div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/50">
+                    <span>Costo Aterrizado Total</span>
                     <div className="text-right">
                       <span className="text-primary">{formatBase(currencyBase === 'USD' ? purchaseTotal : purchaseTotal * xr)}</span>
                       <span className="text-xs text-muted-foreground font-normal ml-2">≈ {currencyBase === 'USD' ? formatDOP(purchaseTotal * xr) : formatUSD(purchaseTotal)}</span>

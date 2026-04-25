@@ -7,9 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download } from 'lucide-react';
+import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download, Truck } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
+import { ShipmentExpensesDialog } from '@/components/finanzas/ShipmentExpensesDialog';
 import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { exportToExcel } from '@/lib/export-utils';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ export function OrdenesTab() {
   const [payShipment, setPayShipment] = useState<any>(null);
   const [editShipment, setEditShipment] = useState<any>(null);
   const [editSale, setEditSale] = useState<any>(null);
+  const [editExpenses, setEditExpenses] = useState<any>(null);
   const [receiving, setReceiving] = useState(false);
   const rate = getGlobalExchangeRate();
 
@@ -368,6 +370,12 @@ export function OrdenesTab() {
                       onClick={() => { setEditShipment(detailOrder); setDetailOrder(null); }}>
                       <Pencil className="w-3.5 h-3.5" /> Editar Orden
                     </Button>
+                    {detailOrder.status !== 'received' && (
+                      <Button size="sm" variant="outline" className="gap-1.5 text-xs"
+                        onClick={() => { setEditExpenses(detailOrder); setDetailOrder(null); }}>
+                        <Truck className="w-3.5 h-3.5" /> Editar Gastos (Flete/Aduana)
+                      </Button>
+                    )}
                     {detailOrder.status !== 'received' && (detailOrder.shipment_items?.length || 0) > 0 && (
                       <Button size="sm" variant="default" className="gap-1.5 text-xs" disabled={receiving}
                         onClick={() => receiveShipment(detailOrder)}>
@@ -649,6 +657,17 @@ export function OrdenesTab() {
           }
         }}
         editShipment={editShipment}
+      />
+
+      {/* Edit Shipment Expenses (freight/customs/other) */}
+      <ShipmentExpensesDialog
+        open={!!editExpenses}
+        onOpenChange={v => { if (!v) setEditExpenses(null); }}
+        shipment={editExpenses}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+          queryClient.invalidateQueries({ queryKey: ['shipments'] });
+        }}
       />
 
       {/* Edit Sale Dialog */}
