@@ -126,6 +126,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       // Precarga AUTOMÁTICA según estado de pago del envío
       setPaymentMode(autoPaymentMode);
       setBankAccountId(autoBankAccountId);
+      setCapitalize(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, shipment?.id]);
