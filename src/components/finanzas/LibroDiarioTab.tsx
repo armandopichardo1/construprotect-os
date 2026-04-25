@@ -386,10 +386,63 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar descripción, cuenta, proveedor..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
-        </div>
+        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+          <PopoverTrigger asChild>
+            <div className="relative flex-1 min-w-[160px] max-w-[320px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Buscar # asiento, documento, cliente…"
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); if (!searchOpen) setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                className="h-8 pl-8 text-xs rounded-lg"
+              />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-[320px]" align="start" onOpenAutoFocus={e => e.preventDefault()}>
+            <Command shouldFilter={false}>
+              <CommandList>
+                <CommandEmpty className="text-xs py-4 text-center text-muted-foreground">Sin coincidencias</CommandEmpty>
+                {suggestions.entries.length > 0 && (
+                  <CommandGroup heading="Asientos">
+                    {suggestions.entries.map(s => (
+                      <CommandItem key={`e-${s.value}`} value={`e-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-medium">{s.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.sub}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {suggestions.documents.length > 0 && (
+                  <CommandGroup heading="Documentos / Referencias">
+                    {suggestions.documents.map(s => (
+                      <CommandItem key={`d-${s.value}`} value={`d-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-medium">{s.value}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.sub}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {suggestions.clients.length > 0 && (
+                  <CommandGroup heading="Clientes / Proveedores">
+                    {suggestions.clients.map(s => (
+                      <CommandItem key={`c-${s.value}`} value={`c-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex justify-between w-full">
+                          <span>{s.value}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.count} mov.</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]">
             <SelectValue placeholder="Tipo" />
