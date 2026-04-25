@@ -346,22 +346,36 @@ date: txDate,
           break;
         }
         case 'purchase': {
-          // All lines belong to ONE shipment/PO
-          let totalCost = 0;
+          // All lines belong to ONE shipment/PO. Landed cost (freight + customs + other)
+          // is prorrated to each line by FOB value (qty × unit cost) per IAS 2 / NIC 2.
+          let totalFob = 0;
           const lineItems: { sku: string; qty: number; cost: number }[] = [];
           for (const row of validRows) {
             const d = row.raw;
             const qty = Number(d._qty);
             const cost = Number(d._price);
-            totalCost += qty * cost;
+            totalFob += qty * cost;
             lineItems.push({ sku: String(d._sku), qty, cost });
           }
+          const freight = Math.max(0, Number(txFreightUsd) || 0);
+          const customs = Math.max(0, Number(txCustomsUsd) || 0);
+          const other = Math.max(0, Number(txOtherUsd) || 0);
+          const landedAddons = freight + customs + other;
+          const totalLanded = totalFob + landedAddons;
+
           const shipPayload: any = {
             supplier_name: txVendor || 'Importación masiva',
             po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`,
-            total_cost_usd: totalCost,
+            total_cost_usd: totalLanded,
+            shipping_cost_usd: freight,
+            customs_cost_usd: customs,
             status: 'ordered' as any,
-            notes: txNotes || null,
+            notes: [
+              txNotes,
+              landedAddons > 0
+                ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)} · Aduana $${customs.toFixed(2)} · Otros $${other.toFixed(2)} (Total addons $${landedAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
+                : null,
+            ].filter(Boolean).join(' · ') || null,
             order_date: txDate,
           };
           const { data: ship, error: shipErr } = await supabase.from('shipments').insert(shipPayload).select('id').single();
@@ -370,12 +384,16 @@ date: txDate,
           for (const item of lineItems) {
             const { data: prod } = await supabase.from('products').select('id').eq('sku', item.sku).maybeSingle();
             if (!prod) { failed++; continue; }
+            // Prorrate landed addons by FOB value (qty × cost) of this line
+            const lineFob = item.qty * item.cost;
+            const lineAddon = totalFob > 0 ? (lineFob / totalFob) * landedAddons : 0;
+            const landedUnitCost = item.qty > 0 ? item.cost + (lineAddon / item.qty) : item.cost;
             const itemPayload: any = {
               shipment_id: ship.id,
               product_id: prod.id,
               quantity_ordered: item.qty,
               quantity_received: 0,
-              unit_cost_usd: item.cost,
+              unit_cost_usd: Number(landedUnitCost.toFixed(4)),
             };
             const { error } = await supabase.from('shipment_items').insert(itemPayload);
             if (error) { failed++; } else { inserted++; }
