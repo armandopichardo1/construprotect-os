@@ -167,6 +167,8 @@ export function DiscountRulesManager() {
         <strong className="text-foreground">¿Cómo funciona?</strong> Al seleccionar un producto en una venta, el sistema busca la regla más específica (Cliente + Categoría &gt; Cliente &gt; Categoría) y aplica el descuento. El usuario puede sobrescribirlo manualmente en la línea.
       </div>
 
+      <DiscountTester rules={rules} contacts={contacts} categories={categories} />
+
       {conflictCount > 0 && (
         <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
@@ -389,6 +391,129 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
       <div className="flex gap-2 pt-2">
         <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Discount Tester ----------
+function DiscountTester({ rules, contacts, categories }: { rules: any[]; contacts: any[]; categories: string[] }) {
+  const [contactId, setContactId] = useState<string>('');
+  const [category, setCategory] = useState<string>('');
+  const [amountStr, setAmountStr] = useState<string>('');
+  const amount = Number(amountStr) || 0;
+
+  // Same selection rule as runtime: order by priority desc, first match wins.
+  // Skip "global" rules (no contact AND no category) to mirror CrearTransaccionTab.
+  const matched = useMemo(() => {
+    const active = rules.filter((r: any) => r.is_active);
+    const sorted = [...active].sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
+    for (const r of sorted) {
+      if (!r.contact_id && !r.category) continue;
+      const contactOk = r.contact_id ? r.contact_id === contactId : true;
+      const categoryOk = r.category ? (!!category && r.category === category) : true;
+      if (contactOk && categoryOk) return r;
+    }
+    return null;
+  }, [rules, contactId, category]);
+
+  // Other active rules that also matched but lost on priority — surfaced as info.
+  const alsoMatched = useMemo(() => {
+    if (!matched) return [];
+    return rules.filter((r: any) =>
+      r.is_active && r.id !== matched.id && (r.contact_id || r.category) &&
+      (r.contact_id ? r.contact_id === contactId : true) &&
+      (r.category ? (!!category && r.category === category) : true)
+    );
+  }, [rules, matched, contactId, category]);
+
+  const isPct = matched?.discount_type === 'pct';
+  const discountUsd = matched
+    ? (isPct ? amount * (Number(matched.discount_pct) || 0) / 100 : Math.min(amount, Number(matched.discount_amount_usd) || 0))
+    : 0;
+  const net = Math.max(0, amount - discountUsd);
+  const effectivePct = amount > 0 ? (discountUsd / amount) * 100 : 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Probar descuento</h3>
+        <span className="text-[10px] text-muted-foreground">Simula qué regla se aplicaría sin afectar datos reales.</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <Label className="text-xs">Cliente</Label>
+          <Select value={contactId || 'all'} onValueChange={v => setContactId(v === 'all' ? '' : v)}>
+            <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Sin cliente" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">— Sin cliente —</SelectItem>
+              {contacts.map((c: any) => (
+                <SelectItem key={c.id} value={c.id}>{c.contact_name}{c.company_name ? ` (${c.company_name})` : ''}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Categoría</Label>
+          <Select value={category || 'all'} onValueChange={v => setCategory(v === 'all' ? '' : v)}>
+            <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Sin categoría" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">— Sin categoría —</SelectItem>
+              {categories.map((c: string) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Monto bruto (USD)</Label>
+          <div className="relative mt-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+            <Input type="number" min={0} step={0.01} value={amountStr}
+              onChange={e => setAmountStr(e.target.value)} className="pl-6 h-9" placeholder="0.00" />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+        {!matched ? (
+          <p className="text-xs text-muted-foreground">
+            {(!contactId && !category)
+              ? 'Selecciona al menos un cliente o una categoría para evaluar.'
+              : 'Ninguna regla activa coincide con este cliente/categoría. Se aplicará el precio sin descuento.'}
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs text-muted-foreground">Regla aplicada</p>
+                <p className="text-sm font-semibold">
+                  {matched.name || <span className="italic text-muted-foreground">Sin nombre</span>}
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">prioridad {matched.priority || 0}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {matched.contact_id ? (contacts.find((c: any) => c.id === matched.contact_id)?.contact_name || '—') : 'Todos los clientes'}
+                  {' / '}
+                  {matched.category || 'Todas las categorías'}
+                  {' · '}
+                  {matched.discount_type === 'amount' ? `US$ ${Number(matched.discount_amount_usd).toFixed(2)} fijo` : `${Number(matched.discount_pct).toFixed(2)}%`}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Neto</p>
+                <p className="text-lg font-bold text-primary font-mono">US$ {net.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Descuento: US$ {discountUsd.toFixed(2)} ({effectivePct.toFixed(2)}%)
+                </p>
+              </div>
+            </div>
+            {alsoMatched.length > 0 && (
+              <div className="text-[11px] text-muted-foreground border-t border-border/50 pt-2">
+                <strong className="text-foreground">{alsoMatched.length} regla(s)</strong> también coinciden pero tienen menor prioridad: {alsoMatched.map((r: any) => `${r.name || 'sin nombre'} (p${r.priority || 0})`).join(', ')}.
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
