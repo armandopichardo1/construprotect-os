@@ -34,6 +34,8 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [capitalize, setCapitalize] = useState<boolean>(true);
+  type ProrationMethod = 'fob' | 'units' | 'weight' | 'volume';
+  const [prorationMethod, setProrationMethod] = useState<ProrationMethod>('fob');
 
   // Load chart of accounts to pick bank / CxP / inventory
   const { data: accounts = [] } = useQuery({
