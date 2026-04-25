@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download, Truck, Layers, Anchor } from 'lucide-react';
+import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download, Truck, Layers, Anchor, History } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
 import { ShipmentExpensesDialog } from '@/components/finanzas/ShipmentExpensesDialog';
+import { ShipmentHistoricalAdjustmentDialog } from '@/components/finanzas/ShipmentHistoricalAdjustmentDialog';
 import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
 import { exportToExcel } from '@/lib/export-utils';
 import { toast } from 'sonner';
