@@ -99,7 +99,11 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
 
   const currentFreight = Number(shipment?.shipping_cost_usd || 0);
   const currentCustoms = Number(shipment?.customs_cost_usd || 0);
+  // Fuente primaria: campo estructurado other_cost_usd. Fallback a regex de notes solo
+  // para envíos antiguos donde aún no se haya migrado el dato.
   const currentOther = (() => {
+    const structured = Number((shipment as any)?.other_cost_usd);
+    if (Number.isFinite(structured) && structured > 0) return structured;
     const m = String(shipment?.notes || '').match(/Otros \$([0-9.]+)/);
     return m ? Number(m[1]) : 0;
   })();
