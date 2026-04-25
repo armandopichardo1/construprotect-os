@@ -105,6 +105,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
       );
       setBankAccountId(shipment.payment_account_id || '');
       setNotes('');
+      setUpdateWac(true);
     }
   }, [open, shipment?.id]);
 
