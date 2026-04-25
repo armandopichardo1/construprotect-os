@@ -697,9 +697,28 @@ export function OrdenesTab() {
         open={!!editExpenses}
         onOpenChange={v => { if (!v) setEditExpenses(null); }}
         shipment={editExpenses}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
-          queryClient.invalidateQueries({ queryKey: ['shipments'] });
+        onSaved={async () => {
+          // Refetch inmediato (no esperar a que la query se invalide perezosamente)
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['shipments-orders'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['shipments'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['inventory-stock'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' }),
+            queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' }),
+          ]);
+          // Refrescar snapshot del detalle abierto, si aplica
+          const targetId = editExpenses?.id || detailOrder?.id;
+          if (targetId) {
+            const { data } = await supabase
+              .from('shipments')
+              .select('*, shipment_items(*, products(name, sku))')
+              .eq('id', targetId)
+              .maybeSingle();
+            if (data) {
+              if (detailOrder && detailOrder.id === targetId) setDetailOrder(data);
+              if (editExpenses && editExpenses.id === targetId) setEditExpenses(data);
+            }
+          }
         }}
       />
 
