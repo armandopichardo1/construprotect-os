@@ -177,7 +177,13 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
-  }, [entries, typeFilter, searchQuery, filterByDate, sortField, sortDir]);
+  }, [entries, typeFilter, monthFilter, yearFilter, searchQuery, filterByDate, sortField, sortDir]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    entries.forEach(e => { if (e.date) years.add(e.date.slice(0, 4)); });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [entries]);
 
   const totals = useMemo(() => ({
     debit_usd: filtered.reduce((s, e) => s + e.debit_usd, 0),
