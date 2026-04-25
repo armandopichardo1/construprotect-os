@@ -78,8 +78,19 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   );
 
   // Helpers to find canonical accounts by code-prefix
-  const inventoryAcct = useMemo(() => accounts.find((a: any) => a.code === '13000') || accounts.find((a: any) => a.classification === 'Inventarios'), [accounts]);
+  // Inventario en Tránsito (13200) si el envío NO ha sido recibido — NIC 2
+  // Inventarios (13000) si ya fue recibido (corrección post-recepción)
+  const isReceived_ = shipment?.status === 'received';
+  const inventoryInTransitAcct = useMemo(() => accounts.find((a: any) => a.code === '13200') || accounts.find((a: any) => a.classification === 'Compras en Tránsito'), [accounts]);
+  const inventoryFinalAcct = useMemo(() => accounts.find((a: any) => a.code === '13000') || accounts.find((a: any) => a.classification === 'Inventarios'), [accounts]);
+  const inventoryAcct = isReceived_ ? inventoryFinalAcct : (inventoryInTransitAcct || inventoryFinalAcct);
   const cxpAcct = useMemo(() => accounts.find((a: any) => a.code === '20150') || accounts.find((a: any) => a.code === '20100') || accounts.find((a: any) => a.classification?.includes('Cuentas por Pagar')), [accounts]);
+
+  // Modo de pago AUTOMÁTICO según estado de pago del envío:
+  // - paid + payment_account_id → Banco (con esa cuenta)
+  // - pending / partial → CxP
+  const autoPaymentMode: 'bank' | 'cxp' = (shipment?.payment_status === 'paid' && shipment?.payment_account_id) ? 'bank' : 'cxp';
+  const autoBankAccountId: string = shipment?.payment_account_id || '';
 
   const items: any[] = shipment?.shipment_items || [];
 
