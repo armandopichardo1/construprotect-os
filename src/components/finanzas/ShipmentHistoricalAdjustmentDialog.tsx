@@ -492,6 +492,21 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
             />
           </div>
 
+          {/* Toggle: actualizar WAC versionado */}
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 p-2.5">
+            <div className="space-y-0.5">
+              <Label htmlFor="update-wac" className="text-xs font-medium cursor-pointer">
+                Actualizar WAC versionado
+              </Label>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {isReceived
+                  ? 'Recalcula unit_cost_usd y total_unit_cost_usd sobre el stock disponible HOY. Los movimientos previos en inventory_movements no se modifican; se inserta un movimiento qty=0 como marcador de versión.'
+                  : 'Suma el ajuste al unit_cost del item. El WAC se aplicará correctamente cuando se reciba el envío.'}
+              </p>
+            </div>
+            <Switch id="update-wac" checked={updateWac} onCheckedChange={setUpdateWac} />
+          </div>
+
           {/* Vista previa contable */}
           {amountUsd > 0 && debitAcct && credAcct && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
@@ -510,6 +525,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
               </div>
               <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
                 Fecha del asiento: {format(effectiveDate, "d MMM yyyy", { locale: es })}
+                {updateWac && <> · WAC versionado activo</>}
               </div>
             </div>
           )}
@@ -524,8 +540,8 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
           )}
 
           <div className="text-[10px] text-muted-foreground italic">
-            Este flujo NO reprorratea el costo unitario por producto ni recalcula WAC. Si necesitas
-            redistribuir el costo aterrizado, usa el botón "Editar gastos".
+            Forward-only: las unidades ya vendidas conservan su COGS pasado. Si necesitas
+            redistribuir todo el costo aterrizado del envío, usa "Editar gastos".
           </div>
         </div>
 
