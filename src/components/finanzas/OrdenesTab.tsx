@@ -508,22 +508,42 @@ export function OrdenesTab() {
                       <TableHead className="text-[10px]">SKU</TableHead>
                       <TableHead className="text-[10px]">Producto</TableHead>
                       <TableHead className="text-[10px] text-right">Cant.</TableHead>
-                      <TableHead className="text-[10px] text-right">Precio Unit.</TableHead>
+                      <TableHead className="text-[10px] text-right">Precio Bruto</TableHead>
+                      <TableHead className="text-[10px] text-right">Desc.</TableHead>
+                      <TableHead className="text-[10px] text-right">Precio Neto</TableHead>
                       <TableHead className="text-[10px] text-right">Costo Unit.</TableHead>
                       <TableHead className="text-[10px] text-right">Subtotal</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(detailOrder.sale_items || []).map((si: any) => (
-                      <TableRow key={si.id}>
-                        <TableCell className="text-[10px] font-mono">{si.products?.sku || '—'}</TableCell>
-                        <TableCell className="text-[10px]">{si.products?.name || '—'}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono">{si.quantity}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono">{formatDOP(Number(si.unit_price_usd || 0) * rate)}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono text-muted-foreground">{formatDOP(Number(si.unit_cost_usd || 0) * rate)}</TableCell>
-                        <TableCell className="text-[10px] text-right font-mono font-medium">{formatDOP(Number(si.line_total_usd || 0) * rate)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {(detailOrder.sale_items || []).map((si: any) => {
+                      const netUnit = Number(si.unit_price_usd || 0);
+                      const listUnit = Number(si.products?.price_list_usd || 0);
+                      // Use list price as gross when it's higher than what was sold (i.e. a discount was applied).
+                      // Otherwise the net price is also the gross price.
+                      const grossUnit = listUnit > netUnit && listUnit > 0 ? listUnit : netUnit;
+                      const discountUsd = Math.max(0, grossUnit - netUnit);
+                      const discountPct = grossUnit > 0 ? (discountUsd / grossUnit) * 100 : 0;
+                      const hasDiscount = discountUsd > 0.001;
+                      return (
+                        <TableRow key={si.id}>
+                          <TableCell className="text-[10px] font-mono">{si.products?.sku || '—'}</TableCell>
+                          <TableCell className="text-[10px]">{si.products?.name || '—'}</TableCell>
+                          <TableCell className="text-[10px] text-right font-mono">{si.quantity}</TableCell>
+                          <TableCell className={cn('text-[10px] text-right font-mono', hasDiscount && 'text-muted-foreground line-through')}>
+                            {formatDOP(grossUnit * rate)}
+                          </TableCell>
+                          <TableCell className="text-[10px] text-right font-mono text-warning">
+                            {hasDiscount ? `-${discountPct.toFixed(1)}%` : '—'}
+                          </TableCell>
+                          <TableCell className="text-[10px] text-right font-mono font-semibold">
+                            {formatDOP(netUnit * rate)}
+                          </TableCell>
+                          <TableCell className="text-[10px] text-right font-mono text-muted-foreground">{formatDOP(Number(si.unit_cost_usd || 0) * rate)}</TableCell>
+                          <TableCell className="text-[10px] text-right font-mono font-medium">{formatDOP(Number(si.line_total_usd || 0) * rate)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
 
