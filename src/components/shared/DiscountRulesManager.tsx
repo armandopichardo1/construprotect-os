@@ -367,6 +367,25 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
         <Textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} className="mt-1" rows={2} />
       </div>
 
+      {liveConflicts.length > 0 && (
+        <div className={cn(
+          'rounded-lg border p-2.5 text-[11px] flex items-start gap-2',
+          samePriorityConflict ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-warning/40 bg-warning/10 text-warning'
+        )}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <div>
+            <strong className="block">
+              {samePriorityConflict
+                ? `Conflicto: ${liveConflicts.length} regla(s) activa(s) con MISMO cliente/categoría y MISMA prioridad.`
+                : `Aviso: ya existe(n) ${liveConflicts.length} regla(s) activa(s) con el mismo cliente/categoría.`}
+            </strong>
+            <span className="text-muted-foreground">
+              Prioridades existentes: {liveConflicts.map((r: any) => r.priority).join(', ')}. {samePriorityConflict ? 'Cambia la prioridad para definir cuál gana.' : 'Se aplicará la de mayor prioridad.'}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-2">
         <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
