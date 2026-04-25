@@ -55,7 +55,7 @@ export function OrdenesTab() {
     queryKey: ['sales-orders'],
     queryFn: async () => {
       const { data } = await supabase.from('sales')
-        .select('*, contacts(contact_name, company_name), sale_items(*, products(name, sku))')
+        .select('*, contacts(contact_name, company_name), sale_items(*, products(name, sku, price_list_usd))')
         .order('date', { ascending: false });
       return data || [];
     },
