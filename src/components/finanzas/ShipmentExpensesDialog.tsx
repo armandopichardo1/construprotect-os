@@ -196,6 +196,78 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         if (itErr) throw itErr;
       }
 
+      // 2.5) CAPITALIZACIÓN: si está activo, actualiza products.unit_cost_usd vía WAC
+      // y recalcula márgenes. Aplica especialmente cuando el envío YA fue recibido.
+      const capitalizedProducts: { sku: string; oldCost: number; newCost: number; newWAC: number }[] = [];
+      if (capitalize) {
+        for (const p of preview) {
+          const item = items.find((i: any) => i.id === p.id);
+          if (!item?.product_id) continue;
+          const newItemCost = Number(p.newUnitCost.toFixed(4));
+
+          // Cargar inventario y producto actuales
+          const { data: prod } = await supabase
+            .from('products')
+            .select('unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd, sku')
+            .eq('id', item.product_id)
+            .single();
+          if (!prod) continue;
+
+          const currentCost = Number(prod.unit_cost_usd || 0);
+          let newCost = newItemCost;
+
+          if (shipment.status === 'received') {
+            // El envío ya fue recibido → aplicar WAC con stock actual
+            const { data: inv } = await supabase
+              .from('inventory')
+              .select('quantity_on_hand')
+              .eq('product_id', item.product_id)
+              .maybeSingle();
+            const stockQty = Number(inv?.quantity_on_hand || 0);
+            const incomingQty = Number(item.quantity_received || item.quantity_ordered || 0);
+            // WAC tradicional: el stock actual ya incluye la entrada anterior con el costo viejo,
+            // así que reasignamos el delta del addon distribuido sobre el stock actual.
+            const previousLanded = Number(item.unit_cost_usd || 0); // ya updated arriba? No: leemos baseline
+            // Para el delta usamos: nuevo costo aterrizado de esta línea vs. costo previamente
+            // contabilizado en stock. Si stockQty <= 0, simplemente fijamos newItemCost.
+            if (stockQty > 0 && incomingQty > 0) {
+              const deltaPerUnit = newItemCost - currentCost;
+              const onHandValue = stockQty * currentCost;
+              const adjustment = deltaPerUnit * Math.min(stockQty, incomingQty);
+              newCost = stockQty > 0 ? (onHandValue + adjustment) / stockQty : newItemCost;
+            } else {
+              newCost = newItemCost;
+            }
+          } else {
+            // Envío aún no recibido → fija unit_cost_usd al nuevo aterrizado para que al
+            // momento de recibir, el WAC use el costo correcto.
+            newCost = newItemCost;
+          }
+
+          const updates: Record<string, number> = {
+            unit_cost_usd: Number(newCost.toFixed(4)),
+            total_unit_cost_usd: Number(newCost.toFixed(4)),
+          };
+          // Recalcular márgenes
+          [
+            { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+            { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+            { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+            { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+          ].forEach(({ price, field }) => {
+            if (price > 0) updates[field] = Number((((price - newCost) / price) * 100).toFixed(1));
+          });
+
+          const { error: prodErr } = await supabase
+            .from('products')
+            .update(updates as any)
+            .eq('id', item.product_id);
+          if (prodErr) throw prodErr;
+
+          capitalizedProducts.push({ sku: prod.sku, oldCost: currentCost, newCost, newWAC: newCost });
+        }
+      }
+
       // 3) Create journal entry for the DELTA (if any)
       let journalEntryId: string | null = null;
       if (Math.abs(deltaAddons) > 0.001) {
