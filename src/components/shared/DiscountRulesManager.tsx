@@ -167,6 +167,8 @@ export function DiscountRulesManager() {
         <strong className="text-foreground">¿Cómo funciona?</strong> Al seleccionar un producto en una venta, el sistema busca la regla más específica (Cliente + Categoría &gt; Cliente &gt; Categoría) y aplica el descuento. El usuario puede sobrescribirlo manualmente en la línea.
       </div>
 
+      <DiscountTester rules={rules} contacts={contacts} categories={categories} />
+
       {conflictCount > 0 && (
         <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
