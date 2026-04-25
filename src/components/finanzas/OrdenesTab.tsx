@@ -505,33 +505,131 @@ export function OrdenesTab() {
                     );
                   })()}
 
-                  {/* Items table */}
-                  {(detailOrder.shipment_items?.length || 0) > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-[10px]">SKU</TableHead>
-                          <TableHead className="text-[10px]">Producto</TableHead>
-                          <TableHead className="text-[10px] text-right">Cant.</TableHead>
-                          <TableHead className="text-[10px] text-right">Recibido</TableHead>
-                          <TableHead className="text-[10px] text-right">Costo Unit.</TableHead>
-                          <TableHead className="text-[10px] text-right">Subtotal</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(detailOrder.shipment_items || []).map((si: any) => (
-                          <TableRow key={si.id}>
-                            <TableCell className="text-[10px] font-mono">{si.products?.sku || '—'}</TableCell>
-                            <TableCell className="text-[10px]">{si.products?.name || '—'}</TableCell>
-                            <TableCell className="text-[10px] text-right font-mono">{si.quantity_ordered}</TableCell>
-                            <TableCell className="text-[10px] text-right font-mono">{si.quantity_received}</TableCell>
-                            <TableCell className="text-[10px] text-right font-mono">{formatDOP(Number(si.unit_cost_usd || 0) * rate)}</TableCell>
-                            <TableCell className="text-[10px] text-right font-mono font-medium">{formatDOP(Number(si.unit_cost_usd || 0) * si.quantity_ordered * rate)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
+                  {/* ===== Sección: Costo Aterrizado por Producto ===== */}
+                  {(detailOrder.shipment_items?.length || 0) > 0 ? (() => {
+                    const items = detailOrder.shipment_items || [];
+                    const otherMatch = String(detailOrder.notes || '').match(/Otros \$([0-9.]+)/);
+                    const otherUSD = otherMatch ? Number(otherMatch[1]) : 0;
+                    const shippingUSD = Number(detailOrder.shipping_cost_usd || 0);
+                    const customsUSD = Number(detailOrder.customs_cost_usd || 0);
+                    const addonsUSD = shippingUSD + customsUSD + otherUSD;
+
+                    // El unit_cost_usd guardado YA está aterrizado (re-prorrateado al editar gastos).
+                    // Para mostrar FOB hay que des-prorratearlo de forma proporcional.
+                    const totalLanded = items.reduce((s: number, it: any) =>
+                      s + Number(it.unit_cost_usd || 0) * Number(it.quantity_ordered || 0), 0);
+                    const totalFobUSD = Math.max(0, totalLanded - addonsUSD);
+                    const fobFactor = totalLanded > 0 && totalFobUSD > 0 ? totalFobUSD / totalLanded : 1;
+
+                    const enriched = items.map((si: any) => {
+                      const qty = Number(si.quantity_ordered || 0);
+                      const landedUnit = Number(si.unit_cost_usd || 0);
+                      const fobUnit = landedUnit * fobFactor;
+                      const lineFob = fobUnit * qty;
+                      const lineWeight = totalFobUSD > 0 ? lineFob / totalFobUSD : (items.length ? 1 / items.length : 0);
+                      const freightShare = shippingUSD * lineWeight;
+                      const customsShare = customsUSD * lineWeight;
+                      const otherShare = otherUSD * lineWeight;
+                      const addonShare = freightShare + customsShare + otherShare;
+                      const addonUnit = qty > 0 ? addonShare / qty : 0;
+                      return { si, qty, fobUnit, lineFob, freightShare, customsShare, otherShare, addonShare, addonUnit, landedUnit, lineLanded: landedUnit * qty };
+                    });
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-primary" /> Costo Aterrizado por Producto
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground">
+                            Prorrateo por valor FOB · NIC 2
+                          </span>
+                        </div>
+
+                        {addonsUSD > 0 && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {shippingUSD > 0 && (
+                              <div className="rounded-lg border border-border bg-muted/20 p-2 text-center">
+                                <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                                  <Truck className="w-3 h-3" /> Flete
+                                </div>
+                                <div className="text-xs font-mono font-semibold mt-0.5">${shippingUSD.toFixed(2)}</div>
+                              </div>
+                            )}
+                            {customsUSD > 0 && (
+                              <div className="rounded-lg border border-border bg-muted/20 p-2 text-center">
+                                <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                                  <Anchor className="w-3 h-3" /> Aduana
+                                </div>
+                                <div className="text-xs font-mono font-semibold mt-0.5">${customsUSD.toFixed(2)}</div>
+                              </div>
+                            )}
+                            {otherUSD > 0 && (
+                              <div className="rounded-lg border border-border bg-muted/20 p-2 text-center">
+                                <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                                  <Package className="w-3 h-3" /> Otros
+                                </div>
+                                <div className="text-xs font-mono font-semibold mt-0.5">${otherUSD.toFixed(2)}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+                          <table className="w-full text-[10px]">
+                            <thead className="bg-muted/40">
+                              <tr>
+                                <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">SKU</th>
+                                <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Producto</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Cant.</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">FOB unit USD</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Flete</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Aduana</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Otros</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">+ Addon /u</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-primary">Aterrizado /u</th>
+                                <th className="text-right px-2 py-1.5 font-medium text-primary">Total línea</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {enriched.map((r: any) => (
+                                <tr key={r.si.id} className="border-t border-border/40">
+                                  <td className="px-2 py-1.5 font-mono">{r.si.products?.sku || '—'}</td>
+                                  <td className="px-2 py-1.5 truncate max-w-[160px]">{r.si.products?.name || '—'}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono">{r.qty}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">${r.fobUnit.toFixed(4)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">${r.freightShare.toFixed(2)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">${r.customsShare.toFixed(2)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">${r.otherShare.toFixed(2)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono text-muted-foreground">${r.addonUnit.toFixed(4)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono font-semibold text-primary">${r.landedUnit.toFixed(4)}</td>
+                                  <td className="text-right px-2 py-1.5 font-mono font-semibold text-primary">${r.lineLanded.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-muted/30 border-t-2 border-border">
+                              <tr>
+                                <td colSpan={3} className="px-2 py-1.5 font-semibold">Totales</td>
+                                <td className="text-right px-2 py-1.5 font-mono font-semibold">${totalFobUSD.toFixed(2)}</td>
+                                <td className="text-right px-2 py-1.5 font-mono font-semibold">${shippingUSD.toFixed(2)}</td>
+                                <td className="text-right px-2 py-1.5 font-mono font-semibold">${customsUSD.toFixed(2)}</td>
+                                <td className="text-right px-2 py-1.5 font-mono font-semibold">${otherUSD.toFixed(2)}</td>
+                                <td className="text-right px-2 py-1.5 font-mono font-semibold">${addonsUSD.toFixed(2)}</td>
+                                <td className="text-right px-2 py-1.5"></td>
+                                <td className="text-right px-2 py-1.5 font-mono font-bold text-primary">${(totalFobUSD + addonsUSD).toFixed(2)}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+
+                        {addonsUSD === 0 && (
+                          <p className="text-[10px] text-muted-foreground italic">
+                            Esta orden aún no tiene gastos de flete/aduana/otros registrados — el costo aterrizado coincide con el FOB. Usa "Editar Gastos" para añadirlos.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })() : (
                     <p className="text-xs text-muted-foreground text-center py-4">Sin ítems de detalle en esta orden.</p>
                   )}
 
