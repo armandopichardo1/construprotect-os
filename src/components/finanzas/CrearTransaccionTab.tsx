@@ -702,11 +702,12 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           const realProductId = isService ? null : i.product_id;
           const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
+          const netUnit = i.unit_price_usd * (1 - (i.discount_pct || 0) / 100);
           return {
             sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
-            unit_price_usd: i.unit_price_usd, unit_cost_usd: costUsd,
-            line_total_usd: i.unit_price_usd * i.quantity,
-            margin_pct: i.unit_price_usd > 0 ? Math.round((i.unit_price_usd - costUsd) / i.unit_price_usd * 100) : 0,
+            unit_price_usd: netUnit, unit_cost_usd: costUsd,
+            line_total_usd: netUnit * i.quantity,
+            margin_pct: netUnit > 0 ? Math.round((netUnit - costUsd) / netUnit * 100) : 0,
           };
         });
         await supabase.from('sale_items').insert(itemsData);
