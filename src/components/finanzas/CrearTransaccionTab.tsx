@@ -421,6 +421,22 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     return gross * (Math.min(100, Math.max(0, it.discount_pct || 0)) / 100);
   };
   const lineNetUsd = (it: SaleItem) => Math.max(0, lineGrossUsd(it) - lineDiscountUsd(it));
+
+  // Determina el origen del descuento aplicado en una línea (manual / cliente+categoría / cliente / categoría / sin descuento)
+  const getDiscountOrigin = (it: SaleItem): { label: string; tone: 'manual' | 'rule' | 'none' } => {
+    const hasDiscount = lineDiscountUsd(it) > 0.0001;
+    if (!hasDiscount) return { label: 'Sin descuento', tone: 'none' };
+    if (it._discountTouched) return { label: 'Manual', tone: 'manual' };
+    if (!it.product_id || it.product_id.startsWith('svc:')) return { label: 'Manual', tone: 'manual' };
+    const prod = products.find((p: any) => p.id === it.product_id);
+    const rule = findDiscountRule(contactId, prod?.category || null);
+    if (!rule) return { label: 'Manual', tone: 'manual' };
+    if (rule.contact_id && rule.category) return { label: `Regla: Cliente + ${rule.category}`, tone: 'rule' };
+    if (rule.contact_id) return { label: 'Regla: Cliente', tone: 'rule' };
+    if (rule.category) return { label: `Regla: Categoría ${rule.category}`, tone: 'rule' };
+    return { label: 'Regla automática', tone: 'rule' };
+  };
+
   const subtotal = saleItems.reduce((s, i) => s + lineNetUsd(i), 0);
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
