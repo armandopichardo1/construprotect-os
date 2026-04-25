@@ -1707,6 +1707,7 @@ export type Database = {
           id: string
           notes: string | null
           order_date: string
+          other_cost_usd: number
           payment_account_id: string | null
           payment_date: string | null
           payment_status: string
@@ -1728,6 +1729,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          other_cost_usd?: number
           payment_account_id?: string | null
           payment_date?: string | null
           payment_status?: string
@@ -1749,6 +1751,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          other_cost_usd?: number
           payment_account_id?: string | null
           payment_date?: string | null
           payment_status?: string
