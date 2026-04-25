@@ -156,7 +156,23 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const entries: JournalEntry[] = useMemo(() => {
     const all: JournalEntry[] = [];
 
-    // Sort journal entries by date DESC then by created_at DESC for same-date entries
+    // Sort ASC first to assign correlative entry numbers per year, then we will display DESC
+    const ascending = [...journalEntries].sort((a: any, b: any) => {
+      const dateCmp = (a.date || '').localeCompare(b.date || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+
+    const yearCounters = new Map<string, number>();
+    const numberById = new Map<string, string>();
+    ascending.forEach((je: any) => {
+      const year = (je.date || '').slice(0, 4) || '----';
+      const next = (yearCounters.get(year) || 0) + 1;
+      yearCounters.set(year, next);
+      numberById.set(je.id, `AS-${year}-${String(next).padStart(5, '0')}`);
+    });
+
+    // Display order: DESC by date, then created_at
     const sorted = [...journalEntries].sort((a: any, b: any) => {
       const dateCmp = (b.date || '').localeCompare(a.date || '');
       if (dateCmp !== 0) return dateCmp;
@@ -172,9 +188,12 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       const exRate = Number(je.exchange_rate) || rate;
       const type = inferType(je.description);
       const vendorClient = extractVendorClient(je.description);
+      const document = extractDocument(je.description);
 
       all.push({
         id: je.id,
+        entry_number: numberById.get(je.id) || '',
+        document,
         date: je.date,
         type,
         description: je.description,
@@ -188,7 +207,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
         credit_dop: totalCredit * exRate,
         exchange_rate: exRate,
         vendor_client: vendorClient,
-        ref: '',
+        ref: document,
         raw: je,
       });
     });
