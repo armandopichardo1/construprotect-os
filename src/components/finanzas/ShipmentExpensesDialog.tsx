@@ -174,6 +174,23 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   }, [willPostJournal, acct13000, acct20150, paymentMode, bankAccountId, selectedBankAcct]);
 
   const [reversalConfirmOpen, setReversalConfirmOpen] = useState(false);
+  const [previewConfirmOpen, setPreviewConfirmOpen] = useState(false);
+
+  // Cuentas DR/CR que se asentarán (para preview de confirmación)
+  const credAcctPreview = useMemo(() => {
+    if (paymentMode === 'cxp') return acct20150 || null;
+    return selectedBankAcct || null;
+  }, [paymentMode, acct20150, selectedBankAcct]);
+  const debitAcctPreview = inventoryAcct || null;
+
+  // Helper: navegar al Libro Diario filtrado por código de cuenta
+  const openLibroDiarioByAccount = (code: string | null | undefined) => {
+    if (!code) return;
+    onOpenChange(false);
+    setReversalConfirmOpen(false);
+    setPreviewConfirmOpen(false);
+    navigate(`/finanzas?tab=${encodeURIComponent('Libro Diario')}&q=${encodeURIComponent(code)}`);
+  };
 
   const handleSave = async () => {
     if (!shipment) return;
@@ -190,6 +207,11 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     // Paso de confirmación extra cuando el delta es negativo (se generará una reversa contable)
     if (deltaAddons < -0.001) {
       setReversalConfirmOpen(true);
+      return;
+    }
+    // Confirmación de tratamiento contable cuando se asentará un cargo positivo
+    if (deltaAddons > 0.001) {
+      setPreviewConfirmOpen(true);
       return;
     }
     await performSave();
@@ -874,14 +896,38 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                   Estás reduciendo los gastos del envío en <strong className="text-destructive">{fmt(Math.abs(deltaAddons))}</strong> respecto a lo previamente capitalizado
                   ({fmt(currentAddons)} → {fmt(newAddons)}).
                 </p>
-                <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs space-y-1">
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs space-y-1.5">
                   <p className="font-semibold text-foreground">Asiento de reversa que se creará:</p>
-                  <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-                    <li>
-                      <strong className="text-foreground">Débito</strong> a {paymentMode === 'cxp' ? 'Cuentas por Pagar (20150)' : `${selectedBankAcct?.code || '—'} ${selectedBankAcct?.description || 'cuenta bancaria'}`} por {fmt(Math.abs(deltaAddons))}
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li className="flex items-center justify-between gap-2">
+                      <span>
+                        <strong className="text-foreground">DR</strong>{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLibroDiarioByAccount(credAcctPreview?.code)}
+                          className="font-mono text-primary hover:underline"
+                          title="Abrir Libro Diario filtrado por esta cuenta"
+                        >
+                          {credAcctPreview?.code || '—'}
+                        </button>{' '}
+                        {credAcctPreview?.description || (paymentMode === 'cxp' ? 'Cuentas por Pagar' : 'cuenta bancaria')}
+                      </span>
+                      <span className="font-mono text-foreground">{fmt(Math.abs(deltaAddons))}</span>
                     </li>
-                    <li>
-                      <strong className="text-foreground">Crédito</strong> a {inventoryAcct?.code || '13000'} {inventoryAcct?.description || 'Inventarios'} por {fmt(Math.abs(deltaAddons))}
+                    <li className="flex items-center justify-between gap-2">
+                      <span>
+                        <strong className="text-foreground">CR</strong>{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLibroDiarioByAccount(debitAcctPreview?.code || '13000')}
+                          className="font-mono text-primary hover:underline"
+                          title="Abrir Libro Diario filtrado por esta cuenta"
+                        >
+                          {debitAcctPreview?.code || '13000'}
+                        </button>{' '}
+                        {debitAcctPreview?.description || 'Inventarios'}
+                      </span>
+                      <span className="font-mono text-foreground">{fmt(Math.abs(deltaAddons))}</span>
                     </li>
                   </ul>
                   <p className="text-[11px] text-muted-foreground pt-1">
@@ -905,6 +951,79 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Sí, generar reversa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={previewConfirmOpen} onOpenChange={setPreviewConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary" />
+              Confirma el tratamiento contable
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Se capitalizará un incremento de <strong className="text-foreground">{fmt(deltaAddons)}</strong> en gastos del envío
+                  ({fmt(currentAddons)} → {fmt(newAddons)}). Verifica las cuentas antes de guardar — puedes abrir el Libro Diario filtrado por cada cuenta.
+                </p>
+                <div className="rounded-md border border-border bg-muted/30 p-2.5 text-xs space-y-1.5">
+                  <p className="font-semibold text-foreground">Asiento que se creará:</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li className="flex items-center justify-between gap-2">
+                      <span>
+                        <strong className="text-foreground">DR</strong>{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLibroDiarioByAccount(debitAcctPreview?.code || '13000')}
+                          className="font-mono text-primary hover:underline inline-flex items-center gap-1"
+                          title="Abrir Libro Diario filtrado por esta cuenta"
+                        >
+                          {debitAcctPreview?.code || '13000'} <ExternalLink className="w-3 h-3" />
+                        </button>{' '}
+                        {debitAcctPreview?.description || 'Inventarios'}
+                      </span>
+                      <span className="font-mono text-foreground">{fmt(deltaAddons)}</span>
+                    </li>
+                    <li className="flex items-center justify-between gap-2">
+                      <span>
+                        <strong className="text-foreground">CR</strong>{' '}
+                        <button
+                          type="button"
+                          onClick={() => openLibroDiarioByAccount(credAcctPreview?.code)}
+                          className="font-mono text-primary hover:underline inline-flex items-center gap-1"
+                          title="Abrir Libro Diario filtrado por esta cuenta"
+                        >
+                          {credAcctPreview?.code || '—'} <ExternalLink className="w-3 h-3" />
+                        </button>{' '}
+                        {credAcctPreview?.description || (paymentMode === 'cxp' ? 'Cuentas por Pagar' : 'cuenta bancaria')}
+                      </span>
+                      <span className="font-mono text-foreground">{fmt(deltaAddons)}</span>
+                    </li>
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    {paymentMode === 'cxp'
+                      ? 'Aumenta el inventario capitalizado y registra la deuda con el proveedor en CxP (20150).'
+                      : 'Aumenta el inventario capitalizado y descuenta el monto de la cuenta bancaria seleccionada.'}
+                    {capitalize && ' Además se recalculará el WAC y los márgenes de los productos afectados.'}
+                  </p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={async (e) => {
+                e.preventDefault();
+                setPreviewConfirmOpen(false);
+                await performSave();
+              }}
+            >
+              Confirmar y guardar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
