@@ -775,6 +775,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                         <th className="text-right px-2 py-1.5 font-medium text-muted-foreground">Otros</th>
                         <th className="text-right px-2 py-1.5 font-medium text-primary">Δ</th>
                         <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Pago</th>
+                        <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">Asiento</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -783,6 +784,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                         const dateStr = `${d.toLocaleDateString('es-DO')} ${d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })}`;
                         const arrow = (prev: number, next: number) =>
                           Math.abs(next - prev) < 0.001 ? '—' : `${fmt(prev)} → ${fmt(next)}`;
+                        const jeId: string | null = h.journal_entry_id || null;
+                        const jeShort = jeId ? String(jeId).slice(0, 8) : null;
+                        const openJournal = () => {
+                          if (!jeShort) return;
+                          onOpenChange(false);
+                          navigate(`/finanzas?tab=${encodeURIComponent('Libro Diario')}&q=${jeShort}`);
+                        };
                         return (
                           <tr key={h.id} className="border-t border-border/40 align-top">
                             <td className="px-2 py-1.5 font-mono text-muted-foreground whitespace-nowrap">{dateStr}</td>
@@ -795,6 +803,32 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                             </td>
                             <td className="px-2 py-1.5 text-muted-foreground">
                               {h.payment_mode === 'cxp' ? 'CxP' : h.payment_mode === 'bank' ? 'Banco' : '—'}
+                            </td>
+                            <td className="px-2 py-1.5 whitespace-nowrap">
+                              {jeShort ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={openJournal}
+                                    className="font-mono text-primary hover:underline"
+                                    title={`Abrir asiento ${jeShort} en el Libro Diario`}
+                                  >
+                                    {jeShort}
+                                  </button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={openJournal}
+                                    title="Abrir Libro Diario filtrado por este asiento"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="italic text-muted-foreground">—</span>
+                              )}
                             </td>
                           </tr>
                         );
