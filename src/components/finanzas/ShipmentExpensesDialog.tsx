@@ -908,6 +908,75 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         </DialogFooter>
       </DialogContent>
 
+      <AlertDialog open={reprocessConfirmOpen} onOpenChange={setReprocessConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Se reprocesará el costo aterrizado del envío
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Estás por modificar Flete / Aduana / Otros del envío{' '}
+                  <strong className="text-foreground">{shipment.po_number || shipment.id?.slice(0, 8)}</strong>.
+                  Esto reprocesará el costo unitario aterrizado de cada producto y, si aplica, recalculará el inventario.
+                </p>
+                <div className="rounded-md border border-border bg-muted/30 p-2.5 text-xs space-y-1.5">
+                  <p className="font-semibold text-foreground">Lo que va a ocurrir al guardar:</p>
+                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                    <li>
+                      <strong className="text-foreground">Reprorrateo por valor FOB</strong> de los addons sobre cada línea del envío
+                      ({fmt(currentAddons)} → {fmt(newAddons)}, Δ {deltaAddons >= 0 ? '+' : ''}{fmt(deltaAddons)}).
+                    </li>
+                    <li>
+                      Actualización de <strong className="text-foreground">unit_cost_usd</strong> en cada{' '}
+                      <code className="text-[10px] px-1 py-0.5 rounded bg-muted">shipment_items</code> con el nuevo costo aterrizado.
+                    </li>
+                    {capitalize ? (
+                      <li>
+                        <strong className="text-foreground">Recalculo de WAC</strong> y márgenes (Lista, Arquitecto, Proyecto, Mayoreo) sobre productos afectados.
+                        {isReceived
+                          ? ' Como el envío ya fue recibido, el ajuste se distribuye sobre el stock disponible y queda un movimiento de inventario tipo "ajuste" (qty=0) por SKU.'
+                          : ' El nuevo costo quedará fijado para que al recibir el envío el WAC use el valor correcto.'}
+                      </li>
+                    ) : (
+                      <li>
+                        Sin capitalización activa: solo se actualizan los costos de las líneas del envío. WAC y márgenes <strong>no</strong> se tocarán.
+                      </li>
+                    )}
+                    {Math.abs(deltaAddons) > 0.001 ? (
+                      <li>
+                        Se generará un <strong className="text-foreground">asiento contable</strong> por el delta ({fmt(Math.abs(deltaAddons))}) contra{' '}
+                        {isReceived ? <><strong>13000 Inventarios</strong></> : <><strong>13200 Compras en Tránsito</strong></>}.
+                        Verás el desglose DR/CR en el siguiente paso.
+                      </li>
+                    ) : (
+                      <li>
+                        El total no cambia ({fmt(newAddons)}), así que <strong>no se generará asiento contable</strong>; solo se reprorratea la composición interna entre Flete/Aduana/Otros.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                <p className="text-xs text-muted-foreground">¿Continuar con el reproceso?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={async (e) => {
+                e.preventDefault();
+                await continueAfterReprocess();
+              }}
+            >
+              Sí, reprocesar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={reversalConfirmOpen} onOpenChange={setReversalConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
