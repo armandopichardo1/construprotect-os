@@ -379,10 +379,9 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
             </div>
           </div>
         )}
-        {(
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted/30 p-3 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal FOB ({items.length} ítems)</span><span className="font-mono">{fmt(totalFob)}</span></div>
+        <div className="space-y-4">
+          <div className="rounded-lg bg-muted/30 p-3 text-xs">
+            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal FOB ({items.length} ítems)</span><span className="font-mono">{fmt(totalFob)}</span></div>
               {currentAddons > 0 && (
                 <div className="flex justify-between text-muted-foreground/80 mt-1">
                   <span>Addons actuales</span><span className="font-mono">{fmt(currentAddons)}</span>
