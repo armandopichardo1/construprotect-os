@@ -361,8 +361,22 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPriceTier(tier);
     setSaleItems(prev => prev.map(item => {
       if (!item.product_id) return item;
-      const prod = products.find((p: any) => p.id === item.product_id);
-      return { ...item, unit_price_usd: getPriceForTier(prod, tier) };
+      const isService = item.product_id.startsWith('svc:');
+      const prod = isService ? null : products.find((p: any) => p.id === item.product_id);
+      const newPrice = isService ? item.unit_price_usd : getPriceForTier(prod, tier);
+      // Re-apply discount rule unless user already edited it manually
+      if (item._discountTouched) {
+        return { ...item, unit_price_usd: newPrice };
+      }
+      const rule = findDiscountRule(id, prod?.category || null);
+      return {
+        ...item,
+        unit_price_usd: newPrice,
+        discount_type: 'pct',
+        discount_pct: rule ? Number(rule.discount_pct) : 0,
+        discount_amount_usd: 0,
+        _discountDisplay: undefined,
+      };
     }));
   };
 
@@ -371,14 +385,27 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
       if (idx !== i) return item;
-      const updated = { ...item, [field]: value, _priceDisplay: undefined };
+      const updated: SaleItem = { ...item, [field]: value, _priceDisplay: undefined };
       if (field === 'product_id') {
         // Check if it's a service (prefixed with svc:)
         if (typeof value === 'string' && value.startsWith('svc:')) {
           updated.unit_price_usd = 0; // user sets price manually for services
+          if (!updated._discountTouched) {
+            updated.discount_pct = 0;
+            updated.discount_amount_usd = 0;
+            updated.discount_type = 'pct';
+          }
         } else {
           const prod = products.find((p: any) => p.id === value);
           updated.unit_price_usd = getPriceForTier(prod, priceTier);
+          // Auto-apply discount rule unless manually overridden
+          if (!updated._discountTouched) {
+            const rule = findDiscountRule(contactId, prod?.category || null);
+            updated.discount_type = 'pct';
+            updated.discount_pct = rule ? Number(rule.discount_pct) : 0;
+            updated.discount_amount_usd = 0;
+            updated._discountDisplay = undefined;
+          }
         }
       }
       return updated;
