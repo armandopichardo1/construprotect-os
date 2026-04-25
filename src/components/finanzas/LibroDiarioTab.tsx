@@ -340,6 +340,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const buildExportRows = () => filtered.map(e => {
     const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
     return {
+      'N° Asiento': e.entry_number,
+      'Documento': e.document || '',
       Fecha: e.date,
       Tipo: TYPE_LABELS[e.type]?.label || e.type,
       Descripción: e.description,
