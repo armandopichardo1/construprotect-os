@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatUSD, formatDOP } from '@/lib/format';
@@ -93,6 +93,40 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const [editEntry, setEditEntry] = useState<any>(null);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Fetch sales w/ items to enrich export with discount info per sale
+  const { data: salesWithItems = [] } = useQuery({
+    queryKey: ['sales-discount-map'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('sales')
+        .select('id, invoice_ref, sale_items(quantity, unit_price_usd, gross_unit_price_usd, discount_pct, discount_amount_usd)');
+      return data || [];
+    },
+  });
+
+  // Map: short id (first 8 chars) and invoice_ref → discount totals
+  const discountBySaleKey = useMemo(() => {
+    const map = new Map<string, { discount_usd: number; gross_usd: number; discount_pct: number }>();
+    (salesWithItems as any[]).forEach((s: any) => {
+      const items = s.sale_items || [];
+      const discountUsd = items.reduce((sum: number, it: any) => sum + Number(it.discount_amount_usd || 0), 0);
+      const grossUsd = items.reduce((sum: number, it: any) => sum + Number(it.gross_unit_price_usd || it.unit_price_usd || 0) * Number(it.quantity || 0), 0);
+      const pct = grossUsd > 0 ? (discountUsd / grossUsd) * 100 : 0;
+      const payload = { discount_usd: discountUsd, gross_usd: grossUsd, discount_pct: pct };
+      map.set(s.id.slice(0, 8), payload);
+      if (s.invoice_ref) map.set(String(s.invoice_ref), payload);
+    });
+    return map;
+  }, [salesWithItems]);
+
+  /** For a sale journal entry, find discount via invoice_ref or short id parsed from description "Venta XXXXXXXX — ..." */
+  const getSaleDiscount = useCallback((desc: string) => {
+    const m = desc.match(/Venta\s+([^\s—]+)/i);
+    if (!m) return null;
+    return discountBySaleKey.get(m[1]) || null;
+  }, [discountBySaleKey]);
+
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => {
@@ -226,22 +260,29 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   };
 
   const handleExport = () => {
-    exportToExcel(filtered.map(e => ({
-      Fecha: e.date,
-      Tipo: TYPE_LABELS[e.type]?.label || e.type,
-      Descripción: e.description,
-      'Proveedor/Cliente': e.vendor_client,
-      'Cuenta Débito': e.account_name,
-      'Código Débito': e.account_code,
-      'Cuenta Crédito': e.credit_account_name,
-      'Código Crédito': e.credit_account_code,
-      'Débito USD': e.debit_usd || '',
-      'Crédito USD': e.credit_usd || '',
-      'Débito DOP': e.debit_dop || '',
-      'Crédito DOP': e.credit_dop || '',
-      'Tasa Cambio': e.exchange_rate,
-    })), 'libro-diario', 'Libro Diario');
+    exportToExcel(filtered.map(e => {
+      const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
+      return {
+        Fecha: e.date,
+        Tipo: TYPE_LABELS[e.type]?.label || e.type,
+        Descripción: e.description,
+        'Proveedor/Cliente': e.vendor_client,
+        'Cuenta Débito': e.account_name,
+        'Código Débito': e.account_code,
+        'Cuenta Crédito': e.credit_account_name,
+        'Código Crédito': e.credit_account_code,
+        'Débito USD': e.debit_usd || '',
+        'Crédito USD': e.credit_usd || '',
+        'Débito DOP': e.debit_dop || '',
+        'Crédito DOP': e.credit_dop || '',
+        'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
+        'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
+        'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
+        'Tasa Cambio': e.exchange_rate,
+      };
+    }), 'libro-diario', 'Libro Diario');
   };
+
 
   return (
     <div className="space-y-4">

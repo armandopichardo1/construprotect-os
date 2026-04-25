@@ -7,10 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil } from 'lucide-react';
+import { Package, ShoppingCart, ChevronRight, CalendarDays, User, FileText, PackageCheck, CreditCard, Pencil, Download } from 'lucide-react';
 import { ShipmentPaymentDialog } from '@/components/inventario/ShipmentPaymentDialog';
 import { ShipmentDialog } from '@/components/inventario/ShipmentDialog';
 import { SaleEditDialog } from '@/components/finanzas/SaleEditDialog';
+import { exportToExcel } from '@/lib/export-utils';
 import { toast } from 'sonner';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -242,8 +243,69 @@ export function OrdenesTab() {
 
       {/* Sales Orders */}
       {mode === 'ventas' && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="max-h-[calc(100vh-300px)] overflow-auto">
+        <div className="space-y-2">
+          <div className="flex justify-end">
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => {
+              const rows: any[] = [];
+              sales.forEach((s: any) => {
+                const ex = Number(s.exchange_rate) || rate;
+                const items = s.sale_items || [];
+                if (items.length === 0) {
+                  rows.push({
+                    Factura: s.invoice_ref || s.id.slice(0, 8),
+                    Fecha: s.date,
+                    Cliente: s.contacts?.contact_name || s.contacts?.company_name || '—',
+                    SKU: '—', Producto: '—', Cantidad: 0,
+                    'Precio Bruto USD': 0, 'Descuento %': 0, 'Descuento USD': 0,
+                    'Precio Neto USD': 0, 'Costo Unit. USD': 0,
+                    'Subtotal Línea USD': 0, 'Margen %': 0,
+                    'Tasa Cambio': ex,
+                    'Estado Pago': s.payment_status,
+                  });
+                  return;
+                }
+                items.forEach((it: any) => {
+                  const qty = Number(it.quantity || 0);
+                  const netUnit = Number(it.unit_price_usd || 0);
+                  // Prefer stored gross; fallback to product list price; finally to net
+                  const grossUnit = Number(it.gross_unit_price_usd || 0) > 0
+                    ? Number(it.gross_unit_price_usd)
+                    : Math.max(Number(it.products?.price_list_usd || 0), netUnit);
+                  const discountAmt = Number(it.discount_amount_usd || 0) > 0
+                    ? Number(it.discount_amount_usd)
+                    : Math.max(0, (grossUnit - netUnit) * qty);
+                  const discountPct = grossUnit > 0 ? (((grossUnit - netUnit) / grossUnit) * 100) : 0;
+                  const cost = Number(it.unit_cost_usd || 0);
+                  const lineTotal = Number(it.line_total_usd || 0);
+                  const margin = netUnit > 0 ? ((netUnit - cost) / netUnit) * 100 : 0;
+                  rows.push({
+                    Factura: s.invoice_ref || s.id.slice(0, 8),
+                    Fecha: s.date,
+                    Cliente: s.contacts?.contact_name || s.contacts?.company_name || '—',
+                    SKU: it.products?.sku || '—',
+                    Producto: it.products?.name || '—',
+                    Cantidad: qty,
+                    'Precio Bruto USD': Number(grossUnit.toFixed(2)),
+                    'Descuento %': Number(discountPct.toFixed(2)),
+                    'Descuento USD': Number(discountAmt.toFixed(2)),
+                    'Precio Neto USD': Number(netUnit.toFixed(2)),
+                    'Costo Unit. USD': Number(cost.toFixed(2)),
+                    'Subtotal Línea USD': Number(lineTotal.toFixed(2)),
+                    'Margen %': Number(margin.toFixed(2)),
+                    'Tasa Cambio': ex,
+                    'Estado Pago': s.payment_status,
+                  });
+                });
+              });
+              if (rows.length === 0) { toast.error('Sin ventas para exportar'); return; }
+              exportToExcel(rows, 'ordenes-venta-detalle', 'Detalle Ventas');
+              toast.success(`${rows.length} líneas exportadas`);
+            }}>
+              <Download className="w-3.5 h-3.5" /> Exportar detalle
+            </Button>
+          </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="max-h-[calc(100vh-300px)] overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <TableRow>
@@ -277,6 +339,7 @@ export function OrdenesTab() {
                 )}
               </TableBody>
             </Table>
+          </div>
           </div>
         </div>
       )}

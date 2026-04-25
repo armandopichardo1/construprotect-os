@@ -1353,6 +1353,9 @@ export type Database = {
       sale_items: {
         Row: {
           created_at: string
+          discount_amount_usd: number
+          discount_pct: number
+          gross_unit_price_usd: number
           id: string
           line_total_usd: number
           margin_pct: number | null
@@ -1364,6 +1367,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          discount_amount_usd?: number
+          discount_pct?: number
+          gross_unit_price_usd?: number
           id?: string
           line_total_usd?: number
           margin_pct?: number | null
@@ -1375,6 +1381,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          discount_amount_usd?: number
+          discount_pct?: number
+          gross_unit_price_usd?: number
           id?: string
           line_total_usd?: number
           margin_pct?: number | null
