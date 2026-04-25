@@ -85,6 +85,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo, filterByDate } = useDatePeriodFilter();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [duplicateEntry, setDuplicateEntry] = useState<any>(null);
@@ -150,6 +152,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const filtered = useMemo(() => {
     let items = filterByDate(entries);
     if (typeFilter !== 'all') items = items.filter(e => e.type === typeFilter);
+    if (yearFilter !== 'all') items = items.filter(e => e.date?.slice(0, 4) === yearFilter);
+    if (monthFilter !== 'all') items = items.filter(e => e.date?.slice(5, 7) === monthFilter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       items = items.filter(e =>
@@ -173,7 +177,13 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
-  }, [entries, typeFilter, searchQuery, filterByDate, sortField, sortDir]);
+  }, [entries, typeFilter, monthFilter, yearFilter, searchQuery, filterByDate, sortField, sortDir]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    entries.forEach(e => { if (e.date) years.add(e.date.slice(0, 4)); });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [entries]);
 
   const totals = useMemo(() => ({
     debit_usd: filtered.reduce((s, e) => s + e.debit_usd, 0),
@@ -253,6 +263,32 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
             <SelectItem value="journal" className="text-xs">📒 Asientos</SelectItem>
             <SelectItem value="purchase" className="text-xs">📦 Compras</SelectItem>
             <SelectItem value="credit_note" className="text-xs">📝 NC</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={monthFilter} onValueChange={setMonthFilter}>
+          <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos los meses</SelectItem>
+            {[
+              ['01', 'Enero'], ['02', 'Febrero'], ['03', 'Marzo'], ['04', 'Abril'],
+              ['05', 'Mayo'], ['06', 'Junio'], ['07', 'Julio'], ['08', 'Agosto'],
+              ['09', 'Septiembre'], ['10', 'Octubre'], ['11', 'Noviembre'], ['12', 'Diciembre'],
+            ].map(([v, l]) => (
+              <SelectItem key={v} value={v} className="text-xs">{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+          <SelectTrigger className="h-8 text-xs w-auto min-w-[90px]">
+            <SelectValue placeholder="Año" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos los años</SelectItem>
+            {availableYears.map(y => (
+              <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <DatePeriodFilter period={period} setPeriod={setPeriod} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
