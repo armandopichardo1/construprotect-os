@@ -147,8 +147,8 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
 
   const handleSave = async () => {
     if (!shipment) return;
-    if (shipment.status === 'received') {
-      toast.error('No se puede editar gastos de un envío ya recibido — afectaría WAC e inventario.');
+    if (shipment.status === 'received' && !capitalize) {
+      toast.error('Envío ya recibido — activa "Capitalizar como costo aterrizado" para recalcular WAC y márgenes, o cierra sin guardar.');
       return;
     }
     if (paymentMode === 'bank' && !bankAccountId && Math.abs(deltaAddons) > 0.001) {
