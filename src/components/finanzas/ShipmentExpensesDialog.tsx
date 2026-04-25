@@ -371,11 +371,15 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           </DialogDescription>
         </DialogHeader>
 
-        {isReceived ? (
-          <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground">
-            ⚠️ Este envío ya fue recibido. No se pueden editar los gastos porque afectaría el inventario, el WAC y los asientos contables ya registrados. Si necesitas corregir, registra una nota de crédito o un ajuste contable.
+        {isReceived && (
+          <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <div>
+              <strong>Envío ya recibido.</strong> Para que el ajuste se aplique al catálogo de productos, mantén activado <strong>"Capitalizar como costo aterrizado"</strong>. Esto recalculará WAC y márgenes futuros usando el stock disponible actual. Las ventas pasadas NO se ajustan retroactivamente.
+            </div>
           </div>
-        ) : (
+        )}
+        {(
           <div className="space-y-4">
             <div className="rounded-lg bg-muted/30 p-3 text-xs">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal FOB ({items.length} ítems)</span><span className="font-mono">{fmt(totalFob)}</span></div>
