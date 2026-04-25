@@ -174,6 +174,23 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   }, [willPostJournal, acct13000, acct20150, paymentMode, bankAccountId, selectedBankAcct]);
 
   const [reversalConfirmOpen, setReversalConfirmOpen] = useState(false);
+  const [previewConfirmOpen, setPreviewConfirmOpen] = useState(false);
+
+  // Cuentas DR/CR que se asentarán (para preview de confirmación)
+  const credAcctPreview = useMemo(() => {
+    if (paymentMode === 'cxp') return acct20150 || null;
+    return selectedBankAcct || null;
+  }, [paymentMode, acct20150, selectedBankAcct]);
+  const debitAcctPreview = inventoryAcct || null;
+
+  // Helper: navegar al Libro Diario filtrado por código de cuenta
+  const openLibroDiarioByAccount = (code: string | null | undefined) => {
+    if (!code) return;
+    onOpenChange(false);
+    setReversalConfirmOpen(false);
+    setPreviewConfirmOpen(false);
+    navigate(`/finanzas?tab=${encodeURIComponent('Libro Diario')}&q=${encodeURIComponent(code)}`);
+  };
 
   const handleSave = async () => {
     if (!shipment) return;
@@ -190,6 +207,11 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     // Paso de confirmación extra cuando el delta es negativo (se generará una reversa contable)
     if (deltaAddons < -0.001) {
       setReversalConfirmOpen(true);
+      return;
+    }
+    // Confirmación de tratamiento contable cuando se asentará un cargo positivo
+    if (deltaAddons > 0.001) {
+      setPreviewConfirmOpen(true);
       return;
     }
     await performSave();
