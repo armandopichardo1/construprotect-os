@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck, Wallet, Landmark, CheckCircle2 } from 'lucide-react';
+import { Truck, Sparkles, BookOpen, History, AlertTriangle, ShieldCheck, Wallet, Landmark, CheckCircle2, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 interface Props {
   open: boolean;
