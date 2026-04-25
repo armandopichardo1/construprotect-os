@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [updateWac, setUpdateWac] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
 
   const { data: accounts = [] } = useQuery({
@@ -104,6 +106,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
       );
       setBankAccountId(shipment.payment_account_id || '');
       setNotes('');
+      setUpdateWac(true);
     }
   }, [open, shipment?.id]);
 
@@ -194,6 +197,113 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
       const { error: linesErr } = await supabase.from('journal_entry_lines').insert(lines);
       if (linesErr) throw linesErr;
 
+      // 2.5) ACTUALIZACIÓN VERSIONADA DEL WAC (forward-only)
+      // Distribuye el ajuste por valor FOB entre los items del envío y, para cada
+      // producto, calcula un nuevo WAC sobre el stock disponible HOY. NO se tocan
+      // movimientos pasados; solo se inserta un movimiento "adjustment" de qty=0
+      // como marcador de versión y se actualiza products.unit_cost_usd /
+      // total_unit_cost_usd hacia adelante.
+      const wacUpdates: { sku: string; oldCost: number; newCost: number; deltaPerUnit: number }[] = [];
+      if (updateWac) {
+        const items: any[] = shipment.shipment_items || [];
+        const itemFobTotals = items.map((it: any) => ({
+          item: it,
+          base: Number(it.unit_cost_usd || 0) * Number(it.quantity_ordered || 0),
+        }));
+        const sumBase = itemFobTotals.reduce((s, x) => s + x.base, 0);
+        const useUnits = sumBase <= 0;
+        const sumUnits = items.reduce((s: number, it: any) => s + Number(it.quantity_ordered || 0), 0);
+
+        for (const { item, base } of itemFobTotals) {
+          if (!item.product_id) continue;
+          const qtyOrdered = Number(item.quantity_ordered || 0);
+          const share = useUnits
+            ? (sumUnits > 0 ? qtyOrdered / sumUnits : 0)
+            : (sumBase > 0 ? base / sumBase : 0);
+          const lineAddon = amountUsd * share;
+          if (lineAddon <= 0 || qtyOrdered <= 0) continue;
+          const addonPerUnit = lineAddon / qtyOrdered;
+
+          const { data: prod } = await supabase
+            .from('products')
+            .select('sku, unit_cost_usd, total_unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd')
+            .eq('id', item.product_id)
+            .single();
+          if (!prod) continue;
+
+          const currentCost = Number(prod.unit_cost_usd || 0);
+          let newCost = currentCost;
+          let deltaPerUnit = 0;
+
+          if (isReceived) {
+            // WAC forward-only sobre stock disponible HOY:
+            // newWAC = (stockOnHand × currentWAC + addonPerUnit × min(stockOnHand, qtyOrdered)) / stockOnHand
+            // Las unidades ya vendidas no se reajustan: su COGS pasado queda intacto.
+            const { data: inv } = await supabase
+              .from('inventory')
+              .select('quantity_on_hand')
+              .eq('product_id', item.product_id)
+              .maybeSingle();
+            const stockQty = Number(inv?.quantity_on_hand || 0);
+            if (stockQty > 0) {
+              const applicableUnits = Math.min(stockQty, qtyOrdered);
+              const applicableAddon = addonPerUnit * applicableUnits;
+              const onHandValue = stockQty * currentCost;
+              newCost = (onHandValue + applicableAddon) / stockQty;
+              deltaPerUnit = newCost - currentCost;
+            } else {
+              continue;
+            }
+          } else {
+            // Envío aún no recibido: sumamos el addon al unit_cost del item para
+            // que cuando se reciba, el WAC use el costo correcto.
+            newCost = currentCost + addonPerUnit;
+            deltaPerUnit = addonPerUnit;
+            const newItemCost = Number(item.unit_cost_usd || 0) + addonPerUnit;
+            await supabase
+              .from('shipment_items')
+              .update({ unit_cost_usd: Number(newItemCost.toFixed(4)) })
+              .eq('id', item.id);
+          }
+
+          // Versionado del WAC en products (solo unit_cost_usd / total_unit_cost_usd)
+          const updates: Record<string, number> = {
+            unit_cost_usd: Number(newCost.toFixed(4)),
+            total_unit_cost_usd: Number(newCost.toFixed(4)),
+          };
+          [
+            { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+            { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+            { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+            { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+          ].forEach(({ price, field }) => {
+            if (price > 0) updates[field] = Number((((price - newCost) / price) * 100).toFixed(1));
+          });
+          const { error: prodErr } = await supabase
+            .from('products')
+            .update(updates as any)
+            .eq('id', item.product_id);
+          if (prodErr) throw prodErr;
+
+          // Marcador de versión en inventory_movements: qty=0, no altera stock.
+          // Los movimientos previos quedan INTACTOS con su unit_cost_usd original.
+          if (Math.abs(deltaPerUnit) > 0.0001) {
+            await supabase.from('inventory_movements').insert({
+              product_id: item.product_id,
+              quantity: 0,
+              movement_type: 'adjustment',
+              unit_cost_usd: Number(newCost.toFixed(4)),
+              reference_id: je.id,
+              reference_type: 'shipment_expense_historical_adjustment',
+              notes: `Versión WAC por ajuste histórico — Envío ${poRef} · ${categoryLabel} +${fmt(amountUsd)} (fecha efectiva ${dateStr}) · WAC ${currentCost.toFixed(4)} → ${newCost.toFixed(4)} (Δ ${deltaPerUnit >= 0 ? '+' : ''}${deltaPerUnit.toFixed(4)} USD/u). Movimientos previos no alterados.`,
+            });
+          }
+
+          wacUpdates.push({ sku: prod.sku, oldCost: currentCost, newCost, deltaPerUnit });
+        }
+      }
+
+
       // 3) Registrar en el historial del envío
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes?.user?.id || null;
@@ -226,8 +336,13 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
         });
       if (histErr) console.warn('No se pudo registrar el historial:', histErr.message);
 
-      toast.success(`Ajuste histórico registrado (${fmt(amountUsd)}) con fecha ${format(effectiveDate, "d MMM yyyy", { locale: es })}`, {
-        description: 'No se modificó el costo unitario ni el WAC. Para reprorratear usa "Editar gastos".',
+      const wacMsg = updateWac && wacUpdates.length > 0
+        ? ` · WAC versionado en ${wacUpdates.length} producto(s)`
+        : (updateWac ? ' · sin productos con stock para versionar WAC' : '');
+      toast.success(`Ajuste histórico registrado (${fmt(amountUsd)}) con fecha ${format(effectiveDate, "d MMM yyyy", { locale: es })}${wacMsg}`, {
+        description: updateWac
+          ? 'WAC actualizado hacia adelante. Movimientos previos quedan intactos.'
+          : 'Solo asiento contable. WAC y costo unitario no modificados.',
       });
 
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
@@ -235,6 +350,9 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
       queryClient.invalidateQueries({ queryKey: ['shipment-expense-history', shipment.id] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
@@ -374,6 +492,21 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
             />
           </div>
 
+          {/* Toggle: actualizar WAC versionado */}
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/20 p-2.5">
+            <div className="space-y-0.5">
+              <Label htmlFor="update-wac" className="text-xs font-medium cursor-pointer">
+                Actualizar WAC versionado
+              </Label>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {isReceived
+                  ? 'Recalcula unit_cost_usd y total_unit_cost_usd sobre el stock disponible HOY. Los movimientos previos en inventory_movements no se modifican; se inserta un movimiento qty=0 como marcador de versión.'
+                  : 'Suma el ajuste al unit_cost del item. El WAC se aplicará correctamente cuando se reciba el envío.'}
+              </p>
+            </div>
+            <Switch id="update-wac" checked={updateWac} onCheckedChange={setUpdateWac} />
+          </div>
+
           {/* Vista previa contable */}
           {amountUsd > 0 && debitAcct && credAcct && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
@@ -392,6 +525,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
               </div>
               <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/40">
                 Fecha del asiento: {format(effectiveDate, "d MMM yyyy", { locale: es })}
+                {updateWac && <> · WAC versionado activo</>}
               </div>
             </div>
           )}
@@ -406,8 +540,8 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
           )}
 
           <div className="text-[10px] text-muted-foreground italic">
-            Este flujo NO reprorratea el costo unitario por producto ni recalcula WAC. Si necesitas
-            redistribuir el costo aterrizado, usa el botón "Editar gastos".
+            Forward-only: las unidades ya vendidas conservan su COGS pasado. Si necesitas
+            redistribuir todo el costo aterrizado del envío, usa "Editar gastos".
           </div>
         </div>
 
