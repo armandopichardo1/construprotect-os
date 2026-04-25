@@ -730,16 +730,13 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                 </div>
               )}
             </div>
-          </div>
-        )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          {!isReceived && (
-            <Button onClick={handleSave} disabled={saving || items.length === 0}>
-              {saving ? 'Guardando...' : 'Guardar y Reprorratear'}
-            </Button>
-          )}
+          <Button onClick={handleSave} disabled={saving || items.length === 0}>
+            {saving ? 'Guardando...' : (isReceived && capitalize ? 'Guardar y Capitalizar' : 'Guardar y Reprorratear')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
