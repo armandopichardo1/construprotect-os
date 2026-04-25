@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ProductosContent } from '@/pages/ProductosPage';
+import { DiscountRulesManager } from '@/components/shared/DiscountRulesManager';
 
 const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Reglas de Descuento', 'Cuentas Contables', 'Tasas de Cambio'];
 
