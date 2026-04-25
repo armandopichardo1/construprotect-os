@@ -1355,6 +1355,7 @@ export type Database = {
           created_at: string
           discount_amount_usd: number
           discount_pct: number
+          discount_type: string
           gross_unit_price_usd: number
           id: string
           line_total_usd: number
@@ -1369,6 +1370,7 @@ export type Database = {
           created_at?: string
           discount_amount_usd?: number
           discount_pct?: number
+          discount_type?: string
           gross_unit_price_usd?: number
           id?: string
           line_total_usd?: number
@@ -1383,6 +1385,7 @@ export type Database = {
           created_at?: string
           discount_amount_usd?: number
           discount_pct?: number
+          discount_type?: string
           gross_unit_price_usd?: number
           id?: string
           line_total_usd?: number
