@@ -51,6 +51,7 @@ export function ShipmentHistoricalAdjustmentDialog({ open, onOpenChange, shipmen
   const [paymentMode, setPaymentMode] = useState<'cxp' | 'bank'>('cxp');
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [updateWac, setUpdateWac] = useState<boolean>(true);
   const [saving, setSaving] = useState(false);
 
   const { data: accounts = [] } = useQuery({
