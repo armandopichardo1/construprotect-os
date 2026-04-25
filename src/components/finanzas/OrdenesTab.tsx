@@ -435,42 +435,58 @@ export function OrdenesTab() {
                   </div>
 
                   {/* Costs breakdown */}
-                  <div className="rounded-xl bg-muted/30 p-3 space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Costo Productos</span>
-                      <span className="font-mono">{formatDOP(totalCostUSD * rate)}</span>
-                    </div>
-                    {Number(detailOrder.shipping_cost_usd) > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Envío</span>
-                        <span className="font-mono">{formatDOP(Number(detailOrder.shipping_cost_usd) * rate)}</span>
-                      </div>
-                    )}
-                    {Number(detailOrder.customs_cost_usd) > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Aduana</span>
-                        <span className="font-mono">{formatDOP(Number(detailOrder.customs_cost_usd) * rate)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-xs font-semibold border-t border-border pt-1.5">
-                      <span>Total</span>
-                      <span className="font-mono">{formatDOP((totalCostUSD + Number(detailOrder.shipping_cost_usd || 0) + Number(detailOrder.customs_cost_usd || 0)) * rate)}</span>
-                    </div>
-                    {paidUSD > 0 && (
-                      <>
-                        <div className="flex justify-between text-xs text-success">
-                          <span>Pagado</span>
-                          <span className="font-mono">{formatDOP(paidUSD * rate)}</span>
+                  {(() => {
+                    const otherMatch = String(detailOrder.notes || '').match(/Otros \$([0-9.]+)/);
+                    const otherUSD = otherMatch ? Number(otherMatch[1]) : 0;
+                    const shippingUSD = Number(detailOrder.shipping_cost_usd || 0);
+                    const customsUSD = Number(detailOrder.customs_cost_usd || 0);
+                    const addonsUSD = shippingUSD + customsUSD + otherUSD;
+                    const landedUSD = totalCostUSD + addonsUSD;
+                    return (
+                      <div className="rounded-xl bg-muted/30 p-3 space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Subtotal FOB (productos)</span>
+                          <span className="font-mono">{formatDOP(totalCostUSD * rate)}</span>
                         </div>
-                        {pendingUSD > 0 && (
-                          <div className="flex justify-between text-xs text-amber-400">
-                            <span>Saldo Pendiente</span>
-                            <span className="font-mono">{formatDOP(pendingUSD * rate)}</span>
+                        {shippingUSD > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">+ Flete</span>
+                            <span className="font-mono">{formatDOP(shippingUSD * rate)}</span>
                           </div>
                         )}
-                      </>
-                    )}
-                  </div>
+                        {customsUSD > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">+ Aduana</span>
+                            <span className="font-mono">{formatDOP(customsUSD * rate)}</span>
+                          </div>
+                        )}
+                        {otherUSD > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">+ Otros gastos</span>
+                            <span className="font-mono">{formatDOP(otherUSD * rate)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs font-semibold border-t border-border pt-1.5">
+                          <span>Costo Aterrizado Total</span>
+                          <span className="font-mono text-primary">{formatDOP(landedUSD * rate)}</span>
+                        </div>
+                        {paidUSD > 0 && (
+                          <>
+                            <div className="flex justify-between text-xs text-success">
+                              <span>Pagado</span>
+                              <span className="font-mono">{formatDOP(paidUSD * rate)}</span>
+                            </div>
+                            {pendingUSD > 0 && (
+                              <div className="flex justify-between text-xs text-warning">
+                                <span>Saldo Pendiente</span>
+                                <span className="font-mono">{formatDOP(pendingUSD * rate)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Items table */}
                   {(detailOrder.shipment_items?.length || 0) > 0 ? (
