@@ -259,7 +259,7 @@ export function DiscountRulesManager() {
         <Dialog open onOpenChange={() => setEditing(null)}>
           <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editing.id ? 'Editar Regla de Descuento' : 'Nueva Regla de Descuento'}</DialogTitle></DialogHeader>
-            <DiscountRuleForm initial={editing} contacts={contacts} categories={categories} onSave={handleSave} onCancel={() => setEditing(null)} />
+            <DiscountRuleForm initial={editing} contacts={contacts} categories={categories} existingRules={rules} onSave={handleSave} onCancel={() => setEditing(null)} />
           </DialogContent>
         </Dialog>
       )}
