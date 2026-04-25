@@ -65,16 +65,18 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
   });
 
   // Load journal entries previously linked to this shipment (via history)
+  const historyJournalIds = useMemo(
+    () => (history || []).map((h: any) => h.journal_entry_id).filter(Boolean) as string[],
+    [history]
+  );
   const { data: linkedJournals = [] } = useQuery({
-    queryKey: ['shipment-linked-journals', shipment?.id],
-    enabled: !!shipment?.id && open,
+    queryKey: ['shipment-linked-journals', shipment?.id, historyJournalIds.join(',')],
+    enabled: !!shipment?.id && open && historyJournalIds.length > 0,
     queryFn: async () => {
-      const ids = (history || []).map((h: any) => h.journal_entry_id).filter(Boolean);
-      if (ids.length === 0) return [];
       const { data } = await supabase
         .from('journal_entries')
         .select('id, date, description, total_debit_usd')
-        .in('id', ids);
+        .in('id', historyJournalIds);
       return data || [];
     },
   });
