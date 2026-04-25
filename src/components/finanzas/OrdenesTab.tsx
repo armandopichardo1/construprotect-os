@@ -257,9 +257,9 @@ export function OrdenesTab() {
                           variant={hasAddons ? 'outline' : 'default'}
                           className="h-7 text-[10px] gap-1 px-2"
                           disabled={!canEditExpenses}
-                          title={canEditExpenses
-                            ? (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')
-                            : 'Envío ya recibido — no se puede editar gastos'}
+                          title={s.status === 'received'
+                            ? 'Envío recibido — al guardar se capitalizará como ajuste de costo aterrizado (WAC + márgenes)'
+                            : (hasAddons ? 'Editar flete / aduana / otros y reprorratear inventario' : 'Agregar flete / aduana / otros y prorratear al inventario')}
                           onClick={() => setEditExpenses(s)}
                         >
                           <Truck className="w-3 h-3" />
