@@ -669,7 +669,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       await supabase.from('journal_entry_lines').insert(linesData);
     }
 
-    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+    invalidateJournalCaches(entry.id);
+    return entry.id as string;
   };
 
   // ===== MANUAL SAVE =====
