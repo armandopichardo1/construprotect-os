@@ -260,22 +260,29 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   };
 
   const handleExport = () => {
-    exportToExcel(filtered.map(e => ({
-      Fecha: e.date,
-      Tipo: TYPE_LABELS[e.type]?.label || e.type,
-      Descripción: e.description,
-      'Proveedor/Cliente': e.vendor_client,
-      'Cuenta Débito': e.account_name,
-      'Código Débito': e.account_code,
-      'Cuenta Crédito': e.credit_account_name,
-      'Código Crédito': e.credit_account_code,
-      'Débito USD': e.debit_usd || '',
-      'Crédito USD': e.credit_usd || '',
-      'Débito DOP': e.debit_dop || '',
-      'Crédito DOP': e.credit_dop || '',
-      'Tasa Cambio': e.exchange_rate,
-    })), 'libro-diario', 'Libro Diario');
+    exportToExcel(filtered.map(e => {
+      const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
+      return {
+        Fecha: e.date,
+        Tipo: TYPE_LABELS[e.type]?.label || e.type,
+        Descripción: e.description,
+        'Proveedor/Cliente': e.vendor_client,
+        'Cuenta Débito': e.account_name,
+        'Código Débito': e.account_code,
+        'Cuenta Crédito': e.credit_account_name,
+        'Código Crédito': e.credit_account_code,
+        'Débito USD': e.debit_usd || '',
+        'Crédito USD': e.credit_usd || '',
+        'Débito DOP': e.debit_dop || '',
+        'Crédito DOP': e.credit_dop || '',
+        'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
+        'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
+        'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
+        'Tasa Cambio': e.exchange_rate,
+      };
+    }), 'libro-diario', 'Libro Diario');
   };
+
 
   return (
     <div className="space-y-4">
