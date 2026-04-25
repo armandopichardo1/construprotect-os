@@ -106,6 +106,8 @@ interface SaleItem {
   quantity: number;
   unit_price_usd: number;
   discount_pct: number;
+  discount_amount_usd: number; // absolute discount per line in USD
+  discount_type: 'pct' | 'amount';
   _priceDisplay?: string; // raw string for decimal input
   _discountDisplay?: string;
 }
@@ -228,7 +230,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [invoiceRef, setInvoiceRef] = useState('');
   const [priceTier, setPriceTier] = useState('list');
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
 
   // Purchase-specific state
   const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
@@ -334,7 +336,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
   const removeSaleItem = (i: number) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
@@ -353,7 +355,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const lineNetUsd = (it: SaleItem) => it.unit_price_usd * it.quantity * (1 - (it.discount_pct || 0) / 100);
+  const lineGrossUsd = (it: SaleItem) => it.unit_price_usd * it.quantity;
+  const lineDiscountUsd = (it: SaleItem) => {
+    const gross = lineGrossUsd(it);
+    if (it.discount_type === 'amount') return Math.min(gross, Math.max(0, it.discount_amount_usd || 0));
+    return gross * (Math.min(100, Math.max(0, it.discount_pct || 0)) / 100);
+  };
+  const lineNetUsd = (it: SaleItem) => Math.max(0, lineGrossUsd(it) - lineDiscountUsd(it));
   const subtotal = saleItems.reduce((s, i) => s + lineNetUsd(i), 0);
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
@@ -499,7 +507,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setAmount(''); setManualDate(undefined); setCustomRate(''); setEditingRate(false);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
-    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
     setPurchaseSupplierId(''); setPurchaseSupplierName('');
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
@@ -702,11 +710,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           const realProductId = isService ? null : i.product_id;
           const prod = isService ? null : products.find((p: any) => p.id === i.product_id);
           const costUsd = Number(prod?.unit_cost_usd || 0);
-          const netUnit = i.unit_price_usd * (1 - (i.discount_pct || 0) / 100);
+          const qty = i.quantity || 0;
+          const netLine = lineNetUsd(i);
+          const netUnit = qty > 0 ? netLine / qty : 0;
           return {
-            sale_id: sale.id, product_id: realProductId, quantity: i.quantity,
+            sale_id: sale.id, product_id: realProductId, quantity: qty,
             unit_price_usd: netUnit, unit_cost_usd: costUsd,
-            line_total_usd: netUnit * i.quantity,
+            line_total_usd: netLine,
             margin_pct: netUnit > 0 ? Math.round((netUnit - costUsd) / netUnit * 100) : 0,
           };
         });
@@ -1261,7 +1271,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <span className="flex-1">Producto / Servicio</span>
                     <span className="w-12 text-center">Cant</span>
                     <span className="w-24">Precio</span>
-                    <span className="w-14 text-center">Desc %</span>
+                    <span className="w-[104px] text-center">Descuento</span>
                     <span className="w-20 text-right">Total</span>
                   </div>
                   {saleItems.map((item, i) => {
@@ -1299,21 +1309,49 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                           }}
                           className="text-xs" placeholder={`${currencySymbol}0.00`} />
                       </div>
-                      <div className="w-14 shrink-0">
+                      <div className="w-[104px] shrink-0 flex gap-0.5">
                         <Input type="text" inputMode="decimal"
-                          value={item._discountDisplay ?? (item.discount_pct ? String(item.discount_pct) : '')}
+                          value={
+                            item._discountDisplay ??
+                            (item.discount_type === 'pct'
+                              ? (item.discount_pct ? String(item.discount_pct) : '')
+                              : (item.discount_amount_usd
+                                  ? String(currencyBase === 'USD'
+                                      ? Math.round(item.discount_amount_usd * 100) / 100
+                                      : Math.round(item.discount_amount_usd * xr * 100) / 100)
+                                  : ''))
+                          }
                           onChange={e => {
                             const raw = e.target.value.replace(/[^0-9.,]/g, '');
                             setSaleItems(prev => prev.map((it, idx) => {
                               if (idx !== i) return it;
-                              const val = Math.min(100, Math.max(0, parseNum(raw)));
-                              return { ...it, _discountDisplay: raw, discount_pct: val };
+                              const val = parseNum(raw);
+                              if (it.discount_type === 'pct') {
+                                const pct = Math.min(100, Math.max(0, val));
+                                return { ...it, _discountDisplay: raw, discount_pct: pct };
+                              }
+                              const usd = currencyBase === 'USD' ? val : val / xr;
+                              return { ...it, _discountDisplay: raw, discount_amount_usd: usd };
                             }));
                           }}
                           onBlur={() => {
                             setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : { ...it, _discountDisplay: undefined }));
                           }}
-                          className="text-xs text-center" placeholder="0" />
+                          className="text-xs text-center px-1" placeholder="0" />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSaleItems(prev => prev.map((it, idx) => idx !== i ? it : {
+                              ...it,
+                              discount_type: it.discount_type === 'pct' ? 'amount' : 'pct',
+                              _discountDisplay: undefined,
+                            }))
+                          }
+                          className="w-7 shrink-0 rounded-md border border-input bg-muted/40 hover:bg-muted text-xs font-semibold"
+                          title={item.discount_type === 'pct' ? 'Cambiar a monto' : 'Cambiar a porcentaje'}
+                        >
+                          {item.discount_type === 'pct' ? '%' : currencySymbol}
+                        </button>
                       </div>
                       <span className="text-xs font-mono w-20 text-right shrink-0 pb-2">{lineTotalBase > 0 ? formatBase(lineTotalDisplay) : '—'}</span>
                       {saleItems.length > 1 && (
