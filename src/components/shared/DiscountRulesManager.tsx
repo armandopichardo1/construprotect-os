@@ -15,6 +15,27 @@ import { cn } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
+// Cross-scope overlap: rules whose scope STRICTLY contains or is contained by the form's scope.
+// e.g. form = (contactA + categoryX)  overlaps with  (contactA, *)  and (*, categoryX)
+//      form = (contactA, *)           overlaps with  (contactA + anyCategory)
+// Identical scope is excluded (handled separately as "same scope").
+// Global rules (no contact AND no category) are skipped — they don't apply at runtime.
+function findCrossScopeOverlaps(form: any, rules: any[]): any[] {
+  const fc = form.contact_id || null;
+  const fk = form.category || null;
+  if (!fc && !fk) return [];
+  return rules.filter((r: any) => {
+    if (r.id === form.id || !r.is_active) return false;
+    const rc = r.contact_id || null;
+    const rk = r.category || null;
+    if (!rc && !rk) return false;
+    if (rc === fc && rk === fk) return false; // identical scope handled elsewhere
+    const rCoversForm = (rc ? rc === fc : true) && (rk ? rk === fk : true);
+    const formCoversR = (fc ? fc === rc : true) && (fk ? fk === rk : true);
+    return rCoversForm || formCoversR;
+  });
+}
+
 export function DiscountRulesManager() {
   const queryClient = useQueryClient();
   const { data: rules = [], isLoading } = useQuery({
@@ -108,6 +129,27 @@ export function DiscountRulesManager() {
           ? `Conflicto: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría y MISMA prioridad (${form.priority || 0}). El resultado al aplicar será impredecible. ¿Guardar de todos modos?`
           : `Aviso: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría. Se usará la de mayor prioridad. ¿Guardar?`;
         if (!window.confirm(msg)) return;
+      }
+
+      // Cross-scope overlap detection: rule scopes that include or are included by this one
+      // (e.g. Cliente+Categoría vs Cliente solo, o Categoría sola).
+      const crossOverlaps = findCrossScopeOverlaps(form, rules);
+      if (crossOverlaps.length > 0) {
+        const formPrio = Number(form.priority || 0);
+        const lines = crossOverlaps.map((o: any) => {
+          const scope = o.contact_id && o.category ? 'Cliente+Categoría'
+            : o.contact_id ? 'Cliente' : 'Categoría';
+          const cName = contacts.find((c: any) => c.id === o.contact_id)?.contact_name || (o.contact_id ? '—' : 'Todos');
+          const winner = Number(o.priority || 0) > formPrio ? ' → GANA esta regla existente'
+            : Number(o.priority || 0) < formPrio ? ' → gana la nueva'
+            : ' → MISMA prioridad (impredecible)';
+          return `• ${scope} [${cName} / ${o.category || 'Todas'}] p${o.priority || 0}${winner}`;
+        }).join('\n');
+        const hasTie = crossOverlaps.some((o: any) => Number(o.priority || 0) === formPrio);
+        const header = hasTie
+          ? `Solape con MISMA prioridad detectado (${crossOverlaps.length} regla[s] de alcance distinto). El resultado al aplicar será impredecible.`
+          : `Solape de alcances distintos detectado (${crossOverlaps.length} regla[s]). Solo ganará la de mayor prioridad.`;
+        if (!window.confirm(`${header}\n\n${lines}\n\n¿Guardar de todos modos?`)) return;
       }
     }
 
@@ -288,6 +330,12 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
     );
   }, [existingRules, form]);
   const samePriorityConflict = liveConflicts.some((r: any) => Number(r.priority) === Number(form.priority || 0));
+  const liveCrossOverlaps = useMemo(
+    () => ((form.is_active ?? true) ? findCrossScopeOverlaps(form, existingRules) : []),
+    [existingRules, form]
+  );
+  const formPriority = Number(form.priority || 0);
+  const crossSamePriority = liveCrossOverlaps.some((r: any) => Number(r.priority || 0) === formPriority);
 
   return (
     <div className="space-y-3">
@@ -384,6 +432,31 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
             <span className="text-muted-foreground">
               Prioridades existentes: {liveConflicts.map((r: any) => r.priority).join(', ')}. {samePriorityConflict ? 'Cambia la prioridad para definir cuál gana.' : 'Se aplicará la de mayor prioridad.'}
             </span>
+          </div>
+        </div>
+      )}
+
+      {liveCrossOverlaps.length > 0 && (
+        <div className={cn(
+          'rounded-lg border p-2.5 text-[11px] flex items-start gap-2',
+          crossSamePriority ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-warning/40 bg-warning/10 text-warning'
+        )}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="block">
+              {crossSamePriority
+                ? `Solape cruzado con MISMA prioridad: ${liveCrossOverlaps.length} regla(s) de alcance distinto.`
+                : `Solape cruzado: ${liveCrossOverlaps.length} regla(s) activa(s) cubren un alcance que se solapa con éste.`}
+            </strong>
+            <ul className="text-muted-foreground space-y-0.5 pl-3 list-disc">
+              {liveCrossOverlaps.slice(0, 4).map((o: any) => {
+                const scope = o.contact_id && o.category ? 'Cliente+Categoría' : o.contact_id ? 'Cliente' : 'Categoría';
+                const cmp = Number(o.priority || 0) > formPriority ? 'gana esta existente' : Number(o.priority || 0) < formPriority ? 'gana la nueva' : 'empate (impredecible)';
+                return <li key={o.id}>{scope} · prioridad {o.priority || 0} · {cmp}</li>;
+              })}
+              {liveCrossOverlaps.length > 4 && <li>… y {liveCrossOverlaps.length - 4} más</li>}
+            </ul>
+            <span className="block text-muted-foreground">Ajusta prioridad o restringe el alcance para evitar resultados ambiguos.</span>
           </div>
         </div>
       )}
