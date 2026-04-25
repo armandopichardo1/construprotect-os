@@ -355,7 +355,13 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const lineNetUsd = (it: SaleItem) => it.unit_price_usd * it.quantity * (1 - (it.discount_pct || 0) / 100);
+  const lineGrossUsd = (it: SaleItem) => it.unit_price_usd * it.quantity;
+  const lineDiscountUsd = (it: SaleItem) => {
+    const gross = lineGrossUsd(it);
+    if (it.discount_type === 'amount') return Math.min(gross, Math.max(0, it.discount_amount_usd || 0));
+    return gross * (Math.min(100, Math.max(0, it.discount_pct || 0)) / 100);
+  };
+  const lineNetUsd = (it: SaleItem) => Math.max(0, lineGrossUsd(it) - lineDiscountUsd(it));
   const subtotal = saleItems.reduce((s, i) => s + lineNetUsd(i), 0);
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
