@@ -269,11 +269,23 @@ export function DiscountRulesManager() {
   );
 }
 
-function DiscountRuleForm({ initial, contacts, categories, onSave, onCancel }: { initial: any; contacts: any[]; categories: string[]; onSave: (d: any) => Promise<void>; onCancel: () => void }) {
+function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave, onCancel }: { initial: any; contacts: any[]; categories: string[]; existingRules: any[]; onSave: (d: any) => Promise<void>; onCancel: () => void }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
   const submit = async () => { setSaving(true); await onSave(form); setSaving(false); };
+
+  // Live conflict preview
+  const liveConflicts = useMemo(() => {
+    if (!(form.is_active ?? true)) return [];
+    return existingRules.filter((r: any) =>
+      r.id !== form.id &&
+      r.is_active &&
+      (r.contact_id || null) === (form.contact_id || null) &&
+      (r.category || null) === (form.category || null)
+    );
+  }, [existingRules, form]);
+  const samePriorityConflict = liveConflicts.some((r: any) => Number(r.priority) === Number(form.priority || 0));
 
   return (
     <div className="space-y-3">
