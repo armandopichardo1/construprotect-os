@@ -52,7 +52,24 @@ export function OrdenesTab() {
         .order('created_at', { ascending: false });
       return data || [];
     },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
+
+  // Mantener el snapshot del detalle/edición sincronizado con la lista refrescada
+  // (cuando el diálogo de gastos invalida la query, debe verse al instante).
+  useEffect(() => {
+    if (!shipments.length) return;
+    if (detailOrder && detailType === 'compras') {
+      const fresh = shipments.find((s: any) => s.id === detailOrder.id);
+      if (fresh && fresh !== detailOrder) setDetailOrder(fresh);
+    }
+    if (editExpenses) {
+      const fresh = shipments.find((s: any) => s.id === editExpenses.id);
+      if (fresh && fresh !== editExpenses) setEditExpenses(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipments]);
 
   const { data: sales = [] } = useQuery({
     queryKey: ['sales-orders'],
