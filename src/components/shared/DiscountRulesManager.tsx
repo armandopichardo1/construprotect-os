@@ -84,6 +84,33 @@ export function DiscountRulesManager() {
       if (amt <= 0) { toast.error('El monto debe ser mayor a 0'); return; }
     }
 
+    // Conflict / duplicate detection vs existing active rules with same scope
+    if (form.is_active ?? true) {
+      const sameScope = rules.filter((r: any) =>
+        r.id !== form.id &&
+        r.is_active &&
+        (r.contact_id || null) === (form.contact_id || null) &&
+        (r.category || null) === (form.category || null)
+      );
+      if (sameScope.length > 0) {
+        const exactDup = sameScope.find((r: any) =>
+          r.discount_type === form.discount_type &&
+          Number(r.discount_pct) === Number(form.discount_pct || 0) &&
+          Number(r.discount_amount_usd) === Number(form.discount_amount_usd || 0) &&
+          Number(r.priority) === Number(form.priority || 0)
+        );
+        if (exactDup) {
+          toast.error('Regla duplicada: ya existe una regla activa idéntica para el mismo cliente/categoría.');
+          return;
+        }
+        const samePriority = sameScope.find((r: any) => Number(r.priority) === Number(form.priority || 0));
+        const msg = samePriority
+          ? `Conflicto: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría y MISMA prioridad (${form.priority || 0}). El resultado al aplicar será impredecible. ¿Guardar de todos modos?`
+          : `Aviso: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría. Se usará la de mayor prioridad. ¿Guardar?`;
+        if (!window.confirm(msg)) return;
+      }
+    }
+
     const payload: any = {
       name: form.name?.trim() || null,
       contact_id: form.contact_id || null,
