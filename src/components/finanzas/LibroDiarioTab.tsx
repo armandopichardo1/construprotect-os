@@ -16,11 +16,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DatePeriodFilter, useDatePeriodFilter } from './DatePeriodFilter';
 import { exportToExcel, exportToCSV } from '@/lib/export-utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { JournalEntryDuplicateDialog } from './JournalEntryDuplicateDialog';
 import { JournalEntryEditDialog } from './JournalEntryEditDialog';
 
 interface JournalEntry {
   id: string;
+  entry_number: string;
+  document: string;
   date: string;
   type: 'sale' | 'expense' | 'cost' | 'journal' | 'purchase' | 'credit_note';
   description: string;
@@ -74,6 +78,14 @@ function extractVendorClient(desc: string): string {
     }
   }
   return '—';
+}
+
+/** Extract document/reference (factura, PO, NC, etc.) from description first segment */
+function extractDocument(desc: string): string {
+  // Patterns like "Venta INV-001 — ...", "Compra PO-123 — ...", "Nota de crédito NC-7 — ..."
+  const m = desc.match(/^(?:Venta|Compra|Nota de cr[eé]dito|NC|Gasto|Costo|Asiento)\s+([^\s—]+)/i);
+  if (m && m[1]) return m[1];
+  return '';
 }
 
 interface Props {
@@ -144,7 +156,23 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const entries: JournalEntry[] = useMemo(() => {
     const all: JournalEntry[] = [];
 
-    // Sort journal entries by date DESC then by created_at DESC for same-date entries
+    // Sort ASC first to assign correlative entry numbers per year, then we will display DESC
+    const ascending = [...journalEntries].sort((a: any, b: any) => {
+      const dateCmp = (a.date || '').localeCompare(b.date || '');
+      if (dateCmp !== 0) return dateCmp;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+
+    const yearCounters = new Map<string, number>();
+    const numberById = new Map<string, string>();
+    ascending.forEach((je: any) => {
+      const year = (je.date || '').slice(0, 4) || '----';
+      const next = (yearCounters.get(year) || 0) + 1;
+      yearCounters.set(year, next);
+      numberById.set(je.id, `AS-${year}-${String(next).padStart(5, '0')}`);
+    });
+
+    // Display order: DESC by date, then created_at
     const sorted = [...journalEntries].sort((a: any, b: any) => {
       const dateCmp = (b.date || '').localeCompare(a.date || '');
       if (dateCmp !== 0) return dateCmp;
@@ -160,9 +188,12 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       const exRate = Number(je.exchange_rate) || rate;
       const type = inferType(je.description);
       const vendorClient = extractVendorClient(je.description);
+      const document = extractDocument(je.description);
 
       all.push({
         id: je.id,
+        entry_number: numberById.get(je.id) || '',
+        document,
         date: je.date,
         type,
         description: je.description,
@@ -176,7 +207,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
         credit_dop: totalCredit * exRate,
         exchange_rate: exRate,
         vendor_client: vendorClient,
-        ref: '',
+        ref: document,
         raw: je,
       });
     });
@@ -184,20 +215,30 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     return all;
   }, [journalEntries, rate]);
 
-  const filtered = useMemo(() => {
+  // Pre-filtered set: respects month/year/type/period but NOT the search box.
+  // Used to feed autocomplete suggestions so they stay scoped to current filters.
+  const preFiltered = useMemo(() => {
     let items = filterByDate(entries);
     if (typeFilter !== 'all') items = items.filter(e => e.type === typeFilter);
     if (yearFilter !== 'all') items = items.filter(e => e.date?.slice(0, 4) === yearFilter);
     if (monthFilter !== 'all') items = items.filter(e => e.date?.slice(5, 7) === monthFilter);
+    return items;
+  }, [entries, filterByDate, typeFilter, yearFilter, monthFilter]);
+
+  const filtered = useMemo(() => {
+    let items = preFiltered;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       items = items.filter(e =>
         e.description.toLowerCase().includes(q) ||
         e.vendor_client.toLowerCase().includes(q) ||
         e.account_name.toLowerCase().includes(q) ||
-        e.credit_account_name.toLowerCase().includes(q)
+        e.credit_account_name.toLowerCase().includes(q) ||
+        e.entry_number.toLowerCase().includes(q) ||
+        e.document.toLowerCase().includes(q)
       );
     }
+    items = [...items];
     items.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'date') cmp = a.date.localeCompare(b.date);
@@ -212,7 +253,43 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return items;
-  }, [entries, typeFilter, monthFilter, yearFilter, searchQuery, filterByDate, sortField, sortDir]);
+  }, [preFiltered, searchQuery, sortField, sortDir]);
+
+  // Build autocomplete suggestions from preFiltered (so they respect mes/año/tipo/período)
+  const [searchOpen, setSearchOpen] = useState(false);
+  const suggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const matches = (s: string) => !q || s.toLowerCase().includes(q);
+
+    const entriesGroup: { value: string; label: string; sub: string }[] = [];
+    const documentsMap = new Map<string, string>();
+    const clientsMap = new Map<string, number>();
+
+    preFiltered.forEach(e => {
+      if (matches(e.entry_number) || matches(e.description)) {
+        entriesGroup.push({
+          value: e.entry_number,
+          label: e.entry_number,
+          sub: `${e.date} · ${TYPE_LABELS[e.type]?.label || e.type} · ${e.vendor_client}`,
+        });
+      }
+      if (e.document && (matches(e.document) || matches(e.vendor_client))) {
+        if (!documentsMap.has(e.document)) {
+          documentsMap.set(e.document, `${TYPE_LABELS[e.type]?.label || e.type} · ${e.vendor_client}`);
+        }
+      }
+      if (e.vendor_client && e.vendor_client !== '—' && matches(e.vendor_client)) {
+        clientsMap.set(e.vendor_client, (clientsMap.get(e.vendor_client) || 0) + 1);
+      }
+    });
+
+    return {
+      entries: entriesGroup.slice(0, 8),
+      documents: Array.from(documentsMap.entries()).slice(0, 8).map(([value, sub]) => ({ value, sub })),
+      clients: Array.from(clientsMap.entries()).slice(0, 8).map(([value, count]) => ({ value, count })),
+    };
+  }, [preFiltered, searchQuery]);
+
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
@@ -263,6 +340,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
   const buildExportRows = () => filtered.map(e => {
     const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
     return {
+      'N° Asiento': e.entry_number,
+      'Documento': e.document || '',
       Fecha: e.date,
       Tipo: TYPE_LABELS[e.type]?.label || e.type,
       Descripción: e.description,
@@ -309,10 +388,63 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input placeholder="Buscar descripción, cuenta, proveedor..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="h-8 pl-8 text-xs rounded-lg" />
-        </div>
+        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+          <PopoverTrigger asChild>
+            <div className="relative flex-1 min-w-[160px] max-w-[320px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Buscar # asiento, documento, cliente…"
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); if (!searchOpen) setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                className="h-8 pl-8 text-xs rounded-lg"
+              />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-[320px]" align="start" onOpenAutoFocus={e => e.preventDefault()}>
+            <Command shouldFilter={false}>
+              <CommandList>
+                <CommandEmpty className="text-xs py-4 text-center text-muted-foreground">Sin coincidencias</CommandEmpty>
+                {suggestions.entries.length > 0 && (
+                  <CommandGroup heading="Asientos">
+                    {suggestions.entries.map(s => (
+                      <CommandItem key={`e-${s.value}`} value={`e-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-medium">{s.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.sub}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {suggestions.documents.length > 0 && (
+                  <CommandGroup heading="Documentos / Referencias">
+                    {suggestions.documents.map(s => (
+                      <CommandItem key={`d-${s.value}`} value={`d-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-medium">{s.value}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.sub}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {suggestions.clients.length > 0 && (
+                  <CommandGroup heading="Clientes / Proveedores">
+                    {suggestions.clients.map(s => (
+                      <CommandItem key={`c-${s.value}`} value={`c-${s.value}`} onSelect={() => { setSearchQuery(s.value); setSearchOpen(false); }} className="text-xs">
+                        <div className="flex justify-between w-full">
+                          <span>{s.value}</span>
+                          <span className="text-[10px] text-muted-foreground">{s.count} mov.</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="h-8 text-xs w-auto min-w-[120px]">
             <SelectValue placeholder="Tipo" />
