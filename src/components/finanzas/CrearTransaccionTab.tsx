@@ -353,7 +353,8 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const subtotal = saleItems.reduce((s, i) => s + i.unit_price_usd * i.quantity, 0);
+  const lineNetUsd = (it: SaleItem) => it.unit_price_usd * it.quantity * (1 - (it.discount_pct || 0) / 100);
+  const subtotal = saleItems.reduce((s, i) => s + lineNetUsd(i), 0);
   const itbis = subtotal * 0.18;
   const totalSale = subtotal + itbis;
 
