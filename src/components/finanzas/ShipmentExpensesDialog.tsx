@@ -801,6 +801,55 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={reversalConfirmOpen} onOpenChange={setReversalConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              Se generará una reversa contable
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Estás reduciendo los gastos del envío en <strong className="text-destructive">{fmt(Math.abs(deltaAddons))}</strong> respecto a lo previamente capitalizado
+                  ({fmt(currentAddons)} → {fmt(newAddons)}).
+                </p>
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5 text-xs space-y-1">
+                  <p className="font-semibold text-foreground">Asiento de reversa que se creará:</p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+                    <li>
+                      <strong className="text-foreground">Débito</strong> a {paymentMode === 'cxp' ? 'Cuentas por Pagar (20150)' : `${selectedBankAcct?.code || '—'} ${selectedBankAcct?.description || 'cuenta bancaria'}`} por {fmt(Math.abs(deltaAddons))}
+                    </li>
+                    <li>
+                      <strong className="text-foreground">Crédito</strong> a {inventoryAcct?.code || '13000'} {inventoryAcct?.description || 'Inventarios'} por {fmt(Math.abs(deltaAddons))}
+                    </li>
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    Esto descapitalizará costo del inventario y {paymentMode === 'cxp' ? 'reducirá la deuda con el proveedor' : 'reflejará un reintegro/ajuste en la cuenta bancaria'}.
+                    {capitalize && ' Además se recalculará el WAC y los márgenes de los productos afectados.'}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">¿Confirmas la reversa?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={async (e) => {
+                e.preventDefault();
+                setReversalConfirmOpen(false);
+                await performSave();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sí, generar reversa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
