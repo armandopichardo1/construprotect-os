@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
@@ -45,6 +45,19 @@ export function DiscountRulesManager() {
     contact_name: contacts.find((c: any) => c.id === r.contact_id)?.contact_name || (r.contact_id ? '—' : 'Todos'),
   })), [rules, contacts]);
 
+  // Build conflict map: same (contact_id|category) scope among ACTIVE rules
+  const scopeKey = (r: any) => `${r.contact_id || 'ALL'}::${r.category || 'ALL'}`;
+  const conflictGroups = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    rules.filter((r: any) => r.is_active).forEach((r: any) => {
+      const k = scopeKey(r);
+      (groups[k] = groups[k] || []).push(r);
+    });
+    return Object.fromEntries(Object.entries(groups).filter(([, v]) => v.length > 1));
+  }, [rules]);
+  const conflictIds = useMemo(() => new Set(Object.values(conflictGroups).flat().map((r: any) => r.id)), [conflictGroups]);
+  const conflictCount = Object.keys(conflictGroups).length;
+
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     if (!search.trim()) return enriched;
@@ -69,6 +82,33 @@ export function DiscountRulesManager() {
     } else {
       const amt = Number(form.discount_amount_usd || 0);
       if (amt <= 0) { toast.error('El monto debe ser mayor a 0'); return; }
+    }
+
+    // Conflict / duplicate detection vs existing active rules with same scope
+    if (form.is_active ?? true) {
+      const sameScope = rules.filter((r: any) =>
+        r.id !== form.id &&
+        r.is_active &&
+        (r.contact_id || null) === (form.contact_id || null) &&
+        (r.category || null) === (form.category || null)
+      );
+      if (sameScope.length > 0) {
+        const exactDup = sameScope.find((r: any) =>
+          r.discount_type === form.discount_type &&
+          Number(r.discount_pct) === Number(form.discount_pct || 0) &&
+          Number(r.discount_amount_usd) === Number(form.discount_amount_usd || 0) &&
+          Number(r.priority) === Number(form.priority || 0)
+        );
+        if (exactDup) {
+          toast.error('Regla duplicada: ya existe una regla activa idéntica para el mismo cliente/categoría.');
+          return;
+        }
+        const samePriority = sameScope.find((r: any) => Number(r.priority) === Number(form.priority || 0));
+        const msg = samePriority
+          ? `Conflicto: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría y MISMA prioridad (${form.priority || 0}). El resultado al aplicar será impredecible. ¿Guardar de todos modos?`
+          : `Aviso: existe(n) ${sameScope.length} regla(s) activa(s) con el mismo cliente/categoría. Se usará la de mayor prioridad. ¿Guardar?`;
+        if (!window.confirm(msg)) return;
+      }
     }
 
     const payload: any = {
@@ -127,6 +167,23 @@ export function DiscountRulesManager() {
         <strong className="text-foreground">¿Cómo funciona?</strong> Al seleccionar un producto en una venta, el sistema busca la regla más específica (Cliente + Categoría &gt; Cliente &gt; Categoría) y aplica el descuento. El usuario puede sobrescribirlo manualmente en la línea.
       </div>
 
+      {conflictCount > 0 && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="text-foreground">Hay {conflictCount} conflicto(s) de reglas activas con el mismo cliente/categoría.</strong>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {Object.entries(conflictGroups).slice(0, 5).map(([k, grp]: any) => {
+                const r0 = grp[0];
+                const cName = contacts.find((c: any) => c.id === r0.contact_id)?.contact_name || (r0.contact_id ? '—' : 'Todos');
+                return <li key={k}>{cName} / {r0.category || 'Todas'} → {grp.length} reglas (prioridades: {grp.map((g: any) => g.priority).join(', ')})</li>;
+              })}
+            </ul>
+            <p className="text-muted-foreground">Revisa prioridades o desactiva las redundantes para evitar resultados ambiguos al aplicar descuentos.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -159,8 +216,17 @@ export function DiscountRulesManager() {
           </TableHeader>
           <TableBody>
             {filtered.map((r: any) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs font-medium">{r.name || <span className="text-muted-foreground italic">Sin nombre</span>}</TableCell>
+              <TableRow key={r.id} className={cn(conflictIds.has(r.id) && 'bg-warning/5')}>
+                <TableCell className="text-xs font-medium">
+                  <div className="flex items-center gap-1.5">
+                    {r.name || <span className="text-muted-foreground italic">Sin nombre</span>}
+                    {conflictIds.has(r.id) && (
+                      <span title="Conflicto: hay otra regla activa con el mismo cliente/categoría" className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning border border-warning/30">
+                        <AlertTriangle className="w-2.5 h-2.5" />Conflicto
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.contact_name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.category || 'Todas'}</TableCell>
                 <TableCell className="text-xs"><span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{ruleScope(r)}</span></TableCell>
@@ -193,7 +259,7 @@ export function DiscountRulesManager() {
         <Dialog open onOpenChange={() => setEditing(null)}>
           <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editing.id ? 'Editar Regla de Descuento' : 'Nueva Regla de Descuento'}</DialogTitle></DialogHeader>
-            <DiscountRuleForm initial={editing} contacts={contacts} categories={categories} onSave={handleSave} onCancel={() => setEditing(null)} />
+            <DiscountRuleForm initial={editing} contacts={contacts} categories={categories} existingRules={rules} onSave={handleSave} onCancel={() => setEditing(null)} />
           </DialogContent>
         </Dialog>
       )}
@@ -203,11 +269,23 @@ export function DiscountRulesManager() {
   );
 }
 
-function DiscountRuleForm({ initial, contacts, categories, onSave, onCancel }: { initial: any; contacts: any[]; categories: string[]; onSave: (d: any) => Promise<void>; onCancel: () => void }) {
+function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave, onCancel }: { initial: any; contacts: any[]; categories: string[]; existingRules: any[]; onSave: (d: any) => Promise<void>; onCancel: () => void }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
   const submit = async () => { setSaving(true); await onSave(form); setSaving(false); };
+
+  // Live conflict preview
+  const liveConflicts = useMemo(() => {
+    if (!(form.is_active ?? true)) return [];
+    return existingRules.filter((r: any) =>
+      r.id !== form.id &&
+      r.is_active &&
+      (r.contact_id || null) === (form.contact_id || null) &&
+      (r.category || null) === (form.category || null)
+    );
+  }, [existingRules, form]);
+  const samePriorityConflict = liveConflicts.some((r: any) => Number(r.priority) === Number(form.priority || 0));
 
   return (
     <div className="space-y-3">
@@ -288,6 +366,25 @@ function DiscountRuleForm({ initial, contacts, categories, onSave, onCancel }: {
         <Label className="text-xs">Notas</Label>
         <Textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} className="mt-1" rows={2} />
       </div>
+
+      {liveConflicts.length > 0 && (
+        <div className={cn(
+          'rounded-lg border p-2.5 text-[11px] flex items-start gap-2',
+          samePriorityConflict ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-warning/40 bg-warning/10 text-warning'
+        )}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <div>
+            <strong className="block">
+              {samePriorityConflict
+                ? `Conflicto: ${liveConflicts.length} regla(s) activa(s) con MISMO cliente/categoría y MISMA prioridad.`
+                : `Aviso: ya existe(n) ${liveConflicts.length} regla(s) activa(s) con el mismo cliente/categoría.`}
+            </strong>
+            <span className="text-muted-foreground">
+              Prioridades existentes: {liveConflicts.map((r: any) => r.priority).join(', ')}. {samePriorityConflict ? 'Cambia la prioridad para definir cuál gana.' : 'Se aplicará la de mayor prioridad.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <Button onClick={submit} disabled={saving} className="flex-1">{saving ? 'Guardando...' : 'Guardar'}</Button>
