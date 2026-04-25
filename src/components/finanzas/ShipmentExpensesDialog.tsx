@@ -90,17 +90,21 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     queryFn: async () => {
       const [{ data: inv }, { data: prods }] = await Promise.all([
         supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', productIds),
-        supabase.from('products').select('id, unit_cost_usd').in('id', productIds),
+        supabase.from('products').select('id, unit_cost_usd, weight_kg_per_unit, cbm_per_unit').in('id', productIds),
       ]);
-      const map: Record<string, { onHand: number; currentWac: number }> = {};
+      const map: Record<string, { onHand: number; currentWac: number; weightKg: number; cbm: number }> = {};
       productIds.forEach((pid: string) => {
-        map[pid] = { onHand: 0, currentWac: 0 };
+        map[pid] = { onHand: 0, currentWac: 0, weightKg: 0, cbm: 0 };
       });
       (inv || []).forEach((row: any) => {
         if (map[row.product_id]) map[row.product_id].onHand = Number(row.quantity_on_hand || 0);
       });
       (prods || []).forEach((row: any) => {
-        if (map[row.id]) map[row.id].currentWac = Number(row.unit_cost_usd || 0);
+        if (map[row.id]) {
+          map[row.id].currentWac = Number(row.unit_cost_usd || 0);
+          map[row.id].weightKg = Number(row.weight_kg_per_unit || 0);
+          map[row.id].cbm = Number(row.cbm_per_unit || 0);
+        }
       });
       return map;
     },
