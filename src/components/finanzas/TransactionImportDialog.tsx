@@ -809,13 +809,29 @@ date: txDate,
                   <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${grandTotalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
                 </>
               )}
-              {txType === 'purchase' && (
-                <>
-                  <div className="flex justify-between text-sm font-bold"><span>Total compra USD:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${totalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Se creará 1 orden de compra con {validRows.length} producto(s)</p>
-                </>
-              )}
+              {txType === 'purchase' && (() => {
+                const freight = Math.max(0, Number(txFreightUsd) || 0);
+                const customs = Math.max(0, Number(txCustomsUsd) || 0);
+                const other = Math.max(0, Number(txOtherUsd) || 0);
+                const addons = freight + customs + other;
+                const landed = totalUsd + addons;
+                return (
+                  <>
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal FOB:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
+                    {freight > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Flete:</span><span className="font-mono">${freight.toFixed(2)}</span></div>}
+                    {customs > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Aduana:</span><span className="font-mono">${customs.toFixed(2)}</span></div>}
+                    {other > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Otros:</span><span className="font-mono">${other.toFixed(2)}</span></div>}
+                    <div className="border-t border-border my-1" />
+                    <div className="flex justify-between text-sm font-bold"><span>Costo aterrizado USD:</span><span className="font-mono">${landed.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${(landed * exchangeRate).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {addons > 0
+                        ? `Se prorratearán $${addons.toFixed(2)} entre los ${validRows.length} producto(s) por valor FOB. Capitalizado al inventario.`
+                        : `Se creará 1 orden de compra con ${validRows.length} producto(s).`}
+                    </p>
+                  </>
+                );
+              })()}
               {(txType === 'expense' || txType === 'cost') && (
                 <>
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">Líneas:</span><span className="font-medium">{validRows.length}</span></div>
