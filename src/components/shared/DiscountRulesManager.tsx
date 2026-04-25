@@ -330,6 +330,12 @@ function DiscountRuleForm({ initial, contacts, categories, existingRules, onSave
     );
   }, [existingRules, form]);
   const samePriorityConflict = liveConflicts.some((r: any) => Number(r.priority) === Number(form.priority || 0));
+  const liveCrossOverlaps = useMemo(
+    () => ((form.is_active ?? true) ? findCrossScopeOverlaps(form, existingRules) : []),
+    [existingRules, form]
+  );
+  const formPriority = Number(form.priority || 0);
+  const crossSamePriority = liveCrossOverlaps.some((r: any) => Number(r.priority || 0) === formPriority);
 
   return (
     <div className="space-y-3">
