@@ -145,22 +145,37 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     return { ...it, lineFobTotal, lineAddon, newUnitCost, newLineLanded: newUnitCost * it.qty };
   }), [baselineFob, totalFob, newAddons]);
 
+  // Pre-flight: cuentas requeridas en el catálogo. Bloquea guardado si faltan.
+  // Se evalúa siempre que se vaya a generar asiento (delta != 0).
+  const willPostJournal = Math.abs(deltaAddons) > 0.001;
+  const acct13000 = useMemo(() => accounts.find((a: any) => a.code === '13000'), [accounts]);
+  const acct20150 = useMemo(() => accounts.find((a: any) => a.code === '20150'), [accounts]);
+  const selectedBankAcct = useMemo(
+    () => (bankAccountId ? accounts.find((a: any) => a.id === bankAccountId) : null),
+    [accounts, bankAccountId]
+  );
+  const missingAccountErrors = useMemo(() => {
+    const errs: string[] = [];
+    if (!willPostJournal) return errs;
+    if (!acct13000) errs.push('Cuenta 13000 (Inventarios) no encontrada en el catálogo de cuentas.');
+    if (paymentMode === 'cxp' && !acct20150) errs.push('Cuenta 20150 (Cuentas por Pagar Proveedores) no encontrada en el catálogo de cuentas.');
+    if (paymentMode === 'bank') {
+      if (!bankAccountId) errs.push('Selecciona la cuenta bancaria de pago.');
+      else if (!selectedBankAcct) errs.push('La cuenta bancaria seleccionada no existe en el catálogo de cuentas.');
+    }
+    return errs;
+  }, [willPostJournal, acct13000, acct20150, paymentMode, bankAccountId, selectedBankAcct]);
+
   const handleSave = async () => {
     if (!shipment) return;
     if (shipment.status === 'received' && !capitalize) {
       toast.error('Envío ya recibido — activa "Capitalizar como costo aterrizado" para recalcular WAC y márgenes, o cierra sin guardar.');
       return;
     }
-    if (paymentMode === 'bank' && !bankAccountId && Math.abs(deltaAddons) > 0.001) {
-      toast.error('Selecciona la cuenta bancaria de pago.');
-      return;
-    }
-    if (Math.abs(deltaAddons) > 0.001 && !inventoryAcct) {
-      toast.error('No se encontró la cuenta de Inventarios (13000) en el catálogo. Revisa Maestras.');
-      return;
-    }
-    if (Math.abs(deltaAddons) > 0.001 && paymentMode === 'cxp' && !cxpAcct) {
-      toast.error('No se encontró la cuenta de Cuentas por Pagar Proveedores. Revisa Maestras.');
+    if (missingAccountErrors.length > 0) {
+      toast.error(missingAccountErrors[0], {
+        description: missingAccountErrors.length > 1 ? `Y ${missingAccountErrors.length - 1} validación(es) más. Revisa Maestras → Catálogo de Cuentas.` : 'Revisa Maestras → Catálogo de Cuentas.',
+      });
       return;
     }
 
