@@ -242,7 +242,9 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
         e.account_name.toLowerCase().includes(q) ||
         e.credit_account_name.toLowerCase().includes(q) ||
         e.entry_number.toLowerCase().includes(q) ||
-        e.document.toLowerCase().includes(q)
+        e.document.toLowerCase().includes(q) ||
+        String(e.raw?.reference_id || '').toLowerCase().includes(q) ||
+        String(e.raw?.reference_type || '').toLowerCase().includes(q)
       );
     }
     items = [...items];
