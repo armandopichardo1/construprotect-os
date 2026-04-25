@@ -721,20 +721,30 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       if (!purchaseSupplierName.trim() && !purchaseSupplierId) { toast.error('Selecciona un proveedor'); return; }
       if (purchaseItems.some(i => !i.product_id)) { toast.error('Selecciona productos para todos los ítems'); return; }
       if (purchaseTotal <= 0) { toast.error('El total debe ser mayor a 0'); return; }
+      if (dopAddonNeedsRate) {
+        toast.error('Falta tasa de cambio para convertir gastos en DOP a USD. Ajusta la tasa o cambia los gastos a USD.');
+        return;
+      }
+      if (!purchaseReconciles) {
+        toast.error(`El costo aterrizado por línea ($${purchaseLandedSum.toFixed(2)}) no cuadra con el total ($${purchaseTotal.toFixed(2)}). Diferencia: $${purchaseReconcileDelta.toFixed(2)}.`);
+        return;
+      }
 
       setManualSaving(true);
       try {
         const desc = `Compra inventario — ${purchaseSupplierName || 'Proveedor'} — ${formatUSD(purchaseTotal)}`;
         const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : new Date().toISOString().split('T')[0];
 
-        const freight = Math.max(0, purchaseFreightUsd);
-        const customs = Math.max(0, purchaseCustomsUsd);
-        const other = Math.max(0, purchaseOtherUsd);
-        const addons = freight + customs + other;
+        // Use USD-normalized addons (already converted from DOP via xr if applicable)
+        const freight = freightUsd;
+        const customs = customsUsd;
+        const other = otherUsd;
+        const addons = purchaseAddons;
         const fobBase = purchaseFob;
 
+        const ccyTag = (ccy: 'USD' | 'DOP', raw: number) => ccy === 'DOP' ? ` (RD$${raw.toFixed(2)} @ ${xr})` : '';
         const landedNotes = addons > 0
-          ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)} · Aduana $${customs.toFixed(2)} · Otros $${other.toFixed(2)} (Total addons $${addons.toFixed(2)} sobre FOB $${fobBase.toFixed(2)})`
+          ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)}${ccyTag(freightCurrency, purchaseFreightUsd)} · Aduana $${customs.toFixed(2)}${ccyTag(customsCurrency, purchaseCustomsUsd)} · Otros $${other.toFixed(2)}${ccyTag(otherCurrency, purchaseOtherUsd)} (Total addons $${addons.toFixed(2)} sobre FOB $${fobBase.toFixed(2)})`
           : null;
         const finalNotes = [purchaseNotes || null, landedNotes].filter(Boolean).join(' · ') || null;
 
