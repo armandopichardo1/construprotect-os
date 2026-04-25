@@ -615,6 +615,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
     setPurchaseFreightUsd(0); setPurchaseCustomsUsd(0); setPurchaseOtherUsd(0);
+    setFreightCurrency('USD'); setCustomsCurrency('USD'); setOtherCurrency('USD');
     setCnSupplierId(''); setCnSupplierName('');
     setCnAmount(''); setCnReason(''); setCnNotes(''); setCnShipmentId('');
     setJournalLines([
