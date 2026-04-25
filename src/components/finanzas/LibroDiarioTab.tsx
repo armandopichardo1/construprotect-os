@@ -260,28 +260,48 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     setDeleting(false);
   };
 
-  const handleExport = () => {
-    exportToExcel(filtered.map(e => {
-      const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
-      return {
-        Fecha: e.date,
-        Tipo: TYPE_LABELS[e.type]?.label || e.type,
-        Descripción: e.description,
-        'Proveedor/Cliente': e.vendor_client,
-        'Cuenta Débito': e.account_name,
-        'Código Débito': e.account_code,
-        'Cuenta Crédito': e.credit_account_name,
-        'Código Crédito': e.credit_account_code,
-        'Débito USD': e.debit_usd || '',
-        'Crédito USD': e.credit_usd || '',
-        'Débito DOP': e.debit_dop || '',
-        'Crédito DOP': e.credit_dop || '',
-        'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
-        'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
-        'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
-        'Tasa Cambio': e.exchange_rate,
-      };
-    }), 'libro-diario', 'Libro Diario');
+  const buildExportRows = () => filtered.map(e => {
+    const disc = e.type === 'sale' ? getSaleDiscount(e.description) : null;
+    return {
+      Fecha: e.date,
+      Tipo: TYPE_LABELS[e.type]?.label || e.type,
+      Descripción: e.description,
+      'Proveedor/Cliente': e.vendor_client,
+      'Cuenta Débito': e.account_name,
+      'Código Débito': e.account_code,
+      'Cuenta Crédito': e.credit_account_name,
+      'Código Crédito': e.credit_account_code,
+      'Débito USD': e.debit_usd || '',
+      'Crédito USD': e.credit_usd || '',
+      'Débito DOP': e.debit_dop || '',
+      'Crédito DOP': e.credit_dop || '',
+      'Bruto USD (s/desc.)': disc ? Number(disc.gross_usd.toFixed(2)) : '',
+      'Descuento USD': disc && disc.discount_usd > 0 ? Number(disc.discount_usd.toFixed(2)) : '',
+      'Descuento %': disc && disc.discount_usd > 0 ? Number(disc.discount_pct.toFixed(2)) : '',
+      'Tasa Cambio': e.exchange_rate,
+    };
+  });
+
+  const exportFilename = () => {
+    const parts = ['libro-diario'];
+    if (yearFilter !== 'all') parts.push(yearFilter);
+    if (monthFilter !== 'all') parts.push(monthFilter);
+    if (typeFilter !== 'all') parts.push(typeFilter);
+    return parts.join('-');
+  };
+
+  const handleExportExcel = () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) { toast.error('Sin asientos para exportar'); return; }
+    exportToExcel(rows, exportFilename(), 'Libro Diario');
+    toast.success(`${rows.length} asientos exportados a Excel`);
+  };
+
+  const handleExportCSV = () => {
+    const rows = buildExportRows();
+    if (rows.length === 0) { toast.error('Sin asientos para exportar'); return; }
+    exportToCSV(rows, exportFilename());
+    toast.success(`${rows.length} asientos exportados a CSV`);
   };
 
 
