@@ -191,9 +191,11 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
       toast.success('Gastos del envío actualizados — costos aterrizados reprorrateados y asiento contable registrado');
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['libro-diario'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
       onSaved?.();
       onOpenChange(false);
     } catch (e: any) {
