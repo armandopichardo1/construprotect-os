@@ -230,7 +230,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
   const [invoiceRef, setInvoiceRef] = useState('');
   const [priceTier, setPriceTier] = useState('list');
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
 
   // Purchase-specific state
   const [purchaseSupplierId, setPurchaseSupplierId] = useState('');
@@ -336,7 +336,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     }));
   };
 
-  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+  const addSaleItem = () => setSaleItems(prev => [...prev, { product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
   const removeSaleItem = (i: number) => setSaleItems(prev => prev.filter((_, idx) => idx !== i));
   const updateSaleItem = (i: number, field: string, value: any) => {
     setSaleItems(prev => prev.map((item, idx) => {
@@ -501,7 +501,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setAmount(''); setManualDate(undefined); setCustomRate(''); setEditingRate(false);
     setAccountId(''); setContactId(''); setInvoiceRef('');
     setPriceTier('list'); setPaymentStatus('pending');
-    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0 }]);
+    setSaleItems([{ product_id: '', quantity: 0, unit_price_usd: 0, discount_pct: 0, discount_amount_usd: 0, discount_type: 'pct' }]);
     setPurchaseSupplierId(''); setPurchaseSupplierName('');
     setPurchaseItems([{ product_id: '', quantity: 0, unit_cost_usd: 0 }]);
     setPurchaseNotes('');
