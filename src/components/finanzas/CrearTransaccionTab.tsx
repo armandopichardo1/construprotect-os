@@ -402,9 +402,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           // Auto-apply discount rule unless manually overridden
           if (!updated._discountTouched) {
             const rule = findDiscountRule(contactId, prod?.category || null);
-            updated.discount_type = 'pct';
-            updated.discount_pct = rule ? Number(rule.discount_pct) : 0;
-            updated.discount_amount_usd = 0;
+            const ruleType = (rule as any)?.discount_type === 'amount' ? 'amount' : 'pct';
+            updated.discount_type = ruleType;
+            updated.discount_pct = rule && ruleType === 'pct' ? Number(rule.discount_pct) : 0;
+            updated.discount_amount_usd = rule && ruleType === 'amount' ? Number((rule as any).discount_amount_usd) : 0;
             updated._discountDisplay = undefined;
           }
         }
