@@ -819,6 +819,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
             gross_unit_price_usd: grossUnit,
             discount_pct: discountPct,
             discount_amount_usd: discountLine,
+            discount_type: i.discount_type,
           };
         });
         await supabase.from('sale_items').insert(itemsData);
