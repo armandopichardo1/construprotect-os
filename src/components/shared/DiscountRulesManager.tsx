@@ -167,6 +167,23 @@ export function DiscountRulesManager() {
         <strong className="text-foreground">¿Cómo funciona?</strong> Al seleccionar un producto en una venta, el sistema busca la regla más específica (Cliente + Categoría &gt; Cliente &gt; Categoría) y aplica el descuento. El usuario puede sobrescribirlo manualmente en la línea.
       </div>
 
+      {conflictCount > 0 && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning-foreground flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <strong className="text-foreground">Hay {conflictCount} conflicto(s) de reglas activas con el mismo cliente/categoría.</strong>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {Object.entries(conflictGroups).slice(0, 5).map(([k, grp]: any) => {
+                const r0 = grp[0];
+                const cName = contacts.find((c: any) => c.id === r0.contact_id)?.contact_name || (r0.contact_id ? '—' : 'Todos');
+                return <li key={k}>{cName} / {r0.category || 'Todas'} → {grp.length} reglas (prioridades: {grp.map((g: any) => g.priority).join(', ')})</li>;
+              })}
+            </ul>
+            <p className="text-muted-foreground">Revisa prioridades o desactiva las redundantes para evitar resultados ambiguos al aplicar descuentos.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
