@@ -622,6 +622,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     setPreviewAccountOverrides({});
   };
 
+  // Invalida la grilla del Libro Diario y, si se conoce, el detalle del asiento recién creado
+  // para que aparezca sin recargar la página.
+  const invalidateJournalCaches = (entryId?: string | null) => {
+    queryClient.invalidateQueries({ queryKey: ['journal-entries'], refetchType: 'active' });
+    queryClient.invalidateQueries({ queryKey: ['libro-diario'], refetchType: 'active' });
+    if (entryId) {
+      queryClient.invalidateQueries({ queryKey: ['journal-entry', entryId], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['journal-entry-lines', entryId], refetchType: 'active' });
+    }
+  };
+
   // Helper to create journal entry from computed preview lines
   const createJournalFromPreview = async (desc: string, notes?: string) => {
     if (previewLines.length < 2) return;
