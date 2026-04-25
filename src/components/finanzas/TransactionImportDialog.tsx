@@ -119,12 +119,17 @@ export function TransactionImportDialog({ open, onOpenChange, exchangeRate }: Pr
   const [txPaymentStatus, setTxPaymentStatus] = useState('pending');
   const [txNotes, setTxNotes] = useState('');
   const [txCurrency, setTxCurrency] = useState<'USD' | 'DOP'>('USD');
+  // Landed cost fields for purchase imports (capitalized to inventory per IAS 2)
+  const [txFreightUsd, setTxFreightUsd] = useState<string>('');
+  const [txCustomsUsd, setTxCustomsUsd] = useState<string>('');
+  const [txOtherUsd, setTxOtherUsd] = useState<string>('');
 
   const reset = () => {
     setStep('config'); setRows([]); setStats({ inserted: 0, failed: 0 });
     setTxDate(new Date().toISOString().split('T')[0]);
     setTxVendor(''); setTxClient(''); setTxInvoiceRef('');
     setTxPaymentStatus('pending'); setTxNotes(''); setTxCurrency('USD');
+    setTxFreightUsd(''); setTxCustomsUsd(''); setTxOtherUsd('');
   };
 
   const downloadTemplate = () => {
@@ -341,22 +346,36 @@ date: txDate,
           break;
         }
         case 'purchase': {
-          // All lines belong to ONE shipment/PO
-          let totalCost = 0;
+          // All lines belong to ONE shipment/PO. Landed cost (freight + customs + other)
+          // is prorrated to each line by FOB value (qty × unit cost) per IAS 2 / NIC 2.
+          let totalFob = 0;
           const lineItems: { sku: string; qty: number; cost: number }[] = [];
           for (const row of validRows) {
             const d = row.raw;
             const qty = Number(d._qty);
             const cost = Number(d._price);
-            totalCost += qty * cost;
+            totalFob += qty * cost;
             lineItems.push({ sku: String(d._sku), qty, cost });
           }
+          const freight = Math.max(0, Number(txFreightUsd) || 0);
+          const customs = Math.max(0, Number(txCustomsUsd) || 0);
+          const other = Math.max(0, Number(txOtherUsd) || 0);
+          const landedAddons = freight + customs + other;
+          const totalLanded = totalFob + landedAddons;
+
           const shipPayload: any = {
             supplier_name: txVendor || 'Importación masiva',
             po_number: `PO-IMP-${Date.now().toString(36).toUpperCase()}`,
-            total_cost_usd: totalCost,
+            total_cost_usd: totalLanded,
+            shipping_cost_usd: freight,
+            customs_cost_usd: customs,
             status: 'ordered' as any,
-            notes: txNotes || null,
+            notes: [
+              txNotes,
+              landedAddons > 0
+                ? `Costo aterrizado prorrateado por valor FOB — Flete $${freight.toFixed(2)} · Aduana $${customs.toFixed(2)} · Otros $${other.toFixed(2)} (Total addons $${landedAddons.toFixed(2)} sobre FOB $${totalFob.toFixed(2)})`
+                : null,
+            ].filter(Boolean).join(' · ') || null,
             order_date: txDate,
           };
           const { data: ship, error: shipErr } = await supabase.from('shipments').insert(shipPayload).select('id').single();
@@ -365,12 +384,16 @@ date: txDate,
           for (const item of lineItems) {
             const { data: prod } = await supabase.from('products').select('id').eq('sku', item.sku).maybeSingle();
             if (!prod) { failed++; continue; }
+            // Prorrate landed addons by FOB value (qty × cost) of this line
+            const lineFob = item.qty * item.cost;
+            const lineAddon = totalFob > 0 ? (lineFob / totalFob) * landedAddons : 0;
+            const landedUnitCost = item.qty > 0 ? item.cost + (lineAddon / item.qty) : item.cost;
             const itemPayload: any = {
               shipment_id: ship.id,
               product_id: prod.id,
               quantity_ordered: item.qty,
               quantity_received: 0,
-              unit_cost_usd: item.cost,
+              unit_cost_usd: Number(landedUnitCost.toFixed(4)),
             };
             const { error } = await supabase.from('shipment_items').insert(itemPayload);
             if (error) { failed++; } else { inserted++; }
@@ -515,10 +538,29 @@ date: txDate,
               </div>
 
               {txType === 'purchase' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted-foreground">Notas</label>
-                  <Textarea value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="Notas de la orden..." className="text-xs min-h-[40px]" rows={2} />
-                </div>
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Flete USD</label>
+                      <Input type="number" step="0.01" min="0" value={txFreightUsd} onChange={e => setTxFreightUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Aduana USD</label>
+                      <Input type="number" step="0.01" min="0" value={txCustomsUsd} onChange={e => setTxCustomsUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Otros USD</label>
+                      <Input type="number" step="0.01" min="0" value={txOtherUsd} onChange={e => setTxOtherUsd(e.target.value)} placeholder="0.00" className="h-8 text-xs font-mono" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground -mt-1">
+                    💡 Estos costos se <strong>prorratean por valor FOB</strong> entre los productos y se capitalizan al inventario (NIC 2). Ajustan el WAC y los márgenes automáticamente.
+                  </p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">Notas</label>
+                    <Textarea value={txNotes} onChange={e => setTxNotes(e.target.value)} placeholder="Notas de la orden..." className="text-xs min-h-[40px]" rows={2} />
+                  </div>
+                </>
               )}
             </div>
 
@@ -767,13 +809,29 @@ date: txDate,
                   <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${grandTotalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
                 </>
               )}
-              {txType === 'purchase' && (
-                <>
-                  <div className="flex justify-between text-sm font-bold"><span>Total compra USD:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${totalDop.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Se creará 1 orden de compra con {validRows.length} producto(s)</p>
-                </>
-              )}
+              {txType === 'purchase' && (() => {
+                const freight = Math.max(0, Number(txFreightUsd) || 0);
+                const customs = Math.max(0, Number(txCustomsUsd) || 0);
+                const other = Math.max(0, Number(txOtherUsd) || 0);
+                const addons = freight + customs + other;
+                const landed = totalUsd + addons;
+                return (
+                  <>
+                    <div className="flex justify-between text-xs"><span className="text-muted-foreground">Subtotal FOB:</span><span className="font-mono">${totalUsd.toFixed(2)}</span></div>
+                    {freight > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Flete:</span><span className="font-mono">${freight.toFixed(2)}</span></div>}
+                    {customs > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Aduana:</span><span className="font-mono">${customs.toFixed(2)}</span></div>}
+                    {other > 0 && <div className="flex justify-between text-xs"><span className="text-muted-foreground">+ Otros:</span><span className="font-mono">${other.toFixed(2)}</span></div>}
+                    <div className="border-t border-border my-1" />
+                    <div className="flex justify-between text-sm font-bold"><span>Costo aterrizado USD:</span><span className="font-mono">${landed.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs text-muted-foreground"><span>Equivalente RD$:</span><span className="font-mono">RD${(landed * exchangeRate).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {addons > 0
+                        ? `Se prorratearán $${addons.toFixed(2)} entre los ${validRows.length} producto(s) por valor FOB. Capitalizado al inventario.`
+                        : `Se creará 1 orden de compra con ${validRows.length} producto(s).`}
+                    </p>
+                  </>
+                );
+              })()}
               {(txType === 'expense' || txType === 'cost') && (
                 <>
                   <div className="flex justify-between text-xs"><span className="text-muted-foreground">Líneas:</span><span className="font-medium">{validRows.length}</span></div>
