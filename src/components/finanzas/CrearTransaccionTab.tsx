@@ -207,22 +207,17 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
     },
   });
 
-  // Find best matching rule. Priority: contact+category > contact-only > category-only.
-  // Within the same specificity, higher `priority` wins.
+  // Apply rules ordered by priority (desc). The first rule that matches wins and we stop.
+  // A rule matches when its scope (contact / category / both) is satisfied by the current context.
   const findDiscountRule = (contactIdArg: string, category: string | null) => {
     if (!discountRules.length) return null;
-    const buckets = [
-      // contact + category
-      discountRules.filter(r => r.contact_id === contactIdArg && r.category && category && r.category === category),
-      // contact only
-      discountRules.filter(r => r.contact_id === contactIdArg && !r.category),
-      // category only
-      discountRules.filter(r => !r.contact_id && r.category && category && r.category === category),
-    ];
-    for (const bucket of buckets) {
-      if (bucket.length) {
-        return [...bucket].sort((a, b) => (b.priority || 0) - (a.priority || 0))[0];
-      }
+    const sorted = [...discountRules].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    for (const r of sorted) {
+      const contactOk = r.contact_id ? r.contact_id === contactIdArg : true;
+      const categoryOk = r.category ? (!!category && r.category === category) : true;
+      // Skip "global" rules (no contact AND no category) unless explicitly desired — keep current behavior of ignoring them.
+      if (!r.contact_id && !r.category) continue;
+      if (contactOk && categoryOk) return r;
     }
     return null;
   };
