@@ -743,6 +743,43 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
       if (!contactId) { toast.error('Selecciona un cliente'); return; }
       if (saleItems.some(i => !i.product_id)) { toast.error('Selecciona productos o servicios para todos los ítems'); return; }
 
+      // ===== Validaciones contables por línea y de totales =====
+      const EPS = 0.01; // tolerancia centavos USD
+      let recomputedSubtotal = 0;
+      for (let idx = 0; idx < saleItems.length; idx++) {
+        const it = saleItems[idx];
+        const qty = Number(it.quantity || 0);
+        const price = Number(it.unit_price_usd || 0);
+        if (qty <= 0) { toast.error(`Línea ${idx + 1}: la cantidad debe ser mayor a 0`); return; }
+        if (price < 0) { toast.error(`Línea ${idx + 1}: el precio unitario no puede ser negativo`); return; }
+        const gross = qty * price;
+        // Validar descuento contra total bruto de la línea
+        if (it.discount_type === 'pct') {
+          const pct = Number(it.discount_pct || 0);
+          if (pct < 0 || pct > 100) { toast.error(`Línea ${idx + 1}: el descuento % debe estar entre 0 y 100`); return; }
+        } else {
+          const amt = Number(it.discount_amount_usd || 0);
+          if (amt < 0) { toast.error(`Línea ${idx + 1}: el descuento no puede ser negativo`); return; }
+          if (amt - gross > EPS) {
+            toast.error(`Línea ${idx + 1}: el descuento (${formatUSD(amt)}) no puede exceder el total bruto de la línea (${formatUSD(gross)})`);
+            return;
+          }
+        }
+        const net = lineNetUsd(it);
+        if (net < -EPS) { toast.error(`Línea ${idx + 1}: el neto no puede ser negativo`); return; }
+        recomputedSubtotal += net;
+      }
+      const recomputedItbis = recomputedSubtotal * 0.18;
+      const recomputedTotal = recomputedSubtotal + recomputedItbis;
+      if (
+        Math.abs(recomputedSubtotal - subtotal) > EPS ||
+        Math.abs(recomputedItbis - itbis) > EPS ||
+        Math.abs(recomputedTotal - totalSale) > EPS
+      ) {
+        toast.error('Los totales en pantalla no coinciden con el cálculo. Refresca la pantalla e inténtalo nuevamente.');
+        return;
+      }
+
       setManualSaving(true);
       const dateStr = manualDate ? format(manualDate, 'yyyy-MM-dd') : undefined;
       try {
