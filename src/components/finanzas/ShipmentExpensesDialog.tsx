@@ -516,7 +516,7 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
                     {capitalize
-                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo). {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
+                      ? <>Al guardar se actualizará <strong>products.unit_cost_usd</strong> con el nuevo costo aterrizado, se recalcularán <strong>WAC</strong> y <strong>márgenes</strong> (Lista, Arquitecto, Proyecto, Mayoreo), y se dejará un <strong>movimiento de inventario tipo "ajuste"</strong> (qty=0) por SKU para preservar el historial sin alterar el stock. {shipment.status === 'received' ? 'Como el envío YA fue recibido, el ajuste se distribuye sobre el stock actual.' : 'Al recibir este envío, el WAC usará automáticamente el costo aterrizado correcto.'}</>
                       : <>Solo se reprorratearán los <code>shipment_items</code>. <strong className="text-warning">No se actualizará</strong> el costo unitario en el catálogo de productos ni se recalcularán los márgenes — afecta reportería futura.</>
                     }
                   </p>
