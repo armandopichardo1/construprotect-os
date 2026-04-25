@@ -1035,10 +1035,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error) throw error;
         // Auto journal entry
         const costLines = buildCostJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
-        await createAutoJournal(`Costo: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, costLines, { exchangeRate: xr });
+        const costEntry = await createAutoJournal(`Costo: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, costLines, { exchangeRate: xr });
         toast.success('Costo registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['costs'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(costEntry?.id);
       } else if (preview.type === 'sale') {
         const salePayload: any = {
           contact_id: preview.data.contact_id || null,
