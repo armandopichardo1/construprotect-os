@@ -62,6 +62,7 @@ export default function MaestrasPage() {
         {tab === 'Proveedores' && <ProveedoresMaestra />}
         {tab === 'Marcas' && <MarcasMaestra />}
         {tab === 'Servicios' && <ServiciosMaestra />}
+        {tab === 'Reglas de Descuento' && <ReglasDescuentoMaestra />}
         {tab === 'Cuentas Contables' && <CuentasMaestra />}
         {tab === 'Tasas de Cambio' && <TasasCambioMaestra />}
       </div>
