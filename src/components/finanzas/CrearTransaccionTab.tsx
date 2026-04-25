@@ -1018,10 +1018,10 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
         if (error) throw error;
         // Auto journal entry
         const lines = buildExpenseJournalLines(accounts, preview.data.account_id || null, preview.data.category, preview.data.amount_usd);
-        await createAutoJournal(`Gasto: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, lines, { exchangeRate: xr });
+        const expEntry = await createAutoJournal(`Gasto: ${preview.data.description} — ${preview.data.vendor || 'N/A'}`, lines, { exchangeRate: xr });
         toast.success('Gasto registrado con asiento contable');
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        invalidateJournalCaches(expEntry?.id);
       } else if (preview.type === 'cost') {
         const { error } = await supabase.from('costs').insert({
           description: preview.data.description,
