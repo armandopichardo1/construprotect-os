@@ -659,6 +659,17 @@ export function OrdenesTab() {
         editShipment={editShipment}
       />
 
+      {/* Edit Shipment Expenses (freight/customs/other) */}
+      <ShipmentExpensesDialog
+        open={!!editExpenses}
+        onOpenChange={v => { if (!v) setEditExpenses(null); }}
+        shipment={editExpenses}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+          queryClient.invalidateQueries({ queryKey: ['shipments'] });
+        }}
+      />
+
       {/* Edit Sale Dialog */}
       <SaleEditDialog
         open={!!editSale}
