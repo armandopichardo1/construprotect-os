@@ -15,6 +15,27 @@ import { cn } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
+// Cross-scope overlap: rules whose scope STRICTLY contains or is contained by the form's scope.
+// e.g. form = (contactA + categoryX)  overlaps with  (contactA, *)  and (*, categoryX)
+//      form = (contactA, *)           overlaps with  (contactA + anyCategory)
+// Identical scope is excluded (handled separately as "same scope").
+// Global rules (no contact AND no category) are skipped — they don't apply at runtime.
+function findCrossScopeOverlaps(form: any, rules: any[]): any[] {
+  const fc = form.contact_id || null;
+  const fk = form.category || null;
+  if (!fc && !fk) return [];
+  return rules.filter((r: any) => {
+    if (r.id === form.id || !r.is_active) return false;
+    const rc = r.contact_id || null;
+    const rk = r.category || null;
+    if (!rc && !rk) return false;
+    if (rc === fc && rk === fk) return false; // identical scope handled elsewhere
+    const rCoversForm = (rc ? rc === fc : true) && (rk ? rk === fk : true);
+    const formCoversR = (fc ? fc === rc : true) && (fk ? fk === rk : true);
+    return rCoversForm || formCoversR;
+  });
+}
+
 export function DiscountRulesManager() {
   const queryClient = useQueryClient();
   const { data: rules = [], isLoading } = useQuery({
