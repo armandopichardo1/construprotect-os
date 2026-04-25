@@ -19,7 +19,7 @@ import { exportToExcel } from '@/lib/export-utils';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ProductosContent } from '@/pages/ProductosPage';
 
-const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Cuentas Contables', 'Tasas de Cambio'];
+const tabs = ['Productos', 'Clientes', 'Proveedores', 'Marcas', 'Servicios', 'Reglas de Descuento', 'Cuentas Contables', 'Tasas de Cambio'];
 
 const TAB_MAP: Record<string, string> = {
   productos: 'Productos',
@@ -27,6 +27,7 @@ const TAB_MAP: Record<string, string> = {
   proveedores: 'Proveedores',
   marcas: 'Marcas',
   servicios: 'Servicios',
+  descuentos: 'Reglas de Descuento',
   cuentas: 'Cuentas Contables',
   tasas: 'Tasas de Cambio',
 };
