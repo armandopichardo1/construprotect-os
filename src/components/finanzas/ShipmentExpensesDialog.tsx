@@ -294,6 +294,67 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
               )}
             </div>
 
+            {/* Consistency / accounting warnings */}
+            {(() => {
+              const warnings: { level: 'error' | 'warn' | 'info'; msg: string }[] = [];
+              const okStatuses = ['ordered', 'in_transit', 'customs', 'arrived'];
+              if (shipment.status && !okStatuses.includes(shipment.status) && shipment.status !== 'received') {
+                warnings.push({ level: 'warn', msg: `Estado del envío "${shipment.status}" no es estándar. Verifica que sea correcto antes de contabilizar.` });
+              }
+              if (currentAddons > 0 && history.length === 0) {
+                warnings.push({
+                  level: 'error',
+                  msg: `Inconsistencia detectada: este envío tiene ${fmt(currentAddons)} en addons (Flete/Aduana/Otros) pero NO existe historial ni asiento contable previo. Al guardar se generará un asiento por el delta total para regularizar el libro diario.`,
+                });
+              }
+              if (currentAddons > 0 && history.length > 0 && linkedJournals.length === 0) {
+                warnings.push({
+                  level: 'error',
+                  msg: 'Hay historial de cambios pero los asientos contables asociados no se encuentran en el libro diario (posiblemente eliminados). Esto afecta el Balance General y el Estado de Resultados.',
+                });
+              }
+              if (!inventoryAcct) {
+                warnings.push({ level: 'error', msg: 'Falta la cuenta "Inventarios" (código 13000) en el catálogo. Sin esta cuenta no se puede generar el asiento contable y el flete quedaría sin reflejarse en los Estados Financieros.' });
+              }
+              if (!cxpAcct) {
+                warnings.push({ level: 'warn', msg: 'No se encontró la cuenta "Cuentas por Pagar Proveedores". El modo CxP no estará disponible.' });
+              }
+              if (Math.abs(deltaAddons) > 0.001 && paymentMode === 'bank' && !bankAccountId) {
+                warnings.push({ level: 'warn', msg: 'Selecciona una cuenta bancaria de pago para que el asiento se registre correctamente.' });
+              }
+              if (warnings.length === 0 && currentAddons > 0 && history.length > 0 && linkedJournals.length > 0) {
+                return (
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-xs flex items-start gap-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-success shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-success">Contabilización consistente:</strong> Los addons actuales están reflejados en {linkedJournals.length} asiento(s) del libro diario.
+                    </div>
+                  </div>
+                );
+              }
+              if (warnings.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  {warnings.map((w, i) => (
+                    <div key={i} className={`rounded-lg border p-3 text-xs flex items-start gap-2 ${
+                      w.level === 'error' ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                      : w.level === 'warn' ? 'border-warning/40 bg-warning/10 text-warning'
+                      : 'border-border bg-muted/30 text-muted-foreground'
+                    }`}>
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="block mb-0.5">{w.level === 'error' ? 'Error contable' : w.level === 'warn' ? 'Advertencia' : 'Info'}</strong>
+                        {w.msg}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground pl-1">
+                    El asiento generado afecta: <strong>Inventario (Activo)</strong> en el Balance General y, al recibir el envío y vender los productos, el <strong>Costo de Ventas</strong> en el Estado de Resultados.
+                  </p>
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-xs">Flete USD</Label>
