@@ -99,7 +99,11 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
 
   const currentFreight = Number(shipment?.shipping_cost_usd || 0);
   const currentCustoms = Number(shipment?.customs_cost_usd || 0);
+  // Fuente primaria: campo estructurado other_cost_usd. Fallback a regex de notes solo
+  // para envíos antiguos donde aún no se haya migrado el dato.
   const currentOther = (() => {
+    const structured = Number((shipment as any)?.other_cost_usd);
+    if (Number.isFinite(structured) && structured > 0) return structured;
     const m = String(shipment?.notes || '').match(/Otros \$([0-9.]+)/);
     return m ? Number(m[1]) : 0;
   })();
@@ -203,15 +207,16 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
         : null;
       const finalNotes = [userNotes || null, landedAnnotation].filter(Boolean).join(' · ') || null;
 
-      // 1) Update shipment header
+      // 1) Update shipment header (incluye other_cost_usd estructurado)
       const { error: shipErr } = await supabase
         .from('shipments')
         .update({
           shipping_cost_usd: newFreight,
           customs_cost_usd: newCustoms,
+          other_cost_usd: newOther,
           total_cost_usd: totalFob,
           notes: finalNotes,
-        })
+        } as any)
         .eq('id', shipment.id);
       if (shipErr) throw shipErr;
 
