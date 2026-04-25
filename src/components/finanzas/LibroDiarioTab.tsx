@@ -215,20 +215,30 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
     return all;
   }, [journalEntries, rate]);
 
-  const filtered = useMemo(() => {
+  // Pre-filtered set: respects month/year/type/period but NOT the search box.
+  // Used to feed autocomplete suggestions so they stay scoped to current filters.
+  const preFiltered = useMemo(() => {
     let items = filterByDate(entries);
     if (typeFilter !== 'all') items = items.filter(e => e.type === typeFilter);
     if (yearFilter !== 'all') items = items.filter(e => e.date?.slice(0, 4) === yearFilter);
     if (monthFilter !== 'all') items = items.filter(e => e.date?.slice(5, 7) === monthFilter);
+    return items;
+  }, [entries, filterByDate, typeFilter, yearFilter, monthFilter]);
+
+  const filtered = useMemo(() => {
+    let items = preFiltered;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       items = items.filter(e =>
         e.description.toLowerCase().includes(q) ||
         e.vendor_client.toLowerCase().includes(q) ||
         e.account_name.toLowerCase().includes(q) ||
-        e.credit_account_name.toLowerCase().includes(q)
+        e.credit_account_name.toLowerCase().includes(q) ||
+        e.entry_number.toLowerCase().includes(q) ||
+        e.document.toLowerCase().includes(q)
       );
     }
+    items = [...items];
     items.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'date') cmp = a.date.localeCompare(b.date);
