@@ -1271,7 +1271,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
                     <span className="flex-1">Producto / Servicio</span>
                     <span className="w-12 text-center">Cant</span>
                     <span className="w-24">Precio</span>
-                    <span className="w-14 text-center">Desc %</span>
+                    <span className="w-[104px] text-center">Descuento</span>
                     <span className="w-20 text-right">Total</span>
                   </div>
                   {saleItems.map((item, i) => {
