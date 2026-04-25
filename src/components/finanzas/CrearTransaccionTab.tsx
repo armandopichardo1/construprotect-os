@@ -721,7 +721,7 @@ export function CrearTransaccionTab({ rate, rateForMonth, onEditSale, onEditExpe
           supplier_name: purchaseSupplierName || 'Proveedor',
           po_number: `PO-${Date.now().toString(36).toUpperCase()}`,
           order_date: dateStr,
-          total_cost_usd: purchaseTotal, // landed cost (FOB + addons)
+          total_cost_usd: fobBase, // FOB cost — shipping/customs stored separately for breakdown
           shipping_cost_usd: freight,
           customs_cost_usd: customs,
           status: 'ordered' as any,
