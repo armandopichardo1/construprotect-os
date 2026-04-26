@@ -313,7 +313,124 @@ export function AjustesAuditoriaTab() {
     }
   };
 
-  return (
+  // Re-sincronizar WAC y márgenes desde un ajuste específico (forward-only).
+  // Re-aplica el addon por unidad de ESE ajuste sobre el stock actual,
+  // actualiza products.unit_cost_usd / total_unit_cost_usd / márgenes,
+  // y registra un marcador qty=0 en inventory_movements. No toca asientos.
+  const handleResync = async () => {
+    if (!resyncTarget) return;
+    setResyncing(true);
+    try {
+      const h = resyncTarget;
+      const shipment = h.shipments;
+      if (!shipment) throw new Error('Envío no encontrado');
+      const poRef = shipment.po_number || String(shipment.id).slice(0, 8);
+
+      // Si el ajuste fue reversado, re-sincronizar implica aplicar 0 (no tiene sentido).
+      if (h.reversed_at) throw new Error('Este ajuste está reversado; no aplica re-sincronizar.');
+
+      const t = h.adjustment_type || 'edit';
+      // Para reversos no re-sincronizamos desde aquí (ya lo hace el flujo de reverso).
+      if (t === 'reversal') throw new Error('No se puede re-sincronizar desde un contra-asiento.');
+
+      const total = Number(h.delta_total_usd || 0);
+      if (Math.abs(total) < 0.0001) throw new Error('El ajuste tiene Δ = 0; no hay nada que re-sincronizar.');
+
+      const items: any[] = shipment.shipment_items || [];
+      const itemFobTotals = items.map((it: any) => ({
+        item: it,
+        base: Number(it.unit_cost_usd || 0) * Number(it.quantity_ordered || 0),
+      }));
+      const sumBase = itemFobTotals.reduce((s, x) => s + x.base, 0);
+      const sumUnits = items.reduce((s: number, it: any) => s + Number(it.quantity_ordered || 0), 0);
+
+      const results: { sku: string; oldCost: number; newCost: number }[] = [];
+
+      for (const { item, base } of itemFobTotals) {
+        if (!item.product_id) continue;
+        const qtyOrdered = Number(item.quantity_ordered || 0);
+        if (qtyOrdered <= 0) continue;
+        const share = sumBase > 0
+          ? base / sumBase
+          : (sumUnits > 0 ? qtyOrdered / sumUnits : 0);
+        const lineAddon = total * share;
+        if (Math.abs(lineAddon) < 0.0001) continue;
+        const addonPerUnit = lineAddon / qtyOrdered;
+
+        const { data: prod } = await supabase
+          .from('products')
+          .select('sku, unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd')
+          .eq('id', item.product_id)
+          .single();
+        if (!prod) continue;
+
+        const currentCost = Number(prod.unit_cost_usd || 0);
+        const { data: inv } = await supabase
+          .from('inventory')
+          .select('quantity_on_hand')
+          .eq('product_id', item.product_id)
+          .maybeSingle();
+        const stockQty = Number(inv?.quantity_on_hand || 0);
+
+        let newCost = currentCost;
+        if (stockQty > 0) {
+          const applicableUnits = Math.min(stockQty, qtyOrdered);
+          const applicableAddon = addonPerUnit * applicableUnits;
+          newCost = (stockQty * currentCost + applicableAddon) / stockQty;
+          newCost = Math.max(0, newCost);
+        } else {
+          // Sin stock: ajustar el costo del item del envío para futuras recepciones
+          const newItemCost = Math.max(0, Number(item.unit_cost_usd || 0) + addonPerUnit);
+          await supabase
+            .from('shipment_items')
+            .update({ unit_cost_usd: Number(newItemCost.toFixed(4)) })
+            .eq('id', item.id);
+        }
+
+        const updates: Record<string, number> = {
+          unit_cost_usd: Number(newCost.toFixed(4)),
+          total_unit_cost_usd: Number(newCost.toFixed(4)),
+        };
+        [
+          { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+          { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+          { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+          { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+        ].forEach(({ price, field }) => {
+          if (price > 0) updates[field] = Number((((price - newCost) / price) * 100).toFixed(1));
+        });
+        await supabase.from('products').update(updates as any).eq('id', item.product_id);
+
+        if (Math.abs(newCost - currentCost) > 0.0001) {
+          await supabase.from('inventory_movements').insert({
+            product_id: item.product_id,
+            quantity: 0,
+            movement_type: 'adjustment',
+            unit_cost_usd: Number(newCost.toFixed(4)),
+            reference_id: h.id,
+            reference_type: 'shipment_expense_resync',
+            notes: `Re-sincronización WAC desde ajuste ${String(h.id).slice(0, 8)} · Envío ${poRef} · WAC ${currentCost.toFixed(4)} → ${newCost.toFixed(4)}. Forward-only; movimientos previos no alterados.`,
+          });
+        }
+
+        results.push({ sku: prod.sku, oldCost: currentCost, newCost });
+      }
+
+      setResyncResult(results);
+      toast.success(`WAC re-sincronizado en ${results.length} producto(s)`, {
+        description: 'Márgenes recalculados. Movimientos pasados no fueron modificados.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al re-sincronizar WAC');
+    } finally {
+      setResyncing(false);
+    }
+  };
     <div className="space-y-4">
       {/* Header + stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
