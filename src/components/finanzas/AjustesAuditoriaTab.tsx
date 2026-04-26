@@ -883,11 +883,27 @@ function ExpandedImpactPanel({
   openJournal: (id: string) => void;
 }) {
   const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
-  const toggleSku = (key: string) => setExpandedSkus(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
+  const [loadingSkus, setLoadingSkus] = useState<Set<string>>(new Set());
+  const toggleSku = (key: string) => {
+    setExpandedSkus(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        // Mostrar skeleton breve al abrir
+        setLoadingSkus(l => new Set(l).add(key));
+        setTimeout(() => {
+          setLoadingSkus(l => {
+            const n = new Set(l);
+            n.delete(key);
+            return n;
+          });
+        }, 250);
+      }
+      return next;
+    });
+  };
 
   const fmt = (n: number) =>
     `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
