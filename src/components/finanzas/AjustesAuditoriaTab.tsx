@@ -959,18 +959,16 @@ function ExpandedImpactPanel({
   // ---- 3) Estado contable ----
   const jeId: string | null = row.journal_entry_id || null;
   const revJeId: string | null = row.reversal_journal_entry_id || null;
-  const jeBalanced =
-    jeLines.length > 0 &&
-    Math.abs(
-      jeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
-      jeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
-    ) < 0.01;
-  const revBalanced =
-    revJeLines.length > 0 &&
-    Math.abs(
-      revJeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
-      revJeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
-    ) < 0.01;
+  const computeBalance = (lines: any[]) => {
+    const dr = lines.reduce((s, l) => s + Number(l.debit_usd || 0), 0);
+    const cr = lines.reduce((s, l) => s + Number(l.credit_usd || 0), 0);
+    const diff = dr - cr;
+    return { dr, cr, diff, balanced: lines.length > 0 && Math.abs(diff) < 0.01 };
+  };
+  const jeBal = computeBalance(jeLines);
+  const revBal = computeBalance(revJeLines);
+  const jeBalanced = jeBal.balanced;
+  const revBalanced = revBal.balanced;
 
   const renderJeLines = (lines: any[]) => (
     <div className="rounded-md border border-border bg-card overflow-hidden">
