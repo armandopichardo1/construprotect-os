@@ -79,6 +79,51 @@ export function AjustesAuditoriaTab() {
     return m;
   }, [journals]);
 
+  // Detalle del registro expandido
+  const expandedRow = useMemo(
+    () => history.find((h: any) => h.id === expandedId) || null,
+    [history, expandedId]
+  );
+  const expandedJeIds = useMemo(() => {
+    if (!expandedRow) return [] as string[];
+    return [expandedRow.journal_entry_id, expandedRow.reversal_journal_entry_id].filter(Boolean) as string[];
+  }, [expandedRow]);
+  const expandedProductIds = useMemo(() => {
+    if (!expandedRow?.shipments?.shipment_items) return [] as string[];
+    return (expandedRow.shipments.shipment_items as any[])
+      .map(it => it.product_id)
+      .filter(Boolean) as string[];
+  }, [expandedRow]);
+
+  const { data: expandedJeLines = [] } = useQuery({
+    queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
+    enabled: expandedJeIds.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('journal_entry_lines')
+        .select('journal_entry_id, debit_usd, credit_usd, description, account_id, chart_of_accounts(code, description)')
+        .in('journal_entry_id', expandedJeIds);
+      return data || [];
+    },
+  });
+
+  const { data: expandedProductsState = [] } = useQuery({
+    queryKey: ['shipment-expense-history-products-state', expandedProductIds.join(',')],
+    enabled: expandedProductIds.length > 0,
+    queryFn: async () => {
+      const [{ data: prods }, { data: invs }] = await Promise.all([
+        supabase.from('products').select('id, sku, name, unit_cost_usd').in('id', expandedProductIds),
+        supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', expandedProductIds),
+      ]);
+      const invMap: Record<string, number> = {};
+      (invs || []).forEach((i: any) => { invMap[i.product_id] = Number(i.quantity_on_hand || 0); });
+      return (prods || []).map((p: any) => ({
+        ...p,
+        stock_on_hand: invMap[p.id] || 0,
+      }));
+    },
+  });
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return history.filter((h: any) => {
