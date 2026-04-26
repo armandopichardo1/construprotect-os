@@ -546,6 +546,26 @@ export function AjustesAuditoriaTab() {
           variant="outline"
           size="sm"
           className="h-9 text-xs gap-1.5"
+          onClick={() => setExpandedIds(new Set(filtered.map((h: any) => h.id)))}
+          disabled={filtered.length === 0 || filtered.every((h: any) => expandedIds.has(h.id))}
+          title="Abrir el panel de impacto de todos los ajustes visibles"
+        >
+          <ChevronsDown className="w-3 h-3" /> Expandir todo
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
+          onClick={() => setExpandedIds(new Set())}
+          disabled={expandedIds.size === 0}
+          title="Cerrar todos los paneles de impacto"
+        >
+          <ChevronsUp className="w-3 h-3" /> Contraer todo
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['shipment-expense-history-all'] })}
         >
           <RefreshCw className="w-3 h-3" /> Refrescar
