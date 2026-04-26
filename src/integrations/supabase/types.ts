@@ -1557,6 +1557,7 @@ export type Database = {
       }
       shipment_expense_history: {
         Row: {
+          adjustment_type: string | null
           changed_by: string | null
           changed_by_name: string | null
           created_at: string
@@ -1571,9 +1572,15 @@ export type Database = {
           previous_customs_usd: number
           previous_freight_usd: number
           previous_other_usd: number
+          reversal_journal_entry_id: string | null
+          reversal_of_history_id: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          reversed_by_name: string | null
           shipment_id: string
         }
         Insert: {
+          adjustment_type?: string | null
           changed_by?: string | null
           changed_by_name?: string | null
           created_at?: string
@@ -1588,9 +1595,15 @@ export type Database = {
           previous_customs_usd?: number
           previous_freight_usd?: number
           previous_other_usd?: number
+          reversal_journal_entry_id?: string | null
+          reversal_of_history_id?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          reversed_by_name?: string | null
           shipment_id: string
         }
         Update: {
+          adjustment_type?: string | null
           changed_by?: string | null
           changed_by_name?: string | null
           created_at?: string
@@ -1605,6 +1618,11 @@ export type Database = {
           previous_customs_usd?: number
           previous_freight_usd?: number
           previous_other_usd?: number
+          reversal_journal_entry_id?: string | null
+          reversal_of_history_id?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          reversed_by_name?: string | null
           shipment_id?: string
         }
         Relationships: []

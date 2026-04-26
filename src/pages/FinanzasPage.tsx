@@ -35,9 +35,10 @@ import { EstadoSituacionTab } from '@/components/finanzas/EstadoSituacionTab';
 import { ReceiptUpload } from '@/components/finanzas/ReceiptUpload';
 import { PricingTab } from '@/components/finanzas/PricingTab';
 import { OrdenesTab } from '@/components/finanzas/OrdenesTab';
+import { AjustesAuditoriaTab } from '@/components/finanzas/AjustesAuditoriaTab';
 import { DiscountRulesManager } from '@/components/shared/DiscountRulesManager';
 
-const tabs = ['Crear Transacción', 'Resumen', 'Pricing', 'Órdenes', 'Reglas de Descuento', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Situación', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Resumen', 'Pricing', 'Órdenes', 'Auditoría Ajustes', 'Reglas de Descuento', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Situación', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
@@ -260,6 +261,7 @@ export default function FinanzasPage() {
         {tab === 'Pricing' && <PricingTab />}
 
         {tab === 'Órdenes' && <OrdenesTab />}
+        {tab === 'Auditoría Ajustes' && <AjustesAuditoriaTab />}
         {tab === 'Reglas de Descuento' && <DiscountRulesManager />}
 
         {tab === 'Resumen' && (
