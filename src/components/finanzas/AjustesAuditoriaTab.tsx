@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw, ChevronRight, ChevronDown, Package, BookOpen } from 'lucide-react';
 
 const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
