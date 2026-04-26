@@ -1257,12 +1257,21 @@ function ExpandedImpactPanel({
                 ) : jeLines.length === 0 ? (
                   <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">Sin líneas</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">
-                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado
+                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30" title={`DR ${fmt(jeBal.dr)} − CR ${fmt(jeBal.cr)} = ${jeBal.diff > 0 ? '+' : ''}${fmt(jeBal.diff)}`}>
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado · Δ {jeBal.diff > 0 ? '+' : ''}{fmt(jeBal.diff)}
                   </Badge>
                 )
               )}
             </div>
+            {jeId && jeLines.length > 0 && !jeBalanced && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-1.5 mb-1 flex items-start gap-1.5">
+                <AlertTriangle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />
+                <div className="text-[10px] font-mono leading-tight">
+                  <div>DR <strong>{fmt(jeBal.dr)}</strong> − CR <strong>{fmt(jeBal.cr)}</strong></div>
+                  <div className="text-destructive font-semibold">Diferencia: {jeBal.diff > 0 ? '+' : ''}{fmt(jeBal.diff)} USD</div>
+                </div>
+              </div>
+            )}
             {jeId && jeLines.length > 0 ? renderJeLines(jeLines) : (
               <div className="text-[10px] text-muted-foreground italic rounded-md border border-dashed border-border p-2">
                 {jeId ? 'Cargando líneas…' : 'Sin asiento contable asociado.'}
