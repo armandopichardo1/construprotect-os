@@ -1075,37 +1075,160 @@ function ExpandedImpactPanel({
           </div>
         </div>
         {productImpact.length > 0 ? (
-          <div className="rounded-md border border-border bg-card overflow-hidden max-h-56 overflow-y-auto">
-            <table className="w-full text-[10px]">
-              <thead className="bg-muted/40 sticky top-0">
-                <tr>
-                  <th className="text-left px-2 py-1 font-medium">SKU</th>
-                  <th className="text-right px-2 py-1 font-medium">Pedido</th>
-                  <th className="text-right px-2 py-1 font-medium">Stock</th>
-                  <th className="text-right px-2 py-1 font-medium">Add-on/u</th>
-                  <th className="text-right px-2 py-1 font-medium">WAC actual</th>
-                  <th className="text-right px-2 py-1 font-medium">WAC proy.</th>
-                  <th className="text-right px-2 py-1 font-medium">Δ Valor inv.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productImpact.map((p: any, i: number) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-2 py-1 font-mono">{p.sku}</td>
-                    <td className="px-2 py-1 text-right font-mono">{p.qtyOrdered}</td>
-                    <td className="px-2 py-1 text-right font-mono">{p.stock}</td>
-                    <td className={`px-2 py-1 text-right font-mono ${p.addonPerUnit > 0 ? 'text-warning' : p.addonPerUnit < 0 ? 'text-success' : ''}`}>
-                      {p.addonPerUnit > 0 ? '+' : ''}${p.addonPerUnit.toFixed(4)}
-                    </td>
-                    <td className="px-2 py-1 text-right font-mono">${p.currentCost.toFixed(4)}</td>
-                    <td className="px-2 py-1 text-right font-mono font-semibold">${p.projectedNewCost.toFixed(4)}</td>
-                    <td className={`px-2 py-1 text-right font-mono ${p.exposedAmount > 0 ? 'text-warning' : p.exposedAmount < 0 ? 'text-success' : ''}`}>
-                      {p.exposedAmount > 0 ? '+' : ''}{fmt(p.exposedAmount)}
-                    </td>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-semibold text-muted-foreground">
+                Detalle por SKU <span className="text-muted-foreground/70">({productImpact.length})</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setExpandedSkus(new Set(productImpact.map((p: any) => p.productId)))}
+                  disabled={productImpact.every((p: any) => expandedSkus.has(p.productId))}
+                  className="text-[10px] inline-flex items-center gap-0.5 hover:text-primary disabled:opacity-40"
+                >
+                  <ChevronsDown className="w-2.5 h-2.5" /> Expandir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpandedSkus(new Set())}
+                  disabled={expandedSkus.size === 0}
+                  className="text-[10px] inline-flex items-center gap-0.5 hover:text-primary disabled:opacity-40"
+                >
+                  <ChevronsUp className="w-2.5 h-2.5" /> Contraer
+                </button>
+              </div>
+            </div>
+            <div className="rounded-md border border-border bg-card overflow-hidden max-h-72 overflow-y-auto">
+              <table className="w-full text-[10px]">
+                <thead className="bg-muted/40 sticky top-0">
+                  <tr>
+                    <th className="text-left px-2 py-1 font-medium w-6"></th>
+                    <th className="text-left px-2 py-1 font-medium">SKU</th>
+                    <th className="text-right px-2 py-1 font-medium">Pedido</th>
+                    <th className="text-right px-2 py-1 font-medium">Stock</th>
+                    <th className="text-right px-2 py-1 font-medium">Add-on/u</th>
+                    <th className="text-right px-2 py-1 font-medium">WAC actual</th>
+                    <th className="text-right px-2 py-1 font-medium">WAC proy.</th>
+                    <th className="text-right px-2 py-1 font-medium">Δ Valor inv.</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {productImpact.map((p: any, i: number) => {
+                    const key = p.productId || `idx-${i}`;
+                    const isOpen = expandedSkus.has(key);
+                    const addonTotalLine = p.addonPerUnit * p.qtyOrdered; // add-on total prorrateado a la línea
+                    const oldInvValue = p.stock * p.currentCost;
+                    const newInvValue = p.stock * p.projectedNewCost;
+                    const deltaInvValue = newInvValue - oldInvValue;
+                    return (
+                      <>
+                        <tr
+                          key={key}
+                          className={`border-t border-border cursor-pointer hover:bg-muted/30 ${isOpen ? 'bg-muted/20' : ''}`}
+                          onClick={() => toggleSku(key)}
+                        >
+                          <td className="px-2 py-1">
+                            {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          </td>
+                          <td className="px-2 py-1 font-mono">
+                            {p.sku}
+                            {p.name && <div className="text-[9px] text-muted-foreground truncate max-w-[180px]">{p.name}</div>}
+                          </td>
+                          <td className="px-2 py-1 text-right font-mono">{p.qtyOrdered}</td>
+                          <td className="px-2 py-1 text-right font-mono">{p.stock}</td>
+                          <td className={`px-2 py-1 text-right font-mono ${p.addonPerUnit > 0 ? 'text-warning' : p.addonPerUnit < 0 ? 'text-success' : ''}`}>
+                            {p.addonPerUnit > 0 ? '+' : ''}${p.addonPerUnit.toFixed(4)}
+                          </td>
+                          <td className="px-2 py-1 text-right font-mono">${p.currentCost.toFixed(4)}</td>
+                          <td className="px-2 py-1 text-right font-mono font-semibold">${p.projectedNewCost.toFixed(4)}</td>
+                          <td className={`px-2 py-1 text-right font-mono ${p.exposedAmount > 0 ? 'text-warning' : p.exposedAmount < 0 ? 'text-success' : ''}`}>
+                            {p.exposedAmount > 0 ? '+' : ''}{fmt(p.exposedAmount)}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr key={`${key}-detail`} className="bg-muted/10 border-t border-border">
+                            <td></td>
+                            <td colSpan={7} className="px-2 py-2">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                {/* Stock & unidades aplicables */}
+                                <div className="rounded border border-border bg-card p-1.5">
+                                  <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Stock & unidades</div>
+                                  <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                                    <div>Pedido: <strong>{p.qtyOrdered}</strong></div>
+                                    <div>Stock actual: <strong>{p.stock}</strong></div>
+                                    <div className="text-muted-foreground">
+                                      Aplicables = min(stock, pedido) = <strong className="text-foreground">{p.applicableUnits}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Add-on (prorrateo) */}
+                                <div className="rounded border border-border bg-card p-1.5">
+                                  <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Add-on prorrateado</div>
+                                  <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                                    <div>Share FOB: <strong>{(p.share * 100).toFixed(2)}%</strong></div>
+                                    <div>
+                                      Línea: Δ × share = {fmt(deltaTotal)} × {(p.share * 100).toFixed(2)}% ={' '}
+                                      <strong className={addonTotalLine > 0 ? 'text-warning' : addonTotalLine < 0 ? 'text-success' : ''}>
+                                        {addonTotalLine > 0 ? '+' : ''}{fmt(addonTotalLine)}
+                                      </strong>
+                                    </div>
+                                    <div>
+                                      Por unidad: {fmt(addonTotalLine)} ÷ {p.qtyOrdered} ={' '}
+                                      <strong>${p.addonPerUnit.toFixed(4)}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* WAC antes/después */}
+                                <div className="rounded border border-border bg-card p-1.5">
+                                  <div className="text-[9px] uppercase text-muted-foreground tracking-wide">WAC antes → después</div>
+                                  <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                                    <div>WAC antes: <strong>${p.currentCost.toFixed(4)}</strong></div>
+                                    <div>
+                                      WAC después ={' '}
+                                      <span className="text-muted-foreground">
+                                        ({p.stock} × ${p.currentCost.toFixed(4)} + {fmt(p.exposedAmount)}) ÷ {p.stock || 1}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      = <strong className="text-primary">${p.projectedNewCost.toFixed(4)}</strong>{' '}
+                                      <span className={p.deltaCost > 0 ? 'text-warning' : p.deltaCost < 0 ? 'text-success' : 'text-muted-foreground'}>
+                                        (Δ {p.deltaCost > 0 ? '+' : ''}${p.deltaCost.toFixed(4)})
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Cálculo Δ Valor de inventario */}
+                              <div className="rounded border border-primary/30 bg-primary/5 p-1.5 mt-2">
+                                <div className="text-[9px] uppercase text-primary/80 tracking-wide font-semibold">
+                                  Δ Valor de inventario para este SKU
+                                </div>
+                                <div className="text-[10px] font-mono mt-0.5 grid grid-cols-1 md:grid-cols-3 gap-1">
+                                  <div>Valor antes = {p.stock} × ${p.currentCost.toFixed(4)} = <strong>{fmt(oldInvValue)}</strong></div>
+                                  <div>Valor después = {p.stock} × ${p.projectedNewCost.toFixed(4)} = <strong>{fmt(newInvValue)}</strong></div>
+                                  <div>
+                                    Δ ={' '}
+                                    <strong className={deltaInvValue > 0 ? 'text-warning' : deltaInvValue < 0 ? 'text-success' : ''}>
+                                      {deltaInvValue > 0 ? '+' : ''}{fmt(deltaInvValue)}
+                                    </strong>
+                                  </div>
+                                </div>
+                                {p.applicableUnits < p.qtyOrdered && (
+                                  <div className="text-[9px] text-muted-foreground italic mt-1">
+                                    ⚠️ {p.qtyOrdered - p.applicableUnits} unidad(es) ya vendidas — su Δ se reconoce como COGS pasado preservado, no afecta el WAC.
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div className="text-[10px] text-muted-foreground italic">Sin productos asociados al envío.</div>
