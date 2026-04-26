@@ -654,6 +654,65 @@ export function AjustesAuditoriaTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Confirmación de re-sincronización WAC */}
+      <AlertDialog open={!!resyncTarget} onOpenChange={v => { if (!v) { setResyncTarget(null); setResyncResult(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-primary" /> Re-sincronizar WAC y márgenes
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-xs">
+                <p>Recalcula el WAC y los márgenes de los productos del envío a partir de <strong>este ajuste</strong>, de forma <strong>forward-only</strong>:</p>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Reaplica el addon por unidad de este ajuste sobre el <strong>stock disponible HOY</strong>.</li>
+                  <li>Actualiza <code className="text-[10px]">unit_cost_usd</code>, <code className="text-[10px]">total_unit_cost_usd</code> y márgenes en cada producto afectado.</li>
+                  <li>Inserta un movimiento <code className="text-[10px]">adjustment</code> (qty=0) como marcador de versión.</li>
+                  <li><strong>No</strong> genera asientos contables ni modifica movimientos pasados.</li>
+                </ul>
+                {resyncTarget && !resyncResult && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-2 mt-2 space-y-0.5">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Envío:</span><span className="font-mono">{resyncTarget.shipments?.po_number || String(resyncTarget.shipment_id).slice(0, 8)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Δ del ajuste:</span><span className="font-mono font-semibold">{fmt(Math.abs(Number(resyncTarget.delta_total_usd || 0)))}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Productos del envío:</span><span className="font-mono">{(resyncTarget.shipments?.shipment_items || []).length}</span></div>
+                  </div>
+                )}
+                {resyncResult && (
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-2 mt-2 space-y-1">
+                    <div className="flex items-center gap-1.5 text-success">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span className="font-semibold text-[11px]">Re-sincronización completada — {resyncResult.length} producto(s)</span>
+                    </div>
+                    {resyncResult.length > 0 && (
+                      <div className="max-h-40 overflow-auto mt-1 space-y-0.5">
+                        {resyncResult.map((r, i) => (
+                          <div key={i} className="flex justify-between text-[10px] font-mono">
+                            <span className="text-muted-foreground">{r.sku}</span>
+                            <span>${r.oldCost.toFixed(4)} → <strong>${r.newCost.toFixed(4)}</strong></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-2 mt-2 flex gap-1.5 items-start">
+                  <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                  <span className="text-[11px]">Las unidades ya vendidas conservan su COGS pasado. Esto puede generar un nuevo WAC si el stock actual cambió respecto al momento del ajuste.</span>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resyncing}>{resyncResult ? 'Cerrar' : 'Cancelar'}</AlertDialogCancel>
+            {!resyncResult && (
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); handleResync(); }} disabled={resyncing}>
+                {resyncing ? 'Re-sincronizando…' : 'Confirmar re-sync'}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
