@@ -38,6 +38,9 @@ export function AjustesAuditoriaTab() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [reverseTarget, setReverseTarget] = useState<any | null>(null);
   const [reversing, setReversing] = useState(false);
+  const [resyncTarget, setResyncTarget] = useState<any | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState<{ sku: string; oldCost: number; newCost: number }[] | null>(null);
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['shipment-expense-history-all'],
