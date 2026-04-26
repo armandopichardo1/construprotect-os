@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw, ChevronRight, ChevronDown, Package, BookOpen } from 'lucide-react';
 
 const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -41,6 +41,7 @@ export function AjustesAuditoriaTab() {
   const [resyncTarget, setResyncTarget] = useState<any | null>(null);
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<{ sku: string; oldCost: number; newCost: number }[] | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['shipment-expense-history-all'],
@@ -77,6 +78,51 @@ export function AjustesAuditoriaTab() {
     (journals || []).forEach((j: any) => { m[j.id] = j; });
     return m;
   }, [journals]);
+
+  // Detalle del registro expandido
+  const expandedRow = useMemo(
+    () => history.find((h: any) => h.id === expandedId) || null,
+    [history, expandedId]
+  );
+  const expandedJeIds = useMemo(() => {
+    if (!expandedRow) return [] as string[];
+    return [expandedRow.journal_entry_id, expandedRow.reversal_journal_entry_id].filter(Boolean) as string[];
+  }, [expandedRow]);
+  const expandedProductIds = useMemo(() => {
+    if (!expandedRow?.shipments?.shipment_items) return [] as string[];
+    return (expandedRow.shipments.shipment_items as any[])
+      .map(it => it.product_id)
+      .filter(Boolean) as string[];
+  }, [expandedRow]);
+
+  const { data: expandedJeLines = [] } = useQuery({
+    queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
+    enabled: expandedJeIds.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('journal_entry_lines')
+        .select('journal_entry_id, debit_usd, credit_usd, description, account_id, chart_of_accounts(code, description)')
+        .in('journal_entry_id', expandedJeIds);
+      return data || [];
+    },
+  });
+
+  const { data: expandedProductsState = [] } = useQuery({
+    queryKey: ['shipment-expense-history-products-state', expandedProductIds.join(',')],
+    enabled: expandedProductIds.length > 0,
+    queryFn: async () => {
+      const [{ data: prods }, { data: invs }] = await Promise.all([
+        supabase.from('products').select('id, sku, name, unit_cost_usd').in('id', expandedProductIds),
+        supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', expandedProductIds),
+      ]);
+      const invMap: Record<string, number> = {};
+      (invs || []).forEach((i: any) => { invMap[i.product_id] = Number(i.quantity_on_hand || 0); });
+      return (prods || []).map((p: any) => ({
+        ...p,
+        stock_on_hand: invMap[p.id] || 0,
+      }));
+    },
+  });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -528,9 +574,21 @@ export function AjustesAuditoriaTab() {
               const isReversal = t === 'reversal';
               const canReverse = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
               const canResync = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
+              const isExpanded = expandedId === h.id;
               return (
-                <TableRow key={h.id} className={isReversed ? 'opacity-60' : ''}>
-                  <TableCell className="text-[11px] font-mono whitespace-nowrap">{dateStr}</TableCell>
+                <>
+                <TableRow key={h.id} className={`${isReversed ? 'opacity-60' : ''} ${isExpanded ? 'bg-muted/20' : ''}`}>
+                  <TableCell className="text-[11px] font-mono whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isExpanded ? null : h.id)}
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                      title={isExpanded ? 'Ocultar impacto' : 'Ver impacto'}
+                    >
+                      {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      {dateStr}
+                    </button>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[t] || ''}`}>
                       {TYPE_LABELS[t] || t}
@@ -609,6 +667,20 @@ export function AjustesAuditoriaTab() {
                     </div>
                   </TableCell>
                 </TableRow>
+                {isExpanded && (
+                  <TableRow key={`${h.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
+                    <TableCell colSpan={9} className="p-0">
+                      <ExpandedImpactPanel
+                        row={h}
+                        jeLines={expandedJeLines.filter((l: any) => l.journal_entry_id === h.journal_entry_id)}
+                        revJeLines={expandedJeLines.filter((l: any) => l.journal_entry_id === h.reversal_journal_entry_id)}
+                        productsState={expandedProductsState}
+                        openJournal={openJournal}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                </>
               );
             })}
           </TableBody>
@@ -713,6 +785,321 @@ export function AjustesAuditoriaTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Panel de impacto expandido por fila
+// Muestra:
+//   1) Impacto en totales del envío (flete/aduana/otros) antes ↔ después
+//   2) Impacto en valor de inventario / WAC esperado por producto
+//      (delta por unidad aplicado al stock actual = exposición de re-sync)
+//   3) Estado contable del Libro Diario (líneas DR/CR del asiento + reverso)
+// ----------------------------------------------------------------------------
+function ExpandedImpactPanel({
+  row,
+  jeLines,
+  revJeLines,
+  productsState,
+  openJournal,
+}: {
+  row: any;
+  jeLines: any[];
+  revJeLines: any[];
+  productsState: any[];
+  openJournal: (id: string) => void;
+}) {
+  const fmt = (n: number) =>
+    `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const ship = row.shipments || {};
+  const items: any[] = ship.shipment_items || [];
+
+  // ---- 1) Totales del envío (antes / después + delta) ----
+  const prevFreight = Number(row.previous_freight_usd || 0);
+  const newFreight = Number(row.new_freight_usd || 0);
+  const prevCustoms = Number(row.previous_customs_usd || 0);
+  const newCustoms = Number(row.new_customs_usd || 0);
+  const prevOther = Number(row.previous_other_usd || 0);
+  const newOther = Number(row.new_other_usd || 0);
+  const prevAddon = prevFreight + prevCustoms + prevOther;
+  const newAddon = newFreight + newCustoms + newOther;
+  const deltaTotal = Number(row.delta_total_usd || 0);
+
+  // ---- 2) Impacto en costo unitario / valor de inventario ----
+  // Reproducimos el mismo prorrateo por valor FOB que usa el ajuste/reverso.
+  const itemFobTotals = items.map(it => ({
+    item: it,
+    base: Number(it.unit_cost_usd || 0) * Number(it.quantity_ordered || 0),
+  }));
+  const sumBase = itemFobTotals.reduce((s, x) => s + x.base, 0);
+  const sumUnits = items.reduce((s, it: any) => s + Number(it.quantity_ordered || 0), 0);
+
+  const productMap: Record<string, any> = {};
+  productsState.forEach(p => { productMap[p.id] = p; });
+
+  const productImpact = itemFobTotals
+    .map(({ item, base }) => {
+      const qtyOrdered = Number(item.quantity_ordered || 0);
+      if (qtyOrdered <= 0 || !item.product_id) return null;
+      const share = sumBase > 0 ? base / sumBase : (sumUnits > 0 ? qtyOrdered / sumUnits : 0);
+      const lineAddon = deltaTotal * share;
+      const addonPerUnit = qtyOrdered > 0 ? lineAddon / qtyOrdered : 0;
+      const ps = productMap[item.product_id];
+      const stock = ps?.stock_on_hand ?? 0;
+      const currentCost = Number(ps?.unit_cost_usd ?? item.unit_cost_usd ?? 0);
+      const applicableUnits = Math.min(stock, qtyOrdered);
+      const exposedAmount = addonPerUnit * applicableUnits; // valor de inv. impactado
+      const projectedNewCost =
+        stock > 0 ? Math.max(0, (stock * currentCost + exposedAmount) / stock) : currentCost;
+      return {
+        sku: item.products?.sku || ps?.sku || '—',
+        name: item.products?.name || ps?.name || '',
+        qtyOrdered,
+        stock,
+        addonPerUnit,
+        currentCost,
+        projectedNewCost,
+        deltaCost: projectedNewCost - currentCost,
+        exposedAmount,
+      };
+    })
+    .filter(Boolean) as any[];
+
+  const totalExposedInv = productImpact.reduce((s, p) => s + p.exposedAmount, 0);
+  // COGS futuro estimado = Δ costo unitario × stock que aún queda por vender
+  const cogsFutureImpact = productImpact.reduce((s, p) => s + p.deltaCost * p.stock, 0);
+  // COGS pasado preservado = Δ que NO pudo aplicarse al stock actual
+  const cogsPastPreserved = deltaTotal - totalExposedInv;
+
+  // ---- 3) Estado contable ----
+  const jeId: string | null = row.journal_entry_id || null;
+  const revJeId: string | null = row.reversal_journal_entry_id || null;
+  const jeBalanced =
+    jeLines.length > 0 &&
+    Math.abs(
+      jeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
+      jeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
+    ) < 0.01;
+  const revBalanced =
+    revJeLines.length > 0 &&
+    Math.abs(
+      revJeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
+      revJeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
+    ) < 0.01;
+
+  const renderJeLines = (lines: any[]) => (
+    <div className="rounded-md border border-border bg-card overflow-hidden">
+      <table className="w-full text-[10px]">
+        <thead className="bg-muted/40">
+          <tr>
+            <th className="text-left px-2 py-1 font-medium">Cuenta</th>
+            <th className="text-right px-2 py-1 font-medium">Débito</th>
+            <th className="text-right px-2 py-1 font-medium">Crédito</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l: any, i: number) => (
+            <tr key={i} className="border-t border-border">
+              <td className="px-2 py-1">
+                <span className="font-mono text-muted-foreground">{l.chart_of_accounts?.code || '—'}</span>{' '}
+                <span>{l.chart_of_accounts?.description || '—'}</span>
+                {l.description && (
+                  <div className="text-[9px] text-muted-foreground italic truncate">{l.description}</div>
+                )}
+              </td>
+              <td className="px-2 py-1 text-right font-mono">
+                {Number(l.debit_usd || 0) > 0 ? fmt(Number(l.debit_usd)) : '—'}
+              </td>
+              <td className="px-2 py-1 text-right font-mono">
+                {Number(l.credit_usd || 0) > 0 ? fmt(Number(l.credit_usd)) : '—'}
+              </td>
+            </tr>
+          ))}
+          <tr className="border-t-2 border-border bg-muted/20 font-semibold">
+            <td className="px-2 py-1 text-right">Totales</td>
+            <td className="px-2 py-1 text-right font-mono">
+              {fmt(lines.reduce((s, l) => s + Number(l.debit_usd || 0), 0))}
+            </td>
+            <td className="px-2 py-1 text-right font-mono">
+              {fmt(lines.reduce((s, l) => s + Number(l.credit_usd || 0), 0))}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="px-4 py-3 space-y-4 border-t border-border">
+      {/* === BLOQUE 1: TOTALES DEL ENVÍO === */}
+      <div>
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <Package className="w-3 h-3" /> Impacto en totales del envío
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          {[
+            { label: 'Flete', prev: prevFreight, next: newFreight },
+            { label: 'Aduana', prev: prevCustoms, next: newCustoms },
+            { label: 'Otros', prev: prevOther, next: newOther },
+            { label: 'Add-on total', prev: prevAddon, next: newAddon, bold: true },
+          ].map((c, i) => {
+            const d = c.next - c.prev;
+            return (
+              <div key={i} className={`rounded-md border bg-card p-2 ${c.bold ? 'border-primary/40' : 'border-border'}`}>
+                <div className="text-[9px] uppercase text-muted-foreground tracking-wide">{c.label}</div>
+                <div className="flex items-center gap-1 text-[11px] font-mono mt-0.5">
+                  <span className="text-muted-foreground">{fmt(c.prev)}</span>
+                  <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
+                  <span className={c.bold ? 'font-semibold' : ''}>{fmt(c.next)}</span>
+                </div>
+                <div className={`text-[10px] font-mono mt-0.5 ${d > 0 ? 'text-warning' : d < 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                  Δ {d > 0 ? '+' : ''}{fmt(d)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* === BLOQUE 2: IMPACTO EN INVENTARIO Y COGS === */}
+      <div>
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <Package className="w-3 h-3" /> Impacto en inventario y COGS (proyectado)
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+          <div className="rounded-md border border-border bg-card p-2">
+            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Δ Valor de inventario expuesto</div>
+            <div className={`text-sm font-mono font-semibold ${totalExposedInv > 0 ? 'text-warning' : totalExposedInv < 0 ? 'text-success' : ''}`}>
+              {totalExposedInv > 0 ? '+' : ''}{fmt(totalExposedInv)}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Aplicable al stock disponible HOY</div>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">COGS futuro estimado</div>
+            <div className={`text-sm font-mono font-semibold ${cogsFutureImpact > 0 ? 'text-warning' : cogsFutureImpact < 0 ? 'text-success' : ''}`}>
+              {cogsFutureImpact > 0 ? '+' : ''}{fmt(cogsFutureImpact)}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Δ que se reflejará en ventas futuras</div>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">COGS pasado preservado</div>
+            <div className="text-sm font-mono font-semibold text-muted-foreground">
+              {cogsPastPreserved > 0 ? '+' : ''}{fmt(cogsPastPreserved)}
+            </div>
+            <div className="text-[9px] text-muted-foreground">Δ que NO se aplicó (unidades ya vendidas)</div>
+          </div>
+        </div>
+        {productImpact.length > 0 ? (
+          <div className="rounded-md border border-border bg-card overflow-hidden max-h-56 overflow-y-auto">
+            <table className="w-full text-[10px]">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr>
+                  <th className="text-left px-2 py-1 font-medium">SKU</th>
+                  <th className="text-right px-2 py-1 font-medium">Pedido</th>
+                  <th className="text-right px-2 py-1 font-medium">Stock</th>
+                  <th className="text-right px-2 py-1 font-medium">Add-on/u</th>
+                  <th className="text-right px-2 py-1 font-medium">WAC actual</th>
+                  <th className="text-right px-2 py-1 font-medium">WAC proy.</th>
+                  <th className="text-right px-2 py-1 font-medium">Δ Valor inv.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productImpact.map((p: any, i: number) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-2 py-1 font-mono">{p.sku}</td>
+                    <td className="px-2 py-1 text-right font-mono">{p.qtyOrdered}</td>
+                    <td className="px-2 py-1 text-right font-mono">{p.stock}</td>
+                    <td className={`px-2 py-1 text-right font-mono ${p.addonPerUnit > 0 ? 'text-warning' : p.addonPerUnit < 0 ? 'text-success' : ''}`}>
+                      {p.addonPerUnit > 0 ? '+' : ''}${p.addonPerUnit.toFixed(4)}
+                    </td>
+                    <td className="px-2 py-1 text-right font-mono">${p.currentCost.toFixed(4)}</td>
+                    <td className="px-2 py-1 text-right font-mono font-semibold">${p.projectedNewCost.toFixed(4)}</td>
+                    <td className={`px-2 py-1 text-right font-mono ${p.exposedAmount > 0 ? 'text-warning' : p.exposedAmount < 0 ? 'text-success' : ''}`}>
+                      {p.exposedAmount > 0 ? '+' : ''}{fmt(p.exposedAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-[10px] text-muted-foreground italic">Sin productos asociados al envío.</div>
+        )}
+      </div>
+
+      {/* === BLOQUE 3: ESTADO CONTABLE === */}
+      <div>
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          <BookOpen className="w-3 h-3" /> Estado contable — Libro Diario
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[10px] font-semibold">
+                Asiento original{' '}
+                {jeId && (
+                  <button onClick={() => openJournal(jeId)} className="font-mono text-primary hover:underline ml-1 inline-flex items-center gap-0.5">
+                    {String(jeId).slice(0, 8)} <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+              {jeId && (
+                jeBalanced ? (
+                  <Badge variant="outline" className="text-[9px] bg-success/15 text-success border-success/30">
+                    <ShieldCheck className="w-2.5 h-2.5 mr-0.5" /> Balanceado
+                  </Badge>
+                ) : jeLines.length === 0 ? (
+                  <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">Sin líneas</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado
+                  </Badge>
+                )
+              )}
+            </div>
+            {jeId && jeLines.length > 0 ? renderJeLines(jeLines) : (
+              <div className="text-[10px] text-muted-foreground italic rounded-md border border-dashed border-border p-2">
+                {jeId ? 'Cargando líneas…' : 'Sin asiento contable asociado.'}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[10px] font-semibold">
+                Contra-asiento (reverso){' '}
+                {revJeId && (
+                  <button onClick={() => openJournal(revJeId)} className="font-mono text-warning hover:underline ml-1 inline-flex items-center gap-0.5">
+                    {String(revJeId).slice(0, 8)} <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+              {revJeId && (
+                revBalanced ? (
+                  <Badge variant="outline" className="text-[9px] bg-success/15 text-success border-success/30">
+                    <ShieldCheck className="w-2.5 h-2.5 mr-0.5" /> Balanceado
+                  </Badge>
+                ) : revJeLines.length === 0 ? (
+                  <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">Sin líneas</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado
+                  </Badge>
+                )
+              )}
+            </div>
+            {revJeId && revJeLines.length > 0 ? renderJeLines(revJeLines) : (
+              <div className="text-[10px] text-muted-foreground italic rounded-md border border-dashed border-border p-2">
+                {revJeId ? 'Cargando líneas…' : 'Este ajuste no ha sido reversado.'}
+              </div>
+            )}
+          </div>
+        </div>
+        {row.notes && (
+          <div className="mt-2 text-[10px] text-muted-foreground italic">📝 {row.notes}</div>
+        )}
+      </div>
     </div>
   );
 }
