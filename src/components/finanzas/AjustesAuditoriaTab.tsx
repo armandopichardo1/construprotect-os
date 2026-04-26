@@ -41,7 +41,14 @@ export function AjustesAuditoriaTab() {
   const [resyncTarget, setResyncTarget] = useState<any | null>(null);
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<{ sku: string; oldCost: number; newCost: number }[] | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['shipment-expense-history-all'],
