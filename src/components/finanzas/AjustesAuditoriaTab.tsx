@@ -574,9 +574,21 @@ export function AjustesAuditoriaTab() {
               const isReversal = t === 'reversal';
               const canReverse = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
               const canResync = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
+              const isExpanded = expandedId === h.id;
               return (
-                <TableRow key={h.id} className={isReversed ? 'opacity-60' : ''}>
-                  <TableCell className="text-[11px] font-mono whitespace-nowrap">{dateStr}</TableCell>
+                <>
+                <TableRow key={h.id} className={`${isReversed ? 'opacity-60' : ''} ${isExpanded ? 'bg-muted/20' : ''}`}>
+                  <TableCell className="text-[11px] font-mono whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isExpanded ? null : h.id)}
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                      title={isExpanded ? 'Ocultar impacto' : 'Ver impacto'}
+                    >
+                      {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      {dateStr}
+                    </button>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[t] || ''}`}>
                       {TYPE_LABELS[t] || t}
