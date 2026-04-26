@@ -38,6 +38,9 @@ export function AjustesAuditoriaTab() {
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [reverseTarget, setReverseTarget] = useState<any | null>(null);
   const [reversing, setReversing] = useState(false);
+  const [resyncTarget, setResyncTarget] = useState<any | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState<{ sku: string; oldCost: number; newCost: number }[] | null>(null);
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['shipment-expense-history-all'],
@@ -310,6 +313,125 @@ export function AjustesAuditoriaTab() {
     }
   };
 
+  // Re-sincronizar WAC y márgenes desde un ajuste específico (forward-only).
+  // Re-aplica el addon por unidad de ESE ajuste sobre el stock actual,
+  // actualiza products.unit_cost_usd / total_unit_cost_usd / márgenes,
+  // y registra un marcador qty=0 en inventory_movements. No toca asientos.
+  const handleResync = async () => {
+    if (!resyncTarget) return;
+    setResyncing(true);
+    try {
+      const h = resyncTarget;
+      const shipment = h.shipments;
+      if (!shipment) throw new Error('Envío no encontrado');
+      const poRef = shipment.po_number || String(shipment.id).slice(0, 8);
+
+      // Si el ajuste fue reversado, re-sincronizar implica aplicar 0 (no tiene sentido).
+      if (h.reversed_at) throw new Error('Este ajuste está reversado; no aplica re-sincronizar.');
+
+      const t = h.adjustment_type || 'edit';
+      // Para reversos no re-sincronizamos desde aquí (ya lo hace el flujo de reverso).
+      if (t === 'reversal') throw new Error('No se puede re-sincronizar desde un contra-asiento.');
+
+      const total = Number(h.delta_total_usd || 0);
+      if (Math.abs(total) < 0.0001) throw new Error('El ajuste tiene Δ = 0; no hay nada que re-sincronizar.');
+
+      const items: any[] = shipment.shipment_items || [];
+      const itemFobTotals = items.map((it: any) => ({
+        item: it,
+        base: Number(it.unit_cost_usd || 0) * Number(it.quantity_ordered || 0),
+      }));
+      const sumBase = itemFobTotals.reduce((s, x) => s + x.base, 0);
+      const sumUnits = items.reduce((s: number, it: any) => s + Number(it.quantity_ordered || 0), 0);
+
+      const results: { sku: string; oldCost: number; newCost: number }[] = [];
+
+      for (const { item, base } of itemFobTotals) {
+        if (!item.product_id) continue;
+        const qtyOrdered = Number(item.quantity_ordered || 0);
+        if (qtyOrdered <= 0) continue;
+        const share = sumBase > 0
+          ? base / sumBase
+          : (sumUnits > 0 ? qtyOrdered / sumUnits : 0);
+        const lineAddon = total * share;
+        if (Math.abs(lineAddon) < 0.0001) continue;
+        const addonPerUnit = lineAddon / qtyOrdered;
+
+        const { data: prod } = await supabase
+          .from('products')
+          .select('sku, unit_cost_usd, price_list_usd, price_architect_usd, price_project_usd, price_wholesale_usd')
+          .eq('id', item.product_id)
+          .single();
+        if (!prod) continue;
+
+        const currentCost = Number(prod.unit_cost_usd || 0);
+        const { data: inv } = await supabase
+          .from('inventory')
+          .select('quantity_on_hand')
+          .eq('product_id', item.product_id)
+          .maybeSingle();
+        const stockQty = Number(inv?.quantity_on_hand || 0);
+
+        let newCost = currentCost;
+        if (stockQty > 0) {
+          const applicableUnits = Math.min(stockQty, qtyOrdered);
+          const applicableAddon = addonPerUnit * applicableUnits;
+          newCost = (stockQty * currentCost + applicableAddon) / stockQty;
+          newCost = Math.max(0, newCost);
+        } else {
+          // Sin stock: ajustar el costo del item del envío para futuras recepciones
+          const newItemCost = Math.max(0, Number(item.unit_cost_usd || 0) + addonPerUnit);
+          await supabase
+            .from('shipment_items')
+            .update({ unit_cost_usd: Number(newItemCost.toFixed(4)) })
+            .eq('id', item.id);
+        }
+
+        const updates: Record<string, number> = {
+          unit_cost_usd: Number(newCost.toFixed(4)),
+          total_unit_cost_usd: Number(newCost.toFixed(4)),
+        };
+        [
+          { price: Number(prod.price_list_usd), field: 'margin_list_pct' },
+          { price: Number(prod.price_architect_usd), field: 'margin_architect_pct' },
+          { price: Number(prod.price_project_usd), field: 'margin_project_pct' },
+          { price: Number(prod.price_wholesale_usd), field: 'margin_wholesale_pct' },
+        ].forEach(({ price, field }) => {
+          if (price > 0) updates[field] = Number((((price - newCost) / price) * 100).toFixed(1));
+        });
+        await supabase.from('products').update(updates as any).eq('id', item.product_id);
+
+        if (Math.abs(newCost - currentCost) > 0.0001) {
+          await supabase.from('inventory_movements').insert({
+            product_id: item.product_id,
+            quantity: 0,
+            movement_type: 'adjustment',
+            unit_cost_usd: Number(newCost.toFixed(4)),
+            reference_id: h.id,
+            reference_type: 'shipment_expense_resync',
+            notes: `Re-sincronización WAC desde ajuste ${String(h.id).slice(0, 8)} · Envío ${poRef} · WAC ${currentCost.toFixed(4)} → ${newCost.toFixed(4)}. Forward-only; movimientos previos no alterados.`,
+          });
+        }
+
+        results.push({ sku: prod.sku, oldCost: currentCost, newCost });
+      }
+
+      setResyncResult(results);
+      toast.success(`WAC re-sincronizado en ${results.length} producto(s)`, {
+        description: 'Márgenes recalculados. Movimientos pasados no fueron modificados.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments-orders'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al re-sincronizar WAC');
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header + stats */}
@@ -405,6 +527,7 @@ export function AjustesAuditoriaTab() {
               const isReversed = !!h.reversed_at;
               const isReversal = t === 'reversal';
               const canReverse = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
+              const canResync = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
               return (
                 <TableRow key={h.id} className={isReversed ? 'opacity-60' : ''}>
                   <TableCell className="text-[11px] font-mono whitespace-nowrap">{dateStr}</TableCell>
@@ -459,18 +582,31 @@ export function AjustesAuditoriaTab() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    {canReverse ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px] gap-1 px-2"
-                        onClick={() => setReverseTarget(h)}
-                      >
-                        <Undo2 className="w-3 h-3" /> Reversar
-                      </Button>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground italic">—</span>
-                    )}
+                    <div className="flex items-center justify-center gap-1">
+                      {canResync && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] gap-1 px-2"
+                          onClick={() => { setResyncResult(null); setResyncTarget(h); }}
+                          title="Re-sincronizar WAC y márgenes desde este ajuste (forward-only)"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Sync
+                        </Button>
+                      )}
+                      {canReverse ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] gap-1 px-2"
+                          onClick={() => setReverseTarget(h)}
+                        >
+                          <Undo2 className="w-3 h-3" /> Reversar
+                        </Button>
+                      ) : !canResync ? (
+                        <span className="text-[10px] text-muted-foreground italic">—</span>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -515,6 +651,65 @@ export function AjustesAuditoriaTab() {
             <AlertDialogAction onClick={handleReverse} disabled={reversing}>
               {reversing ? 'Reversando…' : 'Confirmar reverso'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmación de re-sincronización WAC */}
+      <AlertDialog open={!!resyncTarget} onOpenChange={v => { if (!v) { setResyncTarget(null); setResyncResult(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-primary" /> Re-sincronizar WAC y márgenes
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-xs">
+                <p>Recalcula el WAC y los márgenes de los productos del envío a partir de <strong>este ajuste</strong>, de forma <strong>forward-only</strong>:</p>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>Reaplica el addon por unidad de este ajuste sobre el <strong>stock disponible HOY</strong>.</li>
+                  <li>Actualiza <code className="text-[10px]">unit_cost_usd</code>, <code className="text-[10px]">total_unit_cost_usd</code> y márgenes en cada producto afectado.</li>
+                  <li>Inserta un movimiento <code className="text-[10px]">adjustment</code> (qty=0) como marcador de versión.</li>
+                  <li><strong>No</strong> genera asientos contables ni modifica movimientos pasados.</li>
+                </ul>
+                {resyncTarget && !resyncResult && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-2 mt-2 space-y-0.5">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Envío:</span><span className="font-mono">{resyncTarget.shipments?.po_number || String(resyncTarget.shipment_id).slice(0, 8)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Δ del ajuste:</span><span className="font-mono font-semibold">{fmt(Math.abs(Number(resyncTarget.delta_total_usd || 0)))}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Productos del envío:</span><span className="font-mono">{(resyncTarget.shipments?.shipment_items || []).length}</span></div>
+                  </div>
+                )}
+                {resyncResult && (
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-2 mt-2 space-y-1">
+                    <div className="flex items-center gap-1.5 text-success">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span className="font-semibold text-[11px]">Re-sincronización completada — {resyncResult.length} producto(s)</span>
+                    </div>
+                    {resyncResult.length > 0 && (
+                      <div className="max-h-40 overflow-auto mt-1 space-y-0.5">
+                        {resyncResult.map((r, i) => (
+                          <div key={i} className="flex justify-between text-[10px] font-mono">
+                            <span className="text-muted-foreground">{r.sku}</span>
+                            <span>${r.oldCost.toFixed(4)} → <strong>${r.newCost.toFixed(4)}</strong></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-2 mt-2 flex gap-1.5 items-start">
+                  <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                  <span className="text-[11px]">Las unidades ya vendidas conservan su COGS pasado. Esto puede generar un nuevo WAC si el stock actual cambió respecto al momento del ajuste.</span>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resyncing}>{resyncResult ? 'Cerrar' : 'Cancelar'}</AlertDialogCancel>
+            {!resyncResult && (
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); handleResync(); }} disabled={resyncing}>
+                {resyncing ? 'Re-sincronizando…' : 'Confirmar re-sync'}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
