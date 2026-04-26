@@ -882,6 +882,13 @@ function ExpandedImpactPanel({
   productsState: any[];
   openJournal: (id: string) => void;
 }) {
+  const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
+  const toggleSku = (key: string) => setExpandedSkus(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
   const fmt = (n: number) =>
     `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
