@@ -883,11 +883,27 @@ function ExpandedImpactPanel({
   openJournal: (id: string) => void;
 }) {
   const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
-  const toggleSku = (key: string) => setExpandedSkus(prev => {
-    const next = new Set(prev);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    return next;
-  });
+  const [loadingSkus, setLoadingSkus] = useState<Set<string>>(new Set());
+  const toggleSku = (key: string) => {
+    setExpandedSkus(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        // Mostrar skeleton breve al abrir
+        setLoadingSkus(l => new Set(l).add(key));
+        setTimeout(() => {
+          setLoadingSkus(l => {
+            const n = new Set(l);
+            n.delete(key);
+            return n;
+          });
+        }, 250);
+      }
+      return next;
+    });
+  };
 
   const fmt = (n: number) =>
     `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1141,46 +1157,69 @@ function ExpandedImpactPanel({
                       </div>
                     </div>
                     {isOpen && (
-                      <div className="px-2 pb-2 space-y-1.5">
-                        <div className="rounded border border-border bg-card p-1.5">
-                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Stock & unidades</div>
-                          <div className="text-[10px] font-mono mt-0.5">
-                            Aplicables = min({p.stock}, {p.qtyOrdered}) = <strong>{p.applicableUnits}</strong>
+                      loadingSkus.has(key) ? (
+                        <div className="px-2 pb-2 space-y-1.5" aria-busy="true" aria-live="polite">
+                          <div className="rounded border border-border bg-card p-1.5 space-y-1">
+                            <div className="h-2 w-20 bg-muted rounded animate-pulse" />
+                            <div className="h-2 w-3/4 bg-muted rounded animate-pulse" />
+                          </div>
+                          <div className="rounded border border-border bg-card p-1.5 space-y-1">
+                            <div className="h-2 w-24 bg-muted rounded animate-pulse" />
+                            <div className="h-2 w-2/3 bg-muted rounded animate-pulse" />
+                            <div className="h-2 w-1/2 bg-muted rounded animate-pulse" />
+                          </div>
+                          <div className="rounded border border-border bg-card p-1.5 space-y-1">
+                            <div className="h-2 w-28 bg-muted rounded animate-pulse" />
+                            <div className="h-2 w-full bg-muted rounded animate-pulse" />
+                            <div className="h-2 w-5/6 bg-muted rounded animate-pulse" />
+                          </div>
+                          <div className="rounded border border-primary/30 bg-primary/5 p-1.5 space-y-1">
+                            <div className="h-2 w-32 bg-primary/20 rounded animate-pulse" />
+                            <div className="h-2 w-3/4 bg-primary/15 rounded animate-pulse" />
                           </div>
                         </div>
-                        <div className="rounded border border-border bg-card p-1.5">
-                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Add-on prorrateado</div>
-                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
-                            <div>Share FOB: <strong>{(p.share * 100).toFixed(2)}%</strong></div>
-                            <div>Línea: <strong>{addonTotalLine > 0 ? '+' : ''}{fmt(addonTotalLine)}</strong></div>
-                          </div>
-                        </div>
-                        <div className="rounded border border-border bg-card p-1.5">
-                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">WAC antes → después</div>
-                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
-                            <div>({p.stock} × ${p.currentCost.toFixed(4)} + {fmt(p.exposedAmount)}) ÷ {p.stock || 1}</div>
-                            <div>= <strong className="text-primary">${p.projectedNewCost.toFixed(4)}</strong>{' '}
-                              <span className={p.deltaCost > 0 ? 'text-warning' : p.deltaCost < 0 ? 'text-success' : 'text-muted-foreground'}>
-                                (Δ {p.deltaCost > 0 ? '+' : ''}${p.deltaCost.toFixed(4)})
-                              </span>
+                      ) : (
+                        <div className="px-2 pb-2 space-y-1.5">
+                          <div className="rounded border border-border bg-card p-1.5">
+                            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Stock & unidades</div>
+                            <div className="text-[10px] font-mono mt-0.5">
+                              Aplicables = min({p.stock}, {p.qtyOrdered}) = <strong>{p.applicableUnits}</strong>
                             </div>
                           </div>
-                        </div>
-                        <div className="rounded border border-primary/30 bg-primary/5 p-1.5">
-                          <div className="text-[9px] uppercase text-primary/80 tracking-wide font-semibold">Δ Valor de inventario</div>
-                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
-                            <div>Antes: {fmt(oldInvValue)} → Después: {fmt(newInvValue)}</div>
-                            <div>Δ = <strong className={deltaInvValue > 0 ? 'text-warning' : deltaInvValue < 0 ? 'text-success' : ''}>
-                              {deltaInvValue > 0 ? '+' : ''}{fmt(deltaInvValue)}
-                            </strong></div>
-                          </div>
-                          {p.applicableUnits < p.qtyOrdered && (
-                            <div className="text-[9px] text-muted-foreground italic mt-1">
-                              ⚠️ {p.qtyOrdered - p.applicableUnits} unidad(es) ya vendidas.
+                          <div className="rounded border border-border bg-card p-1.5">
+                            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Add-on prorrateado</div>
+                            <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                              <div>Share FOB: <strong>{(p.share * 100).toFixed(2)}%</strong></div>
+                              <div>Línea: <strong>{addonTotalLine > 0 ? '+' : ''}{fmt(addonTotalLine)}</strong></div>
                             </div>
-                          )}
+                          </div>
+                          <div className="rounded border border-border bg-card p-1.5">
+                            <div className="text-[9px] uppercase text-muted-foreground tracking-wide">WAC antes → después</div>
+                            <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                              <div>({p.stock} × ${p.currentCost.toFixed(4)} + {fmt(p.exposedAmount)}) ÷ {p.stock || 1}</div>
+                              <div>= <strong className="text-primary">${p.projectedNewCost.toFixed(4)}</strong>{' '}
+                                <span className={p.deltaCost > 0 ? 'text-warning' : p.deltaCost < 0 ? 'text-success' : 'text-muted-foreground'}>
+                                  (Δ {p.deltaCost > 0 ? '+' : ''}${p.deltaCost.toFixed(4)})
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded border border-primary/30 bg-primary/5 p-1.5">
+                            <div className="text-[9px] uppercase text-primary/80 tracking-wide font-semibold">Δ Valor de inventario</div>
+                            <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                              <div>Antes: {fmt(oldInvValue)} → Después: {fmt(newInvValue)}</div>
+                              <div>Δ = <strong className={deltaInvValue > 0 ? 'text-warning' : deltaInvValue < 0 ? 'text-success' : ''}>
+                                {deltaInvValue > 0 ? '+' : ''}{fmt(deltaInvValue)}
+                              </strong></div>
+                            </div>
+                            {p.applicableUnits < p.qtyOrdered && (
+                              <div className="text-[9px] text-muted-foreground italic mt-1">
+                                ⚠️ {p.qtyOrdered - p.applicableUnits} unidad(es) ya vendidas.
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )
                     )}
                   </div>
                 );
