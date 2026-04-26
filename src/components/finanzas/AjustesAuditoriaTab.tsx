@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw, ChevronRight, ChevronDown, Package, BookOpen } from 'lucide-react';
+import { History, Search, Undo2, ExternalLink, AlertTriangle, ShieldCheck, RefreshCw, ChevronRight, ChevronDown, ChevronsDown, ChevronsUp, Package, BookOpen } from 'lucide-react';
 
 const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -41,7 +41,14 @@ export function AjustesAuditoriaTab() {
   const [resyncTarget, setResyncTarget] = useState<any | null>(null);
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<{ sku: string; oldCost: number; newCost: number }[] | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['shipment-expense-history-all'],
@@ -79,21 +86,28 @@ export function AjustesAuditoriaTab() {
     return m;
   }, [journals]);
 
-  // Detalle del registro expandido
-  const expandedRow = useMemo(
-    () => history.find((h: any) => h.id === expandedId) || null,
-    [history, expandedId]
+  // Detalles de los registros expandidos (uno o varios)
+  const expandedRows = useMemo(
+    () => history.filter((h: any) => expandedIds.has(h.id)),
+    [history, expandedIds]
   );
   const expandedJeIds = useMemo(() => {
-    if (!expandedRow) return [] as string[];
-    return [expandedRow.journal_entry_id, expandedRow.reversal_journal_entry_id].filter(Boolean) as string[];
-  }, [expandedRow]);
+    const ids = new Set<string>();
+    expandedRows.forEach((r: any) => {
+      if (r.journal_entry_id) ids.add(r.journal_entry_id);
+      if (r.reversal_journal_entry_id) ids.add(r.reversal_journal_entry_id);
+    });
+    return Array.from(ids);
+  }, [expandedRows]);
   const expandedProductIds = useMemo(() => {
-    if (!expandedRow?.shipments?.shipment_items) return [] as string[];
-    return (expandedRow.shipments.shipment_items as any[])
-      .map(it => it.product_id)
-      .filter(Boolean) as string[];
-  }, [expandedRow]);
+    const ids = new Set<string>();
+    expandedRows.forEach((r: any) => {
+      (r?.shipments?.shipment_items || []).forEach((it: any) => {
+        if (it.product_id) ids.add(it.product_id);
+      });
+    });
+    return Array.from(ids);
+  }, [expandedRows]);
 
   const { data: expandedJeLines = [] } = useQuery({
     queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
@@ -532,6 +546,26 @@ export function AjustesAuditoriaTab() {
           variant="outline"
           size="sm"
           className="h-9 text-xs gap-1.5"
+          onClick={() => setExpandedIds(new Set(filtered.map((h: any) => h.id)))}
+          disabled={filtered.length === 0 || filtered.every((h: any) => expandedIds.has(h.id))}
+          title="Abrir el panel de impacto de todos los ajustes visibles"
+        >
+          <ChevronsDown className="w-3 h-3" /> Expandir todo
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
+          onClick={() => setExpandedIds(new Set())}
+          disabled={expandedIds.size === 0}
+          title="Cerrar todos los paneles de impacto"
+        >
+          <ChevronsUp className="w-3 h-3" /> Contraer todo
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['shipment-expense-history-all'] })}
         >
           <RefreshCw className="w-3 h-3" /> Refrescar
@@ -574,14 +608,14 @@ export function AjustesAuditoriaTab() {
               const isReversal = t === 'reversal';
               const canReverse = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
               const canResync = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
-              const isExpanded = expandedId === h.id;
+              const isExpanded = expandedIds.has(h.id);
               return (
                 <>
                 <TableRow key={h.id} className={`${isReversed ? 'opacity-60' : ''} ${isExpanded ? 'bg-muted/20' : ''}`}>
                   <TableCell className="text-[11px] font-mono whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => setExpandedId(isExpanded ? null : h.id)}
+                      onClick={() => toggleExpanded(h.id)}
                       className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                       title={isExpanded ? 'Ocultar impacto' : 'Ver impacto'}
                     >
