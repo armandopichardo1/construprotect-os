@@ -431,6 +431,8 @@ export function AjustesAuditoriaTab() {
       setResyncing(false);
     }
   };
+
+  return (
     <div className="space-y-4">
       {/* Header + stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
