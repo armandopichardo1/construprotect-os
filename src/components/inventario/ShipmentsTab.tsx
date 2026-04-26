@@ -301,6 +301,16 @@ export function ShipmentsTab() {
           const totalCostPO = Number(s.total_cost_usd || 0);
           const paidAmount = Number(s.amount_paid_usd || 0);
           const pendingBalance = totalCostPO - paidAmount;
+          const productCost = (s.shipment_items || []).reduce((acc: number, i: any) => acc + Number(i.unit_cost_usd || 0) * Number(i.quantity_ordered || 0), 0);
+          const freightVal = Number(s.shipping_cost_usd || 0);
+          const customsVal = Number(s.customs_cost_usd || 0);
+          const jeStatus = shipmentJournals[s.id] || { purchase: false, freight: false, customs: false, receipt: false };
+          const missingJEs: string[] = [];
+          if (productCost > 0 && !jeStatus.purchase) missingJEs.push('Compra');
+          if (freightVal > 0 && !jeStatus.freight) missingJEs.push('Flete');
+          if (customsVal > 0 && !jeStatus.customs) missingJEs.push('Aduanas');
+          if (s.status === 'received' && productCost > 0 && !jeStatus.receipt) missingJEs.push('Recepción');
+          const hasMissing = missingJEs.length > 0;
           return (
             <div key={s.id} className="rounded-2xl bg-card border border-border p-5 space-y-4">
               <div className="flex justify-between items-start">
@@ -321,6 +331,17 @@ export function ShipmentsTab() {
                   </span>
                   {s.estimated_arrival && <span className="text-xs text-primary font-medium">ETA: {s.estimated_arrival}</span>}
                   <div className="flex gap-1">
+                    {hasMissing && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs h-7 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                        onClick={() => regenerateJournals(s)}
+                        title={`Faltan asientos: ${missingJEs.join(', ')}`}
+                      >
+                        <BookPlus className="w-3 h-3" /> Generar asiento
+                      </Button>
+                    )}
                     {payStatus !== 'paid' && (
                       <Button size="sm" variant="outline" className="gap-1 text-xs h-7" onClick={() => setPayShipment(s)}>
                         <CreditCard className="w-3 h-3" /> {payStatus === 'partial' ? 'Abonar' : 'Pagar'}
@@ -336,6 +357,14 @@ export function ShipmentsTab() {
                   </div>
                 </div>
               </div>
+              {hasMissing && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Asientos contables faltantes en Libro Diario: <span className="font-semibold">{missingJEs.join(', ')}</span>. Usa "Generar asiento" para crearlos.
+                  </span>
+                </div>
+              )}
               {/* Step progress */}
               <div className="flex items-center gap-1">
                 {STATUS_STEPS.map((step, i) => (
