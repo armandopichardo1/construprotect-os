@@ -108,6 +108,8 @@ export function AjustesAuditoriaTab() {
     });
     return Array.from(ids);
   }, [expandedRows]);
+
+  const { data: expandedJeLines = [] } = useQuery({
     queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
     enabled: expandedJeIds.length > 0,
     queryFn: async () => {
