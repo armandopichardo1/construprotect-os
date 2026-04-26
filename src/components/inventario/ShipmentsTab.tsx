@@ -32,6 +32,145 @@ export function ShipmentsTab() {
     },
   });
 
+  // Detección de asientos contables existentes por shipment.
+  // Como ShipmentDialog/receiveShipment no setean reference_id, hacemos match por
+  // texto en `description` (PO number o id slice). Es heurístico pero confiable porque
+  // las descripciones siguen un patrón fijo.
+  const { data: shipmentJournals = {} } = useQuery({
+    queryKey: ['shipments-journal-map', shipments.map((s: any) => s.id).join(',')],
+    enabled: shipments.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('journal_entries')
+        .select('id, description, total_debit_usd');
+      const map: Record<string, { purchase: boolean; freight: boolean; customs: boolean; receipt: boolean }> = {};
+      shipments.forEach((s: any) => {
+        const tag = s.po_number || s.id.slice(0, 8);
+        const matches = (data || []).filter((j: any) => (j.description || '').includes(tag));
+        map[s.id] = {
+          purchase: matches.some((j: any) => /^Compra —/i.test(j.description)),
+          freight: matches.some((j: any) => /^Freight —/i.test(j.description)),
+          customs: matches.some((j: any) => /^Gastos aduanales —/i.test(j.description)),
+          receipt: matches.some((j: any) => /^Recepción inventario —/i.test(j.description)),
+        };
+      });
+      return map;
+    },
+  });
+
+  /** Detecta qué asientos faltan y los crea. Solo para envíos con costos > 0. */
+  const regenerateJournals = async (shipment: any) => {
+    const items = shipment.shipment_items || [];
+    const productCost = items.reduce((s: number, i: any) => s + Number(i.unit_cost_usd || 0) * Number(i.quantity_ordered || 0), 0);
+    const freightVal = Number(shipment.shipping_cost_usd || 0);
+    const customsVal = Number(shipment.customs_cost_usd || 0);
+    const tag = shipment.po_number || shipment.id.slice(0, 8);
+    const status = shipmentJournals[shipment.id] || { purchase: false, freight: false, customs: false, receipt: false };
+
+    const toCreate: string[] = [];
+    if (productCost > 0 && !status.purchase) toCreate.push('compra');
+    if (freightVal > 0 && !status.freight) toCreate.push('flete');
+    if (customsVal > 0 && !status.customs) toCreate.push('aduanas');
+    if (shipment.status === 'received' && productCost > 0 && !status.receipt) toCreate.push('recepción');
+
+    if (toCreate.length === 0) {
+      toast.info('Todos los asientos ya existen para este envío', {
+        description: 'No hay nada que generar. Revisa el Libro Diario filtrando por el PO.',
+      });
+      return;
+    }
+
+    try {
+      const accounts = await fetchAccounts();
+      const transitAcct = findTransitAccount(accounts);
+      const cxpAcct = findCxPAccount(accounts);
+      const freightAcct = findFreightAccount(accounts);
+      const customsAcct = findCustomsAccount(accounts);
+      const invAcct = findInventoryAccount(accounts);
+
+      const created: string[] = [];
+
+      // 1. Compra: Compras en Tránsito DR / CxP CR
+      if (toCreate.includes('compra') && transitAcct && cxpAcct) {
+        const desc = `Compra — PO ${tag} — ${shipment.supplier_name}`;
+        const { data: entry } = await supabase.from('journal_entries').insert({
+          description: desc, total_debit_usd: productCost, total_credit_usd: productCost,
+          notes: `Generado manualmente desde Envíos. Costo de productos.`,
+        }).select().single();
+        if (entry) {
+          await supabase.from('journal_entry_lines').insert([
+            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: productCost, credit_usd: 0, description: 'Compras en tránsito' },
+            { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: productCost, description: 'Obligación con proveedor' },
+          ]);
+          created.push(`Compra ${formatUSD(productCost)}`);
+        }
+      }
+
+      // 2. Flete
+      if (toCreate.includes('flete') && freightAcct && cxpAcct) {
+        const desc = `Freight — PO ${tag} — ${shipment.supplier_name}`;
+        const { data: entry } = await supabase.from('journal_entries').insert({
+          description: desc, total_debit_usd: freightVal, total_credit_usd: freightVal,
+          notes: `Generado manualmente desde Envíos. Flete.`,
+        }).select().single();
+        if (entry) {
+          await supabase.from('journal_entry_lines').insert([
+            { journal_entry_id: entry.id, account_id: freightAcct.id, debit_usd: freightVal, credit_usd: 0, description: 'Freight / Shipping' },
+            { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: freightVal, description: 'Obligación flete' },
+          ]);
+          created.push(`Flete ${formatUSD(freightVal)}`);
+        }
+      }
+
+      // 3. Aduanas
+      if (toCreate.includes('aduanas') && customsAcct && cxpAcct) {
+        const desc = `Gastos aduanales — PO ${tag} — ${shipment.supplier_name}`;
+        const { data: entry } = await supabase.from('journal_entries').insert({
+          description: desc, total_debit_usd: customsVal, total_credit_usd: customsVal,
+          notes: `Generado manualmente desde Envíos. DGA / Aduanas.`,
+        }).select().single();
+        if (entry) {
+          await supabase.from('journal_entry_lines').insert([
+            { journal_entry_id: entry.id, account_id: customsAcct.id, debit_usd: customsVal, credit_usd: 0, description: 'Impuestos DGA / Aduanas' },
+            { journal_entry_id: entry.id, account_id: cxpAcct.id, debit_usd: 0, credit_usd: customsVal, description: 'Obligación aduanal' },
+          ]);
+          created.push(`Aduanas ${formatUSD(customsVal)}`);
+        }
+      }
+
+      // 4. Recepción: cierra Compras en Tránsito y carga Inventario (solo si ya recibido)
+      if (toCreate.includes('recepción') && invAcct && transitAcct && invAcct.id !== transitAcct.id) {
+        const totalRecv = items.reduce((s: number, i: any) => s + Number(i.unit_cost_usd || 0) * Number(i.quantity_ordered || 0), 0);
+        const desc = `Recepción inventario — PO ${tag} — ${shipment.supplier_name}`;
+        const { data: entry } = await supabase.from('journal_entries').insert({
+          description: desc, total_debit_usd: totalRecv, total_credit_usd: totalRecv,
+          notes: `Generado manualmente. Cierre de compras en tránsito.`,
+        }).select().single();
+        if (entry) {
+          await supabase.from('journal_entry_lines').insert([
+            { journal_entry_id: entry.id, account_id: invAcct.id, debit_usd: totalRecv, credit_usd: 0, description: 'Inventario recibido' },
+            { journal_entry_id: entry.id, account_id: transitAcct.id, debit_usd: 0, credit_usd: totalRecv, description: 'Cierre compras en tránsito' },
+          ]);
+          created.push(`Recepción ${formatUSD(totalRecv)}`);
+        }
+      }
+
+      if (created.length === 0) {
+        toast.error('No se pudo generar ningún asiento', {
+          description: 'Faltan cuentas en el catálogo (Compras en Tránsito, CxP, Flete, Aduanas o Inventarios).',
+        });
+        return;
+      }
+
+      toast.success(`Asientos generados (${created.length})`, { description: created.join(' · ') });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['shipments-journal-map'] });
+    } catch (e: any) {
+      console.error('Error regenerando asientos:', e);
+      toast.error('Error al generar asientos', { description: e.message });
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteShipment) return;
     await supabase.from('shipment_items').delete().eq('shipment_id', deleteShipment.id);
