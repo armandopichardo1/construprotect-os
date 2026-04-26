@@ -959,18 +959,16 @@ function ExpandedImpactPanel({
   // ---- 3) Estado contable ----
   const jeId: string | null = row.journal_entry_id || null;
   const revJeId: string | null = row.reversal_journal_entry_id || null;
-  const jeBalanced =
-    jeLines.length > 0 &&
-    Math.abs(
-      jeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
-      jeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
-    ) < 0.01;
-  const revBalanced =
-    revJeLines.length > 0 &&
-    Math.abs(
-      revJeLines.reduce((s, l) => s + Number(l.debit_usd || 0), 0) -
-      revJeLines.reduce((s, l) => s + Number(l.credit_usd || 0), 0)
-    ) < 0.01;
+  const computeBalance = (lines: any[]) => {
+    const dr = lines.reduce((s, l) => s + Number(l.debit_usd || 0), 0);
+    const cr = lines.reduce((s, l) => s + Number(l.credit_usd || 0), 0);
+    const diff = dr - cr;
+    return { dr, cr, diff, balanced: lines.length > 0 && Math.abs(diff) < 0.01 };
+  };
+  const jeBal = computeBalance(jeLines);
+  const revBal = computeBalance(revJeLines);
+  const jeBalanced = jeBal.balanced;
+  const revBalanced = revBal.balanced;
 
   const renderJeLines = (lines: any[]) => (
     <div className="rounded-md border border-border bg-card overflow-hidden">
@@ -1259,12 +1257,21 @@ function ExpandedImpactPanel({
                 ) : jeLines.length === 0 ? (
                   <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">Sin líneas</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">
-                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado
+                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30" title={`DR ${fmt(jeBal.dr)} − CR ${fmt(jeBal.cr)} = ${jeBal.diff > 0 ? '+' : ''}${fmt(jeBal.diff)}`}>
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado · Δ {jeBal.diff > 0 ? '+' : ''}{fmt(jeBal.diff)}
                   </Badge>
                 )
               )}
             </div>
+            {jeId && jeLines.length > 0 && !jeBalanced && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-1.5 mb-1 flex items-start gap-1.5">
+                <AlertTriangle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />
+                <div className="text-[10px] font-mono leading-tight">
+                  <div>DR <strong>{fmt(jeBal.dr)}</strong> − CR <strong>{fmt(jeBal.cr)}</strong></div>
+                  <div className="text-destructive font-semibold">Diferencia: {jeBal.diff > 0 ? '+' : ''}{fmt(jeBal.diff)} USD</div>
+                </div>
+              </div>
+            )}
             {jeId && jeLines.length > 0 ? renderJeLines(jeLines) : (
               <div className="text-[10px] text-muted-foreground italic rounded-md border border-dashed border-border p-2">
                 {jeId ? 'Cargando líneas…' : 'Sin asiento contable asociado.'}
@@ -1289,12 +1296,21 @@ function ExpandedImpactPanel({
                 ) : revJeLines.length === 0 ? (
                   <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground">Sin líneas</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30">
-                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado
+                  <Badge variant="outline" className="text-[9px] bg-destructive/15 text-destructive border-destructive/30" title={`DR ${fmt(revBal.dr)} − CR ${fmt(revBal.cr)} = ${revBal.diff > 0 ? '+' : ''}${fmt(revBal.diff)}`}>
+                    <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Descuadrado · Δ {revBal.diff > 0 ? '+' : ''}{fmt(revBal.diff)}
                   </Badge>
                 )
               )}
             </div>
+            {revJeId && revJeLines.length > 0 && !revBalanced && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-1.5 mb-1 flex items-start gap-1.5">
+                <AlertTriangle className="w-3 h-3 text-destructive shrink-0 mt-0.5" />
+                <div className="text-[10px] font-mono leading-tight">
+                  <div>DR <strong>{fmt(revBal.dr)}</strong> − CR <strong>{fmt(revBal.cr)}</strong></div>
+                  <div className="text-destructive font-semibold">Diferencia: {revBal.diff > 0 ? '+' : ''}{fmt(revBal.diff)} USD</div>
+                </div>
+              </div>
+            )}
             {revJeId && revJeLines.length > 0 ? renderJeLines(revJeLines) : (
               <div className="text-[10px] text-muted-foreground italic rounded-md border border-dashed border-border p-2">
                 {revJeId ? 'Cargando líneas…' : 'Este ajuste no ha sido reversado.'}
