@@ -933,10 +933,14 @@ function ExpandedImpactPanel({
       const projectedNewCost =
         stock > 0 ? Math.max(0, (stock * currentCost + exposedAmount) / stock) : currentCost;
       return {
+        productId: item.product_id,
         sku: item.products?.sku || ps?.sku || '—',
         name: item.products?.name || ps?.name || '',
         qtyOrdered,
         stock,
+        applicableUnits,
+        share,
+        lineAddon,
         addonPerUnit,
         currentCost,
         projectedNewCost,
