@@ -1127,9 +1127,23 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
           </div>
         )}
 
+        {noChanges && items.length > 0 && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-semibold">No hay cambios que asentar.</span>{' '}
+              Los valores de Flete, Aduana y Otros coinciden con los actuales (Δ {fmt(deltaAddons)}). Modifica algún monto para habilitar el guardado.
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || items.length === 0 || missingAccountErrors.length > 0}>
+          <Button
+            onClick={handleSave}
+            disabled={saving || items.length === 0 || missingAccountErrors.length > 0 || noChanges}
+            title={noChanges ? 'No hay cambios que asentar' : undefined}
+          >
             {saving ? 'Guardando...' : (isReceived && capitalize ? 'Guardar y Capitalizar' : 'Guardar y Reprorratear')}
           </Button>
         </DialogFooter>
