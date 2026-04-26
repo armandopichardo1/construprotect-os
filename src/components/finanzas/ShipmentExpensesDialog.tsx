@@ -279,8 +279,18 @@ export function ShipmentExpensesDialog({ open, onOpenChange, shipment, onSaved }
     navigate(`/finanzas?tab=${encodeURIComponent('Libro Diario')}&q=${encodeURIComponent(code)}`);
   };
 
+  // No hay cambios reales si el delta de addons es ~0 (ni positivo ni negativo).
+  // Tolerancia de 1 centavo para evitar artefactos de redondeo.
+  const noChanges = Math.abs(deltaAddons) < 0.01;
+
   const handleSave = async () => {
     if (!shipment) return;
+    if (noChanges) {
+      toast.warning('No hay cambios que asentar', {
+        description: `Flete, Aduana y Otros coinciden con los valores actuales (Δ ${fmt(deltaAddons)}). Modifica algún monto antes de guardar.`,
+      });
+      return;
+    }
     if (shipment.status === 'received' && !capitalize) {
       toast.error('Envío ya recibido — activa "Capitalizar como costo aterrizado" para recalcular WAC y márgenes, o cierra sin guardar.');
       return;
