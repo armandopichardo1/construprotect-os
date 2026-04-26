@@ -1097,7 +1097,98 @@ function ExpandedImpactPanel({
                 </button>
               </div>
             </div>
-            <div className="rounded-md border border-border bg-card overflow-hidden max-h-72 overflow-y-auto">
+            {/* Mobile: cards compactas */}
+            <div className="md:hidden rounded-md border border-border bg-card max-h-80 overflow-y-auto divide-y divide-border">
+              {productImpact.map((p: any, i: number) => {
+                const key = p.productId || `idx-${i}`;
+                const isOpen = expandedSkus.has(key);
+                const addonTotalLine = p.addonPerUnit * p.qtyOrdered;
+                const oldInvValue = p.stock * p.currentCost;
+                const newInvValue = p.stock * p.projectedNewCost;
+                const deltaInvValue = newInvValue - oldInvValue;
+                return (
+                  <div key={key} className={isOpen ? 'bg-muted/20' : ''}>
+                    <div className="flex items-start gap-1 p-2">
+                      <button
+                        type="button"
+                        aria-label={isOpen ? 'Contraer' : 'Expandir'}
+                        onClick={(e) => { e.stopPropagation(); toggleSku(key); }}
+                        className="shrink-0 -m-1 p-2 rounded hover:bg-muted active:bg-muted/70 touch-manipulation"
+                      >
+                        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </button>
+                      <div className="flex-1 min-w-0" onClick={() => toggleSku(key)}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="font-mono text-[11px] truncate">{p.sku}</div>
+                          <div className={`font-mono text-[11px] font-semibold whitespace-nowrap ${p.exposedAmount > 0 ? 'text-warning' : p.exposedAmount < 0 ? 'text-success' : ''}`}>
+                            {p.exposedAmount > 0 ? '+' : ''}{fmt(p.exposedAmount)}
+                          </div>
+                        </div>
+                        {p.name && <div className="text-[9px] text-muted-foreground truncate">{p.name}</div>}
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1 text-[10px] font-mono">
+                          <div className="text-muted-foreground">Pedido: <span className="text-foreground">{p.qtyOrdered}</span></div>
+                          <div className="text-muted-foreground">Stock: <span className="text-foreground">{p.stock}</span></div>
+                          <div className="text-muted-foreground">
+                            WAC: <span className="text-foreground">${p.currentCost.toFixed(4)}</span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            → <span className="text-primary font-semibold">${p.projectedNewCost.toFixed(4)}</span>
+                          </div>
+                          <div className={`col-span-2 ${p.addonPerUnit > 0 ? 'text-warning' : p.addonPerUnit < 0 ? 'text-success' : 'text-muted-foreground'}`}>
+                            Add-on/u: {p.addonPerUnit > 0 ? '+' : ''}${p.addonPerUnit.toFixed(4)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {isOpen && (
+                      <div className="px-2 pb-2 space-y-1.5">
+                        <div className="rounded border border-border bg-card p-1.5">
+                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Stock & unidades</div>
+                          <div className="text-[10px] font-mono mt-0.5">
+                            Aplicables = min({p.stock}, {p.qtyOrdered}) = <strong>{p.applicableUnits}</strong>
+                          </div>
+                        </div>
+                        <div className="rounded border border-border bg-card p-1.5">
+                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">Add-on prorrateado</div>
+                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                            <div>Share FOB: <strong>{(p.share * 100).toFixed(2)}%</strong></div>
+                            <div>Línea: <strong>{addonTotalLine > 0 ? '+' : ''}{fmt(addonTotalLine)}</strong></div>
+                          </div>
+                        </div>
+                        <div className="rounded border border-border bg-card p-1.5">
+                          <div className="text-[9px] uppercase text-muted-foreground tracking-wide">WAC antes → después</div>
+                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                            <div>({p.stock} × ${p.currentCost.toFixed(4)} + {fmt(p.exposedAmount)}) ÷ {p.stock || 1}</div>
+                            <div>= <strong className="text-primary">${p.projectedNewCost.toFixed(4)}</strong>{' '}
+                              <span className={p.deltaCost > 0 ? 'text-warning' : p.deltaCost < 0 ? 'text-success' : 'text-muted-foreground'}>
+                                (Δ {p.deltaCost > 0 ? '+' : ''}${p.deltaCost.toFixed(4)})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded border border-primary/30 bg-primary/5 p-1.5">
+                          <div className="text-[9px] uppercase text-primary/80 tracking-wide font-semibold">Δ Valor de inventario</div>
+                          <div className="text-[10px] font-mono mt-0.5 space-y-0.5">
+                            <div>Antes: {fmt(oldInvValue)} → Después: {fmt(newInvValue)}</div>
+                            <div>Δ = <strong className={deltaInvValue > 0 ? 'text-warning' : deltaInvValue < 0 ? 'text-success' : ''}>
+                              {deltaInvValue > 0 ? '+' : ''}{fmt(deltaInvValue)}
+                            </strong></div>
+                          </div>
+                          {p.applicableUnits < p.qtyOrdered && (
+                            <div className="text-[9px] text-muted-foreground italic mt-1">
+                              ⚠️ {p.qtyOrdered - p.applicableUnits} unidad(es) ya vendidas.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop/tablet: tabla */}
+            <div className="hidden md:block rounded-md border border-border bg-card overflow-hidden max-h-72 overflow-y-auto">
               <table className="w-full text-[10px]">
                 <thead className="bg-muted/40 sticky top-0">
                   <tr>
