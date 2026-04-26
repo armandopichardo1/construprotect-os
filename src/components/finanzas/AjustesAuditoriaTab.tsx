@@ -667,6 +667,20 @@ export function AjustesAuditoriaTab() {
                     </div>
                   </TableCell>
                 </TableRow>
+                {isExpanded && (
+                  <TableRow key={`${h.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
+                    <TableCell colSpan={9} className="p-0">
+                      <ExpandedImpactPanel
+                        row={h}
+                        jeLines={expandedJeLines.filter((l: any) => l.journal_entry_id === h.journal_entry_id)}
+                        revJeLines={expandedJeLines.filter((l: any) => l.journal_entry_id === h.reversal_journal_entry_id)}
+                        productsState={expandedProductsState}
+                        openJournal={openJournal}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+                </>
               );
             })}
           </TableBody>
