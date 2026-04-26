@@ -582,18 +582,31 @@ export function AjustesAuditoriaTab() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    {canReverse ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px] gap-1 px-2"
-                        onClick={() => setReverseTarget(h)}
-                      >
-                        <Undo2 className="w-3 h-3" /> Reversar
-                      </Button>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground italic">—</span>
-                    )}
+                    <div className="flex items-center justify-center gap-1">
+                      {canResync && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] gap-1 px-2"
+                          onClick={() => { setResyncResult(null); setResyncTarget(h); }}
+                          title="Re-sincronizar WAC y márgenes desde este ajuste (forward-only)"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Sync
+                        </Button>
+                      )}
+                      {canReverse ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] gap-1 px-2"
+                          onClick={() => setReverseTarget(h)}
+                        >
+                          <Undo2 className="w-3 h-3" /> Reversar
+                        </Button>
+                      ) : !canResync ? (
+                        <span className="text-[10px] text-muted-foreground italic">—</span>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
