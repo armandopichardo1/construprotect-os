@@ -579,7 +579,10 @@ export function AjustesAuditoriaTab() {
           variant="outline"
           size="sm"
           className="h-9 text-xs gap-1.5"
-          onClick={() => setExpandedIds(new Set(filtered.map((h: any) => h.id)))}
+          onClick={() => {
+            filtered.forEach((h: any) => prefetchRow(h));
+            setExpandedIds(new Set(filtered.map((h: any) => h.id)));
+          }}
           disabled={filtered.length === 0 || filtered.every((h: any) => expandedIds.has(h.id))}
           title="Abrir el panel de impacto de todos los ajustes visibles"
         >
