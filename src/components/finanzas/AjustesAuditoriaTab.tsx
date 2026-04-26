@@ -86,23 +86,28 @@ export function AjustesAuditoriaTab() {
     return m;
   }, [journals]);
 
-  // Detalle del registro expandido
-  const expandedRow = useMemo(
-    () => history.find((h: any) => h.id === expandedId) || null,
-    [history, expandedId]
+  // Detalles de los registros expandidos (uno o varios)
+  const expandedRows = useMemo(
+    () => history.filter((h: any) => expandedIds.has(h.id)),
+    [history, expandedIds]
   );
   const expandedJeIds = useMemo(() => {
-    if (!expandedRow) return [] as string[];
-    return [expandedRow.journal_entry_id, expandedRow.reversal_journal_entry_id].filter(Boolean) as string[];
-  }, [expandedRow]);
+    const ids = new Set<string>();
+    expandedRows.forEach((r: any) => {
+      if (r.journal_entry_id) ids.add(r.journal_entry_id);
+      if (r.reversal_journal_entry_id) ids.add(r.reversal_journal_entry_id);
+    });
+    return Array.from(ids);
+  }, [expandedRows]);
   const expandedProductIds = useMemo(() => {
-    if (!expandedRow?.shipments?.shipment_items) return [] as string[];
-    return (expandedRow.shipments.shipment_items as any[])
-      .map(it => it.product_id)
-      .filter(Boolean) as string[];
-  }, [expandedRow]);
-
-  const { data: expandedJeLines = [] } = useQuery({
+    const ids = new Set<string>();
+    expandedRows.forEach((r: any) => {
+      (r?.shipments?.shipment_items || []).forEach((it: any) => {
+        if (it.product_id) ids.add(it.product_id);
+      });
+    });
+    return Array.from(ids);
+  }, [expandedRows]);
     queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
     enabled: expandedJeIds.length > 0,
     queryFn: async () => {
