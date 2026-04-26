@@ -649,6 +649,8 @@ export function AjustesAuditoriaTab() {
                     <button
                       type="button"
                       onClick={() => toggleExpanded(h.id)}
+                      onMouseEnter={() => !isExpanded && prefetchRow(h)}
+                      onFocus={() => !isExpanded && prefetchRow(h)}
                       className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                       title={isExpanded ? 'Ocultar impacto' : 'Ver impacto'}
                     >
