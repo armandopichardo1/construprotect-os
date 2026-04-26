@@ -261,6 +261,7 @@ export default function FinanzasPage() {
         {tab === 'Pricing' && <PricingTab />}
 
         {tab === 'Órdenes' && <OrdenesTab />}
+        {tab === 'Auditoría Ajustes' && <AjustesAuditoriaTab />}
         {tab === 'Reglas de Descuento' && <DiscountRulesManager />}
 
         {tab === 'Resumen' && (
