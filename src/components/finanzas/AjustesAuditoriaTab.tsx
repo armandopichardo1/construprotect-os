@@ -109,34 +109,67 @@ export function AjustesAuditoriaTab() {
     return Array.from(ids);
   }, [expandedRows]);
 
-  const { data: expandedJeLines = [] } = useQuery({
-    queryKey: ['shipment-expense-history-je-lines', expandedJeIds.join(',')],
-    enabled: expandedJeIds.length > 0,
+  // ---------------- Caché por id (precarga + reutilización) ----------------
+  // Reemplaza las queries "batched" por una query independiente por id, así
+  // expandir/contraer una fila no invalida los datos de las otras y permite
+  // precargar de forma incremental sin parpadeos.
+  const JE_STALE = 5 * 60 * 1000;   // 5 min
+  const JE_GC    = 10 * 60 * 1000;  // 10 min
+
+  const jeLineQueryOptions = useCallback((jeId: string) => ({
+    queryKey: ['shipment-expense-history-je-lines', jeId],
+    enabled: !!jeId,
+    staleTime: JE_STALE,
+    gcTime: JE_GC,
     queryFn: async () => {
       const { data } = await supabase
         .from('journal_entry_lines')
         .select('journal_entry_id, debit_usd, credit_usd, description, account_id, chart_of_accounts(code, description)')
-        .in('journal_entry_id', expandedJeIds);
+        .eq('journal_entry_id', jeId);
       return data || [];
     },
-  });
+  }), []);
 
-  const { data: expandedProductsState = [] } = useQuery({
-    queryKey: ['shipment-expense-history-products-state', expandedProductIds.join(',')],
-    enabled: expandedProductIds.length > 0,
+  const productStateQueryOptions = useCallback((productId: string) => ({
+    queryKey: ['shipment-expense-history-product-state', productId],
+    enabled: !!productId,
+    staleTime: JE_STALE,
+    gcTime: JE_GC,
     queryFn: async () => {
-      const [{ data: prods }, { data: invs }] = await Promise.all([
-        supabase.from('products').select('id, sku, name, unit_cost_usd').in('id', expandedProductIds),
-        supabase.from('inventory').select('product_id, quantity_on_hand').in('product_id', expandedProductIds),
+      const [{ data: prod }, { data: inv }] = await Promise.all([
+        supabase.from('products').select('id, sku, name, unit_cost_usd').eq('id', productId).maybeSingle(),
+        supabase.from('inventory').select('quantity_on_hand').eq('product_id', productId).maybeSingle(),
       ]);
-      const invMap: Record<string, number> = {};
-      (invs || []).forEach((i: any) => { invMap[i.product_id] = Number(i.quantity_on_hand || 0); });
-      return (prods || []).map((p: any) => ({
-        ...p,
-        stock_on_hand: invMap[p.id] || 0,
-      }));
+      if (!prod) return null;
+      return { ...prod, stock_on_hand: Number(inv?.quantity_on_hand || 0) };
     },
-  });
+  }), []);
+
+  // Suscripciones (re-render cuando llegan datos de cualquiera)
+  const jeLineResults = useQueries({ queries: expandedJeIds.map(jeLineQueryOptions) });
+  const productStateResults = useQueries({ queries: expandedProductIds.map(productStateQueryOptions) });
+
+  // Aplanado para mantener compatibilidad con el resto del componente
+  const expandedJeLines = useMemo(
+    () => jeLineResults.flatMap(r => (r.data as any[]) || []),
+    [jeLineResults]
+  );
+  const expandedProductsState = useMemo(
+    () => productStateResults.map(r => r.data).filter(Boolean) as any[],
+    [productStateResults]
+  );
+
+  // Precarga: dispara las queries por id antes de expandir (hover / focus / expandir todo)
+  const prefetchRow = useCallback((h: any) => {
+    if (!h) return;
+    const jeIds = [h.journal_entry_id, h.reversal_journal_entry_id].filter(Boolean) as string[];
+    jeIds.forEach(id => queryClient.prefetchQuery(jeLineQueryOptions(id)));
+    const prodIds = ((h?.shipments?.shipment_items || []) as any[])
+      .map(it => it.product_id)
+      .filter(Boolean) as string[];
+    prodIds.forEach(id => queryClient.prefetchQuery(productStateQueryOptions(id)));
+  }, [queryClient, jeLineQueryOptions, productStateQueryOptions]);
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
