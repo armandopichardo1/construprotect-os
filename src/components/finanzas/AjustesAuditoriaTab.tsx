@@ -1217,8 +1217,15 @@ function ExpandedImpactPanel({
                           className={`border-t border-border cursor-pointer hover:bg-muted/30 ${isOpen ? 'bg-muted/20' : ''}`}
                           onClick={() => toggleSku(key)}
                         >
-                          <td className="px-2 py-1">
-                            {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          <td className="px-1 py-1">
+                            <button
+                              type="button"
+                              aria-label={isOpen ? 'Contraer' : 'Expandir'}
+                              onClick={(e) => { e.stopPropagation(); toggleSku(key); }}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-muted touch-manipulation"
+                            >
+                              {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            </button>
                           </td>
                           <td className="px-2 py-1 font-mono">
                             {p.sku}
