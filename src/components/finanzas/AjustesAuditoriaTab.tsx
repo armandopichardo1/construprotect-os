@@ -527,6 +527,7 @@ export function AjustesAuditoriaTab() {
               const isReversed = !!h.reversed_at;
               const isReversal = t === 'reversal';
               const canReverse = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
+              const canResync = !isReversed && !isReversal && Math.abs(Number(h.delta_total_usd || 0)) > 0.001;
               return (
                 <TableRow key={h.id} className={isReversed ? 'opacity-60' : ''}>
                   <TableCell className="text-[11px] font-mono whitespace-nowrap">{dateStr}</TableCell>
