@@ -548,9 +548,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
               <SortableHead field="account_name">Cuenta Débito</SortableHead>
               <TableHead className="text-[10px] font-semibold">Cód. C</TableHead>
               <SortableHead field="credit_account_name">Cuenta Crédito</SortableHead>
-              <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
-              <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
-              <SortableHead field="debit_dop" className="text-right">DOP</SortableHead>
+              <SortableHead field="debit_usd" className="text-right">Débito RD$</SortableHead>
+              <SortableHead field="credit_usd" className="text-right">Crédito RD$</SortableHead>
               <TableHead className="text-[10px] w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
