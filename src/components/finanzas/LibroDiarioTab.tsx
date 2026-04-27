@@ -608,7 +608,6 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   </TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.debit_usd > 0 ? formatUSD(e.debit_usd) : '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">
                       <button onClick={() => setEditEntry(e.raw)} title="Editar asiento"
