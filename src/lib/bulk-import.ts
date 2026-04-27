@@ -546,13 +546,13 @@ async function importOnePO(po: any, items: ParsedRow[], catalog: Catalog, log: I
 
   // If status=received, do receipt: update inventory, WAC, close transit
   if (po.status === 'received' && inv && transit) {
-    const totalLanded = calc.items.reduce((s, it) => s + it.landed_unit_cost_usd * it.quantity, 0);
+    const totalLanded = calc.preview.reduce((s, p) => s + p.newLineLanded, 0);
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const product = catalog.productsBySku.get(it.data.sku.toLowerCase());
       if (!product) continue;
       const qty = it.data.quantity_ordered;
-      const newCost = calc.items[i]?.landed_unit_cost_usd ?? it.data.unit_cost_fob_usd;
+      const newCost = calc.preview[i]?.newUnitCost ?? it.data.unit_cost_fob_usd;
       const { data: invRow } = await supabase.from('inventory').select('id, quantity_on_hand').eq('product_id', product.id).maybeSingle();
       const existingQty = invRow?.quantity_on_hand || 0;
       const { data: prod } = await supabase.from('products').select('unit_cost_usd').eq('id', product.id).single();
