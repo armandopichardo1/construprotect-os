@@ -477,13 +477,13 @@ async function importOnePO(po: any, items: ParsedRow[], catalog: Catalog, log: I
   const itemInputs = items.map(it => {
     const product = catalog.productsBySku.get(it.data.sku.toLowerCase());
     return {
-      id: it.data.sku, product_id: product?.id, quantity: it.data.quantity_ordered,
+      id: it.data.sku, product_id: product?.id || null, quantity_ordered: it.data.quantity_ordered,
       unit_cost_usd: it.data.unit_cost_fob_usd,
-      weight_kg_per_unit: 0, cbm_per_unit: 0,
     };
   });
+  // Pass empty shipment so currentAddons=0 (these items haven't had any addons applied yet — they're FOB).
   const calc = computeLanded(
-    { shipping_cost_usd: po.shipping_cost_usd, customs_cost_usd: po.customs_cost_usd, other_cost_usd: po.other_cost_usd },
+    {},
     itemInputs,
     { freight: po.shipping_cost_usd, customs: po.customs_cost_usd, other: po.other_cost_usd },
     'fob',
@@ -497,7 +497,7 @@ async function importOnePO(po: any, items: ParsedRow[], catalog: Catalog, log: I
     await supabase.from('shipment_items').insert({
       shipment_id: ship.id, product_id: product.id,
       quantity_ordered: it.data.quantity_ordered, quantity_received: it.data.quantity_received,
-      unit_cost_usd: calc.items[i]?.landed_unit_cost_usd ?? it.data.unit_cost_fob_usd,
+      unit_cost_usd: calc.preview[i]?.newUnitCost ?? it.data.unit_cost_fob_usd,
     } as any);
   }
 
