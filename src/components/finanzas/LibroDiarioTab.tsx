@@ -548,9 +548,8 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
               <SortableHead field="account_name">Cuenta Débito</SortableHead>
               <TableHead className="text-[10px] font-semibold">Cód. C</TableHead>
               <SortableHead field="credit_account_name">Cuenta Crédito</SortableHead>
-              <SortableHead field="debit_usd" className="text-right">Débito USD</SortableHead>
-              <SortableHead field="credit_usd" className="text-right">Crédito USD</SortableHead>
-              <SortableHead field="debit_dop" className="text-right">DOP</SortableHead>
+              <SortableHead field="debit_usd" className="text-right">Débito RD$</SortableHead>
+              <SortableHead field="credit_usd" className="text-right">Crédito RD$</SortableHead>
               <TableHead className="text-[10px] w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -609,7 +608,6 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                   </TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.debit_usd > 0 ? formatUSD(e.debit_usd) : '—'}</TableCell>
                   <TableCell className="text-xs text-right font-mono">{e.credit_usd > 0 ? formatUSD(e.credit_usd) : '—'}</TableCell>
-                  <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatDOP(e.debit_dop || e.credit_dop)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">
                       <button onClick={() => setEditEntry(e.raw)} title="Editar asiento"
@@ -631,7 +629,7 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={11} className="text-center text-sm text-muted-foreground py-8">
                   No hay asientos contables registrados
                 </TableCell>
               </TableRow>
@@ -641,7 +639,6 @@ export function LibroDiarioTab({ journalEntries = [], rate }: Props) {
                 <TableCell colSpan={8} className="text-xs font-bold">TOTALES</TableCell>
                 <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.debit_usd)}</TableCell>
                 <TableCell className="text-xs text-right font-bold font-mono">{formatUSD(totals.credit_usd)}</TableCell>
-                <TableCell className="text-xs text-right font-bold font-mono text-muted-foreground">{formatDOP(totals.debit_dop)}</TableCell>
                 <TableCell />
               </TableRow>
             )}
