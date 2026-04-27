@@ -37,8 +37,9 @@ import { PricingTab } from '@/components/finanzas/PricingTab';
 import { OrdenesTab } from '@/components/finanzas/OrdenesTab';
 import { AjustesAuditoriaTab } from '@/components/finanzas/AjustesAuditoriaTab';
 import { DiscountRulesManager } from '@/components/shared/DiscountRulesManager';
+import { ImportacionMasivaTab } from '@/components/finanzas/ImportacionMasivaTab';
 
-const tabs = ['Crear Transacción', 'Resumen', 'Pricing', 'Órdenes', 'Auditoría Ajustes', 'Reglas de Descuento', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Situación', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
+const tabs = ['Crear Transacción', 'Importación Masiva', 'Resumen', 'Pricing', 'Órdenes', 'Auditoría Ajustes', 'Reglas de Descuento', 'Libro Diario', 'Ventas', 'Gastos', 'Costos', 'P&L', 'Balance', 'Situación', 'Reportes', 'Flujo Caja', 'Break-Even', 'AI Asesor'];
 
 const COST_CATEGORIES: Record<string, { label: string; icon: string }> = {
   freight: { label: 'Flete', icon: '🚢' },
@@ -258,6 +259,7 @@ export default function FinanzasPage() {
             onEditCost={(data: any) => { setCostPrefill(data); setTab('Costos'); }} />
         )}
 
+        {tab === 'Importación Masiva' && <ImportacionMasivaTab />}
         {tab === 'Pricing' && <PricingTab />}
 
         {tab === 'Órdenes' && <OrdenesTab />}
