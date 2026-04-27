@@ -125,8 +125,14 @@ async function loadCatalog(): Promise<Catalog> {
     accounts,
     accountsByCode: new Map(accounts.filter(a => a.code).map(a => [a.code as string, a])),
     productsBySku: new Map(products.map((p: any) => [trim(p.sku).toLowerCase(), { id: p.id, sku: p.sku, name: p.name }])),
-    contactsByName: new Map(contacts.map((c: any) => [trim(c.contact_name).toLowerCase(), { id: c.id, name: c.contact_name }])
-      .concat(contacts.filter((c: any) => c.company_name).map((c: any) => [trim(c.company_name).toLowerCase(), { id: c.id, name: c.company_name }]))),
+    contactsByName: (() => {
+      const m = new Map<string, { id: string; name: string }>();
+      contacts.forEach((c: any) => {
+        if (c.contact_name) m.set(trim(c.contact_name).toLowerCase(), { id: c.id, name: c.contact_name });
+        if (c.company_name) m.set(trim(c.company_name).toLowerCase(), { id: c.id, name: c.company_name });
+      });
+      return m;
+    })(),
     suppliersByName: new Map(suppliers.map((s: any) => [trim(s.name).toLowerCase(), { id: s.id, name: s.name }])),
     ratesByDate: new Map(rates.map((r: any) => [r.date, Number(r.usd_sell)])),
   };
