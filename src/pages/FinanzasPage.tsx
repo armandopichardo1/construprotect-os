@@ -259,6 +259,7 @@ export default function FinanzasPage() {
             onEditCost={(data: any) => { setCostPrefill(data); setTab('Costos'); }} />
         )}
 
+        {tab === 'Importación Masiva' && <ImportacionMasivaTab />}
         {tab === 'Pricing' && <PricingTab />}
 
         {tab === 'Órdenes' && <OrdenesTab />}
